@@ -8,26 +8,24 @@ import numpy as np
 import space_solvers as ss
 #Parallel programming imports
 import pycuda as pc
-import mpi4py as MPI
-
-
+from mpi4py import MPI
 
 class srk2(object):
     """Use this class to create a swept rule integrator - 2nd Order Runge-Kutta."""
 
     #Constructor Methods
     @classmethod
-    def pde(cls, dfdt, t0, y0, t_b, d, dt, bc):
+    def pde(cls, dfdt, t0, y0, t_b, d, dt, bc, ss):
         "Initialize MyData from a file"
-        return cls(dfdt, t0, y0, t_b, d, dt, bc)
+        return cls(dfdt, t0, y0, t_b, d, dt, bc,ss)
 
     @classmethod
-    def ode(cls, dfdt, t0, y0, t_b, dt):
+    def ode(cls, dfdt, t0, y0, t_b, dt, ss):
          "Initialize MyData from a dict's items"
-         d,bc = None
-         return cls(dfdt, t0, y0, t_b, d, dt, bc)
+         d,bc,ss = None
+         return cls(dfdt, t0, y0, t_b, d, dt, bc, ss)
 
-    def __init__(self, dfdt, t0, y0, t_b, d, dt, bc):
+    def __init__(self, dfdt, t0, y0, t_b, d, dt, bc, ss):
         """This function creates variables from the given class method data."""
         comm = MPI.COMM_WORLD
         masterRank = 0
@@ -94,4 +92,4 @@ if __name__ ==  "__main__":
     y0 = np.zeros(dims)
     t0 = 0
     t_b = 0.4
-    srk2.pde(ss.ex_dfdt,t0,y0,t_b,0,0,0)
+    srk2.pde(ss.ex_dfdt,t0,y0,t_b,0,0,0,5)
