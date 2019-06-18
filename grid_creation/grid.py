@@ -6,35 +6,44 @@
 
 #imports
 import numpy as np
-from collections import deque
 
-def create_comp_grid(y0,t0,dt,t_b):
-    """Use this function to create a computational grid for the swept rule."""
-    initShape = np.shape(y0)    #Shape of initial conditions
-    newShape = (int((t_b-t0)/dt),)+initShape
-    cGrid = np.zeros(newShape)
-    cGrid[0] = y0
-    cGS = cg_simple_decomp(cGrid)
+class grid(np.ndarray):
+    """Grid is a simple wrapper for a np.ndarray that can handle boundary conditions."""
+    def __new__(cls,input_array,cbc=True): #shape, dtype=float, buffer=None, offset=0, strides=None, order=None, cbc=True):
+        # obj = super(grid, subtype).__new__(subtype,shape, dtype, buffer, offset, strides, order)
+        obj = np.asarray(input_array).view(cls)
+        obj.cbc = cbc
+        return obj
 
-    return cGS
+    def __array_finalize__(self, obj):
+        """this method initializes the new object."""
+        self.cbc = getattr(obj,'cbc',None)
+        self.start = np.ones(self.shape)
+        self.end = np.shape-1
 
-def cg_simple_decomp(cGrid):
-    """Use this function to decompose the working array for swept analysis."""
-    cGS = deque()
+    def __getitem__(self,index):
+        """Overloading of __getitem__."""
+        return super(grid,self).__getitem__(index)
 
-    return cGS
+    def __iter__(self):
+        """Overloading iter for ndarray."""
+        super(grid,self).__iter__()
+        return self
 
-def stage1_csd():
-    """This is the first stage to domain of dependence decompositions."""
-
-
-def cg_simple_rebuild(cGrids):
-    """Use this function to rebuild the working arrays for swept analysis."""
-    pass
+    def __next__(self):
+        """Overloading the next function for ndarray."""
+        pass
 
 if __name__ == "__main__":
     y0 = np.zeros((10,10,7))+1
     t0 = 0
     t_b = 1
     dt = 0.1
-    create_comp_grid(y0,t0,dt,t_b)
+    gridTest = grid(y0)
+    # print()
+    # mySplit = np.split(gridTest,2)
+    # print(type(gridTest))
+    # print(mySplit)
+    for g in gridTest:
+        for x in g:
+            print(x)
