@@ -29,78 +29,66 @@ def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
 
-    max_swept_steps = query_gpu_z()
-    print(max_swept_steps)
-    #Creating major axis to split for ranks
-    # plane_shape = np.shape(y0)
-    # new_shape = (2*max_swept_step,)+init_shape
-    # rank_axis = plane_shape.index(max(plane_shape))
-    # part_shape = list(plane_shape)
-    # part_shape[rank_axis] = int(plane_shape[rank_axis]/num_ranks)
-    # part_shape = (2*max_swept_step,)+part_shape
-    # rank_axis+=1
-    #
-    # if rank == master_rank:
-    #     #Creating working array
-    #     comp_grid = np.zeros(new_shape,dtype=np.float32)  #creating new computational working array
-    #     y0 = y0.astype(np.float32)
-    #     comp_grid[0] = y0   #Setting computational grid start to initial conditions
-    #     comp_grid = np.split(comp_grid,num_ranks,axis=rank_axis)
-    #     #Splitting data among ranks
-    # else:
-    #     comp_grid = None
-    #
-    # rank_data = comm.scatter(rank_data,root=master_rank)
-    # print(rank,": ",np.shape(rank_data))
-    #Initial setup
+    #Set up of dimensions
+    plane_shape = np.shape(y0)  #Shape of initial conditions
 
-    if rank == master_rank:
+    #Get avaliable GPU's on a rank
+    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
+    has_gpu = 0
 
-        #Creating work element size with max swept step
-        # swept_steps = tuple()   #creating temporary tuple()
-        # for b_size in block_size:
-        #     swept_steps += (int(b_size/(2*ops)),)
-        # max_swept_step = min(swept_steps)  #max allowable swept step
-        # block_size = (max_swept_step,)+block_size   #updating blocksize
-        # del swept_steps         #Deleting swept steps not needed
-        #
-        # #Creating working array
-        # init_shape = np.shape(y0)    #Shape of initial conditions
-        # new_shape = (2*max_swept_step,)+init_shape
-        # comp_grid = np.zeros(new_shape,dtype=np.float32)  #creating new computational working array
-        # y0 = y0.astype(np.float32)
-        # comp_grid[0] = y0   #Setting computational grid start to initial conditions
-        # # print("Computational Grid Shape: ",newShape)
-        #
-        #
-        # device_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
-        # arch_2D_split(0,comp_grid,block_size)
-        #Splitting working array by time
-        # work_end = deque()
-        # blocks = deque()
-        # workers = deque()
-        # working_block = np.empty(block_size)
-        #Getting device attributes
-        GPUtil.showUtilization()
-        dev_attrs = dev.getDeviceAttrs(0)
-        # for key in dev_attrs:
-        #     print(key,dev_attrs[key])
-    else:
-        pass
-# grid_shape = np.shape(grid)
-#
-# gpu_mpc_count = curr_dev.get_attribute(cuda.device_attribute.MULTIPROCESSOR_COUNT)
+    if gpu_ids:
+        has_gpu = len(gpu_ids)
+    has_gpu = comm.gather(has_gpu,root=0)
+    #-------------------------Determining How Much Work----------------------#
+
+    gpu_blocks,cpu_blocks,gpu_affinity = arch_work_blocks(plane_shape,block_size,gpu_affinity)
+    GPUtil.showUtilization()
+    dev_attrs = dev.getDeviceAttrs(0)
 
 
-def query_gpu_z():
-    device_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
-    max_swept_step = 1e6
-    for dev_id in device_ids:
-        curr_dev = cuda.Device(dev_id)
-        curr_step = curr_dev.get_attribute(cuda.device_attribute.MAX_GRID_DIM_Z)
-        if max_swept_step > curr_step:
-            max_swept_step = curr_step
-    return max_swept_step
+    #----------------------------CUDA TESTING------------------------------#
+    #Array
+    time_len = 2
+
+    a =  np.ones((2,2,time_len,2),dtype=np.float32)
+    a[:,:,0,:] = [2,3]
+
+    #Getting cuda source
+    source_code = source_code_read("./csrc/swept_source.cu")
+    source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+    #Creating cuda source
+    mod = SourceModule(source_code)
+
+    #Constants
+    dt = np.array([0.01,],dtype=np.float32)
+    mss = np.array([100,],dtype=int)
+
+    dt_ptr,_ = mod.get_global("dt")
+    mss_ptr,_ = mod.get_global("mss")
+
+    #Copying to GPU memory
+    cuda.memcpy_htod(mss_ptr,mss)
+    cuda.memcpy_htod(dt_ptr,dt)
+
+    #Executing cuda source
+    func = mod.get_function("sweep")
+    func(cuda.InOut(a),grid=(1,1,1),block=(2,2,1))
+    for x in a:
+        for y in x:
+            print("new time level")
+            for t in y:
+                print(t)
+    #-------------------------END CUDA TESTING---------------------------#
+
+
+def arch_work_blocks(plane_shape,block_size,gpu_affinity):
+    """Use to determine the closest work split based on the specified gpu_affinity."""
+    blocks_x = int(plane_shape[0]/block_size[0])
+    blocks_y = int(plane_shape[1]/block_size[1])
+    total_blocks = blocks_x*blocks_y
+    gpu_blocks = round(total_blocks/(1+1/gpu_affinity))
+    cpu_blocks = total_blocks-gpu_blocks
+    return (gpu_blocks,cpu_blocks,gpu_blocks/cpu_blocks)
 
 def arch_2D_split(part_dev_id,grid,block_size):
     """Use this function to split the array based on architecture."""
@@ -138,14 +126,25 @@ def arch_2D_split(part_dev_id,grid,block_size):
     except Exception as e:
         print(e)
 
+def source_code_read(filename):
+    """Use this function to generate a multi-line string for pycuda from a source file."""
+    with open(filename,"r") as f:
+        source = """\n"""
+        line = f.readline()
+        while line:
+            source+=line
+            line = f.readline()
+    f.closed
+    return source
+
 
 if __name__ == "__main__":
-    dims = (4*256,6*256,4)
+    dims = (5*256,5*256,4)
     y0 = np.zeros(dims)+1
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
     dt = 0.001
     order = 2
-    block_size = (256,256)
+    block_size = (256,256,1)
     sweep(y0,dy,t0,t_b,dt,block_size,2,0,40)

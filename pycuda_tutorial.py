@@ -8,48 +8,47 @@ from pycuda.compiler import SourceModule
 import numpy as np
 import dev
 
-dev_attrs = dev.getDeviceAttrs(0)
-time_len = 10
+def source_code_read(filename):
+    """Use this function to generate a multi-line string for pycuda from a source file."""
+    with open(filename,"r") as f:
+        source = """\n"""
+        line = f.readline()
+        while line:
+            source+=line
+            line = f.readline()
+    f.closed
+    return source
 
-a =  np.ones((256,256,time_len),dtype=np.float32)
-for i in range(time_len):
-    a[:,:,i] = float(i)
-# b_num = 2
-# for i in range(4):
-#     a[0,i]=b_num
-#     a[3,i]=b_num
-#     a[i,0]=b_num
-#     a[i,3]=b_num
 
-# shape = np.array(np.shape(a)).astype(np.float32)
 
-#Allocating cuda memory
-a_gpu = cuda.mem_alloc(a.nbytes)
-# shape_gpu = cuda.mem_alloc(shape.nbytes)
+#Array
+time_len = 2
+
+a =  np.ones((2,2,time_len,2),dtype=np.float32)
+a[:,:,0,:] = [2,3]
+
+#Getting cuda source
+source_code = source_code_read("./csrc/swept_source.cu")
+source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+#Creating cuda source
+mod = SourceModule(source_code)
+
+#Constants
+dt = np.array([0.01,],dtype=np.float32)
+mss = np.array([100,],dtype=int)
+
+dt_ptr,_ = mod.get_global("dt")
+mss_ptr,_ = mod.get_global("mss")
 
 #Copying to GPU memory
-cuda.memcpy_htod(a_gpu,a)
-# cuda.memcpy_htod(shape_gpu,shape)
-
-#Creating cuda source
-mod = SourceModule("""
-  __global__ void doublify(float *a)
-  {
-    int idx = threadIdx.x + threadIdx.y*4;
-    for(int i;i<10;i++)
-    {
-
-    }
-    printf("idx: %d, a[idx]: %0.2f \\n",idx,a[idx]);
-  }
-  """)
+cuda.memcpy_htod(mss_ptr,mss)
+cuda.memcpy_htod(dt_ptr,dt)
 
 #Executing cuda source
-func = mod.get_function("doublify")
-func(a_gpu,block=(32,32,1))
-
-#Copying from GPU
-a_doubled = np.empty_like(a)
-cuda.memcpy_dtoh(a_doubled, a_gpu)
-
-print(a_doubled)
+func = mod.get_function("sweep")
+func(cuda.InOut(a),grid=(1,1,1),block=(2,2,1))
+for x in a:
+    for y in x:
+        print("new time level")
+        for t in y:
+            print(t)
