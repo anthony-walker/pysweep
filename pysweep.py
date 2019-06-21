@@ -25,59 +25,60 @@ def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
     """Use this function to perform swept rule>"""
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
+    print(comm)
     master_rank = 0 #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
 
-    #Set up of dimensions
-    plane_shape = np.shape(y0)  #Shape of initial conditions
-
-    #Get avaliable GPU's on a rank
-    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
-    has_gpu = 0
-
-    if gpu_ids:
-        has_gpu = len(gpu_ids)
-    has_gpu = comm.gather(has_gpu,root=0)
-    #-------------------------Determining How Much Work----------------------#
-
-    gpu_blocks,cpu_blocks,gpu_affinity = arch_work_blocks(plane_shape,block_size,gpu_affinity)
-    GPUtil.showUtilization()
-    dev_attrs = dev.getDeviceAttrs(0)
-
-
-    #----------------------------CUDA TESTING------------------------------#
-    #Array
-    time_len = 2
-
-    a =  np.ones((2,2,time_len,2),dtype=np.float32)
-    a[:,:,0,:] = [2,3]
-
-    #Getting cuda source
-    source_code = source_code_read("./csrc/swept_source.cu")
-    source_code += "\n"+source_code_read("./csrc/euler_source.cu")
-    #Creating cuda source
-    mod = SourceModule(source_code)
-
-    #Constants
-    dt = np.array([0.01,],dtype=np.float32)
-    mss = np.array([100,],dtype=int)
-
-    dt_ptr,_ = mod.get_global("dt")
-    mss_ptr,_ = mod.get_global("mss")
-
-    #Copying to GPU memory
-    cuda.memcpy_htod(mss_ptr,mss)
-    cuda.memcpy_htod(dt_ptr,dt)
-
-    #Executing cuda source
-    func = mod.get_function("sweep")
-    func(cuda.InOut(a),grid=(1,1,1),block=(2,2,1))
-    for x in a:
-        for y in x:
-            print("new time level")
-            for t in y:
-                print(t)
+    # #Set up of dimensions
+    # plane_shape = np.shape(y0)  #Shape of initial conditions
+    #
+    # #Get avaliable GPU's on a rank
+    # gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
+    # has_gpu = 0
+    #
+    # if gpu_ids:
+    #     has_gpu = len(gpu_ids)
+    # has_gpu = comm.gather(has_gpu,root=0)
+    # #-------------------------Determining How Much Work----------------------#
+    #
+    # gpu_blocks,cpu_blocks,gpu_affinity = arch_work_blocks(plane_shape,block_size,gpu_affinity)
+    # GPUtil.showUtilization()
+    # dev_attrs = dev.getDeviceAttrs(0)
+    #
+    #
+    # #----------------------------CUDA TESTING------------------------------#
+    # #Array
+    # time_len = 2
+    #
+    # a =  np.ones((2,2,time_len,2),dtype=np.float32)
+    # a[:,:,0,:] = [2,3]
+    #
+    # #Getting cuda source
+    # source_code = source_code_read("./csrc/swept_source.cu")
+    # source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+    # #Creating cuda source
+    # mod = SourceModule(source_code)
+    #
+    # #Constants
+    # dt = np.array([0.01,],dtype=np.float32)
+    # mss = np.array([100,],dtype=int)
+    #
+    # dt_ptr,_ = mod.get_global("dt")
+    # mss_ptr,_ = mod.get_global("mss")
+    #
+    # #Copying to GPU memory
+    # cuda.memcpy_htod(mss_ptr,mss)
+    # cuda.memcpy_htod(dt_ptr,dt)
+    #
+    # #Executing cuda source
+    # func = mod.get_function("sweep")
+    # func(cuda.InOut(a),grid=(1,1,1),block=(2,2,1))
+    # for x in a:
+    #     for y in x:
+    #         print("new time level")
+    #         for t in y:
+    #             print(t)
     #-------------------------END CUDA TESTING---------------------------#
 
 
