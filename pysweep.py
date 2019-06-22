@@ -25,11 +25,11 @@ def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
     """Use this function to perform swept rule>"""
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
-    print(comm)
+
     master_rank = 0 #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-
+    # univ_size = comm.Get_attr(MPI.UNIVERSE_SIZE)
     # #Set up of dimensions
     # plane_shape = np.shape(y0)  #Shape of initial conditions
     #
