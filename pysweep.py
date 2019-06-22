@@ -16,10 +16,15 @@ from collections import deque
 import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
-import GPUtil
+try:
+    import GPUtil
+except:
+    pass
 import dev
 from mpi4py import MPI
 import multiprocessing as mp
+#Testing imports
+import platform
 
 def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
     """Use this function to perform swept rule>"""
@@ -29,6 +34,11 @@ def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
     master_rank = 0 #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
+    print("size is ",num_ranks)
+
+    universe_size=comm.Get_attr(MPI.UNIVERSE_SIZE)
+    print("universe size is ",universe_size)
+    print(platform.uname())
     # univ_size = comm.Get_attr(MPI.UNIVERSE_SIZE)
     # #Set up of dimensions
     # plane_shape = np.shape(y0)  #Shape of initial conditions
