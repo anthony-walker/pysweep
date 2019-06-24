@@ -30,7 +30,7 @@ import platform
 
 
 
-def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
+def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_affinity=None):
     """Use this function to perform swept rule>"""
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
@@ -41,13 +41,15 @@ def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
 
     #---------------Data Input setup -------------------------
     plane_shape = np.shape(y0)  #Shape of initial conditions
-
-
+    max_swept_step = min(block_size[:-1])/(2*ops)
     #------------------Dividing work based on the architecture-----------------
-    (gpu_sum,cpu_sum) = arch_query()    #This gets architecture information from ranks
+    (gpu_sum,cpu_sum,gpu_id) = arch_query()    #This gets architecture information from ranks
     if rank == master_rank:
-        print(cpu_sum,gpu_sum)
-        # arch_data_split(grid,block_size,num_cpu,num_gpu)
+        gpu_affinity *= gpu_sum/cpu_sum #Adjust affinity by number of gpu/cpu_cores
+        print(gpu_affinity)
+        gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
+        print(gpu_blocks,cpu_blocks)
+        print("Max: ",max_swept_step)
 
     # gpu_blocks,cpu_blocks,gpu_affinity = arch_work_blocks(plane_shape,block_size,gpu_affinity)
     # GPUtil.showUtilization()
@@ -90,48 +92,46 @@ def sweep(y0, dy, t0, t_b, dt,block_size,ops,devices,gpu_affinity):
 
 
 
+def archs_phase_1(block_size,num_cpu,num_gpu):
+    """Use this function to determine the array splits for the first phase (grid1)"""
+    #Axes
+    x_ax = 1
+    y_ax = 2
+    #Getting shape of grid
+    grid_shape = np.shape(grid)
+    #Creating work element partition integers
+    par_x = int(grid_shape[x_ax]/block_size[x_ax])
+    par_y = int(grid_shape[y_ax]/block_size[y_ax])
+    #Split in y
+        #Split in x
+            #Add to list
 
-def arch_data_split(part_dev_id,grid,block_size,num_cpu,num_gpu):
-    """Use this function to split the array based on architecture."""
-    try:
-        #Axes
-        x_ax = 1
-        y_ax = 2
-        #Getting the partition device
-        curr_dev = cuda.Device(part_dev_id)
-        #Checking to max sure block size is not greater than allowable hardward dimensions
-        b1 = (block_size[x_ax]>curr_dev.get_attribute(cuda.device_attribute.MAX_BLOCK_DIM_X))
-        b2 = (block_size[y_ax]>curr_dev.get_attribute(cuda.device_attribute.MAX_BLOCK_DIM_Y))
-        if b1 or b2:
-            raise Exception("Blocksize exceeds hardware specifications.")
-        #Creating work element partition integers
-        par_x = int(grid_shape[x_ax]/block_size[x_ax])
-        par_y = int(grid_shape[y_ax]/block_size[y_ax])
-        # print("Par(x,y,t): ",par_x,", ",par_y,", ",par_t) #Printing partitions
-
-        #Creating times list which includes elements at a specific time level
-
-            # count = 0
-        # for x in np.array_split(t_part,par_x,axis=x_ax):
-        #     for y in np.array_split(x,par_y,axis=y_ax):
-        #         time_level[count]=y
-        #         count+=1
-        # times.append(time_level)
-        # return times
-    except Exception as e:
-        print(e)
+def archs_phase_2(block_size,num_cpu,num_gpu):
+    """Use this function to determine the array splits for the second phase (grid2)"""
+    #Axes
+    x_ax = 1
+    y_ax = 2
+    #Getting shape of grid
+    grid_shape = np.shape(grid)
+    #Creating work element partition integers
+    par_x = int(grid_shape[x_ax]/block_size[x_ax])
+    par_y = int(grid_shape[y_ax]/block_size[y_ax])
+    # print("Par(x,y,t): ",par_x,", ",par_y,", ",par_t) #Printing partitions
 
 
+### ----------------------------- COMPLETED FUNCTIONS -----------------------###
 def arch_work_blocks(plane_shape,block_size,gpu_affinity):
-    """Use to determine the closest work split based on the specified gpu_affinity."""
+    """Use to determine the number of blocks for gpus vs cpus."""
     blocks_x = int(plane_shape[0]/block_size[0])
     blocks_y = int(plane_shape[1]/block_size[1])
     total_blocks = blocks_x*blocks_y
     gpu_blocks = round(total_blocks/(1+1/gpu_affinity))
+    block_mod_y = gpu_blocks%blocks_y
+    if  block_mod_y!= 0:
+        gpu_blocks+=blocks_y-block_mod_y
     cpu_blocks = total_blocks-gpu_blocks
-    return (gpu_blocks,cpu_blocks,gpu_blocks/cpu_blocks)
+    return (gpu_blocks,cpu_blocks)
 
-### ----------------------------- COMPLETED FUNCTIONS -----------------------###
 def arch_query():
     """Use this method to query the system for information about its hardware"""
     #-----------------------------MPI setup--------------------------------
@@ -146,16 +146,18 @@ def arch_query():
     #####################################################################
     #Subtracting cores for those used by virtual cluster.
     if rank == master_rank:
-        cores -= 8
+        cores -= 14
     #####################################################################
 
     #Getting avaliable GPUs with GPUtil
     gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
     gpus = 0
+    gpu_id = None
     if gpu_ids:
         gpus = len(gpu_ids)
+        gpu_id = gpu_ids[0]
     #Gathering all of the information to the master rank
-    rank_info = comm.gather((rank, cores, gpus),root=0)
+    rank_info = comm.gather((rank, cores, gpus,gpu_id),root=0)
     if rank == master_rank:
         gpu_sum = 0
         cpu_sum = 0
@@ -163,8 +165,10 @@ def arch_query():
         for ri in rank_info:
             cpu_sum += ri[1]
             gpu_sum += ri[2]
-        return gpu_sum, cpu_sum
-    return 0,0
+            if ri[-1] is not None:
+                gpu_id = ri[3]
+        return gpu_sum, cpu_sum, gpu_id
+    return None,None,gpu_id
 
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
@@ -180,7 +184,7 @@ def source_code_read(filename):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (5*256,5*256,4)
+    dims = (int(10*256),int(5*256),4)
     y0 = np.zeros(dims)+1
     dy = [0.1,0.1]
     t0 = 0
@@ -188,4 +192,5 @@ if __name__ == "__main__":
     dt = 0.001
     order = 2
     block_size = (256,256,1)
-    sweep(y0,dy,t0,t_b,dt,block_size,2,0,40)
+    GA = 40
+    sweep(y0,dy,t0,t_b,dt,2,block_size,GA)
