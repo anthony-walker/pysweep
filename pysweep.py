@@ -23,14 +23,16 @@ except:
 
 import GPUtil
 from mpi4py import MPI
+#multiprocessing
 import multiprocessing as mp
-import pymp
+import ctypes
+
 #Testing imports
 import platform
+import time
 
 
-
-def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_affinity=None):
+def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
     """Use this function to perform swept rule>"""
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
@@ -39,23 +41,33 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_affinity=None):
     rank = comm.Get_rank()  #current rank
     print("Rank: ",rank," Platform: ",platform.uname()[1])
 
-    #---------------Data Input setup -------------------------
+    #---------------Data Input setup -------------------------#
     plane_shape = np.shape(y0)  #Shape of initial conditions
     max_swept_step = min(block_size[:-1])/(2*ops)
-    #------------------Dividing work based on the architecture-----------------
-    (gpu_sum,cpu_sum,gpu_id) = arch_query()    #This gets architecture information from ranks
-    if rank == master_rank:
-        gpu_affinity *= gpu_sum/cpu_sum #Adjust affinity by number of gpu/cpu_cores
-        print(gpu_affinity)
-        gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
-        print(gpu_blocks,cpu_blocks)
-        print("Max: ",max_swept_step)
 
-    # gpu_blocks,cpu_blocks,gpu_affinity = arch_work_blocks(plane_shape,block_size,gpu_affinity)
-    # GPUtil.showUtilization()
-    # dev_attrs = dev.getDeviceAttrs(0)
-    #
-    #
+    #----------------Reading In Source Code-------------------------------#
+    source_code = source_code_read("./csrc/swept_source.cu")
+    source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+    mod = SourceModule(source_code)
+
+    #------------------Architecture-----------------------------------------
+    gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
+    gpu = cuda.Device(gpu_id[0])
+    cores = mp.cpu_count()
+
+    #------------------Dividing work based on the architecture----------------#
+    if rank == master_rank:
+        y0s = rank_split(y0,plane_shape,num_ranks)
+        if gpu_aff is None:
+            arch_speed_comp(mod,dummy_fcn,block_size)
+
+        # (gpu_sum,cpu_sum,gpu_id) = arch_query()    #This gets architecture information from ranks
+        # gpu_affinity *= gpu_sum/cpu_sum #Adjust affinity by number of gpu/cpu_cores
+        # print(gpu_affinity)
+        # gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
+        # print(gpu_blocks,cpu_blocks)
+        # print("Max: ",max_swept_step)
+
     # #----------------------------CUDA TESTING------------------------------#
     # #Array
     # time_len = 2
@@ -64,10 +76,9 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_affinity=None):
     # a[:,:,0,:] = [2,3]
     #
     # #Getting cuda source
-    # source_code = source_code_read("./csrc/swept_source.cu")
-    # source_code += "\n"+source_code_read("./csrc/euler_source.cu")
-    # #Creating cuda source
-    # mod = SourceModule(source_code)
+
+    #Creating cuda source
+
     #
     # #Constants
     # dt = np.array([0.01,],dtype=np.float32)
@@ -91,6 +102,42 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_affinity=None):
     #-------------------------END CUDA TESTING---------------------------#
 
 
+def arch_speed_comp(source_mod,cpu_fcn,block_size):
+    """This function compares the speed of a block calculation to determine the affinity."""
+    time_steps = (2,)
+    block_size = (5,2,2)+time_steps
+     #----------------------------Testing OMP-------------------------------#
+    shm_dim = int(np.prod(block_size))
+    cores = mp.cpu_count()-14
+    pool = mp.Pool(cores)
+    # #Original random array
+    rand_arr_o = np.random.random_sample(block_size)    #Creating random array
+    # #Reshaping random array for shared memory
+    # rand_arr_1 = np.reshape(rand_arr_o.copy(),shm_dim)
+    # #Creating shared array
+    # shared_arr = mp.Array(c.c_double,rand_arr_1)
+    #Creating shared memory array
+    global shared_array
+    shared_array_base = mp.Array(ctypes.c_double, shm_dim)
+    shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
+    shared_array = shared_array.reshape(block_size)
+
+    #Calling pool from number of cores with the dummy function
+    res = pool.map(cpu_fcn,range(10))
+
+    # rand_arr_2 = np.frombuffer(shared_arr.get_obj())
+    #
+    # rand_arr_2 = np.reshape(rand_arr_2,block_size)
+    #
+    #
+    # start_omp = time.time()
+    # inds_itble = np.ndindex(block_size[:-1])
+
+
+def dummy_fcn(val):
+    """This is a testing function for arch_speed_comp."""
+    print(val*val)
+    return val*val
 
 def archs_phase_1(block_size,num_cpu,num_gpu):
     """Use this function to determine the array splits for the first phase (grid1)"""
@@ -132,6 +179,12 @@ def arch_work_blocks(plane_shape,block_size,gpu_affinity):
     cpu_blocks = total_blocks-gpu_blocks
     return (gpu_blocks,cpu_blocks)
 
+def rank_split(y0,plane_shape,rank_size):
+    """Use this function to equally split data along the largest axis for ranks."""
+    major_axis = plane_shape.index(max(plane_shape))
+    return np.array_split(y0,rank_size,axis=major_axis)
+
+
 def arch_query():
     """Use this method to query the system for information about its hardware"""
     #-----------------------------MPI setup--------------------------------
@@ -145,8 +198,8 @@ def arch_query():
                             #REMOVE ME AFTER TESTING
     #####################################################################
     #Subtracting cores for those used by virtual cluster.
-    if rank == master_rank:
-        cores -= 14
+    # if rank == master_rank:
+    #     cores -= 14
     #####################################################################
 
     #Getting avaliable GPUs with GPUtil
@@ -184,7 +237,7 @@ def source_code_read(filename):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(10*256),int(5*256),4)
+    dims = (int(20*256),int(5*256),4)
     y0 = np.zeros(dims)+1
     dy = [0.1,0.1]
     t0 = 0
@@ -193,4 +246,4 @@ if __name__ == "__main__":
     order = 2
     block_size = (256,256,1)
     GA = 40
-    sweep(y0,dy,t0,t_b,dt,2,block_size,GA)
+    sweep(y0,dy,t0,t_b,dt,2,block_size)
