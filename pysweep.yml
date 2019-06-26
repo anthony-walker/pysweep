@@ -44,6 +44,7 @@ dependencies:
     - pluggy==0.12.0
     - py==1.8.0
     - pycuda==2019.1
+    - pymp-pypi==0.4.2
     - pyparsing==2.4.0
     - pytest==4.6.3
     - pytools==2019.1.1
@@ -51,4 +52,3 @@ dependencies:
     - wcwidth==0.1.7
     - zipp==0.5.1
 prefix: /home/walkanth/miniconda3/envs/pysweep
-
