@@ -12,28 +12,31 @@ import math
 import numpy as np
 from collections import deque
 
+
+#GPU Imports
+import pycuda.driver as cuda
+import pycuda.autoinit
 from pycuda.compiler import SourceModule
-#Parallel programming imports
-try:
-   import pycuda.driver as cuda
-   import pycuda.autoinit
-   from pycuda.compiler import SourceModule
-
-except:
-   pass
-
 import GPUtil
 from mpi4py import MPI
-#multiprocessing
+#Multiprocessing Imports
 import multiprocessing as mp
 import ctypes
 
 #Testing imports
 import platform
 import time
-
+import dev
 #--------------------Global Variables------------------------------#
-shared_array = None
+#------------------Shared Memory Arrays-----------------------------------------
+cpu_array = None
+gpu_array = None
+#------------------Architecture-----------------------------------------
+gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
+dev_attrs = dev.getDeviceAttrs(gpu_id[0])   #Getting device attributes
+gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
+cores = mp.cpu_count()  #Getting number of cpu cores
+#----------------------End Global Variables------------------------#
 
 def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
     """Use this function to perform swept rule>"""
@@ -49,18 +52,15 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
     max_swept_step = min(block_size[:-1])/(2*ops)
 
     #----------------Reading In Source Code-------------------------------#
+    #Try catch is for working at home
     try:
-        source_code = source_code_read("./csrc/swept_source.cu")
-        source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+        source_code = source_code_read("./csrc/swept.h")
+        source_code += "\n"+source_code_read("./csrc/euler2D.h")
     except:
-        source_code = source_code_read("./pysweep/csrc/swept_source.cu")
-        source_code += "\n"+source_code_read("./pysweep/csrc/euler_source.cu")
+        source_code = source_code_read("./pysweep/csrc/swept.h")
+        source_code += "\n"+source_code_read("./pysweep/csrc/euler2D.h")
     mod = SourceModule(source_code)
 
-    #------------------Architecture-----------------------------------------
-    gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
-    gpu = cuda.Device(gpu_id[0])
-    cores = mp.cpu_count()
 
     #------------------Dividing work based on the architecture----------------#
     if rank == master_rank:
@@ -68,83 +68,132 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
         if gpu_aff is None:
             arch_speed_comp(mod,dummy_fcn,block_size)
 
-        # (gpu_sum,cpu_sum,gpu_id) = arch_query()    #This gets architecture information from ranks
-        # gpu_affinity *= gpu_sum/cpu_sum #Adjust affinity by number of gpu/cpu_cores
-        # print(gpu_affinity)
-        # gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
-        # print(gpu_blocks,cpu_blocks)
-        # print("Max: ",max_swept_step)
-
-    # #----------------------------CUDA TESTING------------------------------#
-    # #Array
-    # time_len = 2
-    #
-    # a =  np.ones((2,2,time_len,2),dtype=np.float32)
-    # a[:,:,0,:] = [2,3]
-    #
-    # #Getting cuda source
-
-    #Creating cuda source
-
-    #
-    # #Constants
-    # dt = np.array([0.01,],dtype=np.float32)
-    # mss = np.array([100,],dtype=int)
-    #
-    # dt_ptr,_ = mod.get_global("dt")
-    # mss_ptr,_ = mod.get_global("mss")
-    #
-    # #Copying to GPU memory
-    # cuda.memcpy_htod(mss_ptr,mss)
-    # cuda.memcpy_htod(dt_ptr,dt)
-    #
-    # #Executing cuda source
-    # func = mod.get_function("sweep")
-    # func(cuda.InOut(a),grid=(1,1,1),block=(2,2,1))
-    # for x in a:
-    #     for y in x:
-    #         print("new time level")
-    #         for t in y:
-    #             print(t)
-    #-------------------------END CUDA TESTING---------------------------#
 
 
-def arch_speed_comp(source_mod,cpu_fcn,block_size):
+    #----------------------------CUDA ------------------------------#
+
+    #-------------------------END CUDA ---------------------------#
+
+# (gpu_sum,cpu_sum,gpu_id) = arch_query()    #This gets architecture information from ranks
+# gpu_affinity *= gpu_sum/cpu_sum #Adjust affinity by number of gpu/cpu_cores
+# print(gpu_affinity)
+# gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
+# print(gpu_blocks,cpu_blocks)
+# print("Max: ",max_swept_step)
+
+def create_shared_arrays():
+    """Use this function to create shared memory arrays for node communication."""
+    #----------------------------Creating shared arrays-------------------------#
+    global cpu_array
+    cpu_array_base = mp.Array(ctypes.c_double, shm_dim)
+    cpu_array = np.ctypeslib.as_array(cpu_array_base.get_obj())
+    cpu_array = cpu_array.reshape(block_size)
+
+    global gpu_array
+    gpu_array_base = mp.Array(ctypes.c_double, shm_dim)
+    gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
+    gpu_array = gpu_array.reshape(block_size)
+
+def arch_speed_comp(arr,source_mod,cpu_fcn,block_size):
     """This function compares the speed of a block calculation to determine the affinity."""
-    time_steps = (2,)
-    block_size = (5,2,2)+time_steps
-     #----------------------------Testing OMP-------------------------------#
-    shm_dim = int(np.prod(block_size))
-    cores = mp.cpu_count()-14
-    pool = mp.Pool(cores)
-    # #Original random array
-    rand_arr_o = np.random.random_sample(block_size)    #Creating random array
-    # #Reshaping random array for shared memory
-    # rand_arr_1 = np.reshape(rand_arr_o.copy(),shm_dim)
-    # #Creating shared array
-    # shared_arr = mp.Array(c.c_double,rand_arr_1)
-    #Creating shared memory array
-    global shared_array
-    shared_array_base = mp.Array(ctypes.c_double, shm_dim)
-    shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
-    shared_array = shared_array.reshape(block_size)
-    print("Woo")
-    #Calling pool from number of cores with the dummy function
-    # res = pool.map(cpu_fcn,range(10))
+    num_tries = 10 #Number of tries to get performance ratio
+    pool = mp.Pool(cores)   #Pool allocation
 
-    # rand_arr_2 = np.frombuffer(shared_arr.get_obj())
-    #
-    # rand_arr_2 = np.reshape(rand_arr_2,block_size)
-    #
-    #
-    # start_omp = time.time()
-    # inds_itble = np.ndindex(block_size[:-1])
+    #Creating test blocks
+    cpu_test_blocks = list()
+    for i in range(cores):
+        cpu_test_blocks.append((np.ones(block_size)*2,i))
+        # print(cpu_test_blocks[i][0])
 
+    #------------------------Testing CPU Performance---------------------------#
+    cpu_performance = 0
+    for i in range(num_tries):
+        start_cpu = time.time()
+        cpu_res = pool.map_async(cpu_fcn,cpu_test_blocks)
+        new_cpu_blocks = cpu_res.get()
+        stop_cpu = time.time()
+        cpu_performance += len(np.prod(block_size)*cpu_test_blocks)/(stop_cpu-start_cpu)
+    pool.close()
+    pool.join()
+    cpu_performance /= num_tries
+    print("Average CPU Performance:", cpu_performance)
+    #-------------------------Ending CPU Performance Testing--------------------#
 
-def dummy_fcn(val):
+    #------------------------Testing GPU Performance---------------------------#
+    #Array
+    gpu_test_blocks =  np.ones(block_size,dtype=np.float64)*2
+    # print(gpu_test_blocks)
+    print(type(block_size))
+    start_gpu = cuda.Event()
+    stop_gpu = cuda.Event()
+    start_gpu.record()
+    gpu_dummy_fcn = source_mod.get_function("dummy_fcn")
+    gpu_dummy_fcn(cuda.InOut(gpu_test_blocks),grid=grid_size,block=block_size)
+    stop_gpu.record()
+    stop_gpu.synchronize()
+    gpu_performance = np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
+    # print(gpu_test_blocks)
+    performance_ratio = gpu_performance/cpu_performance
+    print(performance_ratio)
+    #-------------------------Ending CPU Performance Testing--------------------#
+
+def dummy_fcn(args):
     """This is a testing function for arch_speed_comp."""
-    print(val*val)
-    return val*val
+    block = args[0]
+    bID = args[1]
+    for x in block:
+        for y in x:
+            y *= y
+    return (block,bID)
+
+def edges(arr,ops,shape_adj=-1):
+    """Use this function to generate boolean arrays for edge handling."""
+    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
+    mask[(arr.ndim+shape_adj)* (slice(ops, -ops),)] = True
+    return mask
+
+def fpfv(arr,idx,cts):
+    """This method is a five point finite volume method in 2D."""
+    #Five point finite volume method
+
+    #X-direction
+    direction_flux(arr[idx[0]-2,idx[0]],arr[idx[0]-1,idx[0]],arr[idx[0],idx[0]])
+
+
+
+
+def direction_flux(q1,q2):
+    """Use this method to determine the flux in a particular direction."""
+    P1 = pressure(q1)
+    P2 = pressure(q2)
+    tqL = flimiter(q1,q2,P1)
+    tqR = flimiter(q2,q1,)
+    flux = flux(tqL)
+
+def flimiter(qL,qR,num,den):
+    """Use this method to apply the flux limiter to get temporary state."""
+    return qL+0.5*min(pRatio,1)*(qL-qR) if (num > 0 and denom > 0) or (num < 0 and denom < 0) else qL
+
+def flux():
+
+    """Use this method to calculation the flux."""
+
+
+def pressure(q):
+    """Use this function to solve for pressure of the 2D Eulers equations.
+    q is set up as:
+    q[0] = rho
+    q[1] = rho*u
+    q[2] = rho*v
+    q[3] = rho*e
+    P = (GAMMA-1)*(rho*e-rho/2*(rho*u^2+rho*v^2))
+    """
+
+    GAMMA = 1.4
+    HALF = 0.5
+    rho_1_inv = 1/q1[0]
+    vss = (q1[1]*rho_1_inv)*(q1[1]*rho_1_inv)+(q1[2]*rho_1_inv)*(q1[2]*rho_1_inv)
+    return (GAMMA - 1)*(q1[3]-HALF*q1[0]*vss)
 
 def archs_phase_1(block_size,num_cpu,num_gpu):
     """Use this function to determine the array splits for the first phase (grid1)"""
@@ -245,12 +294,14 @@ def source_code_read(filename):
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (int(20*256),int(5*256),4)
+    dims_test = (10,10,2)
     y0 = np.zeros(dims)+1
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
     dt = 0.001
     order = 2
-    block_size = (256,256,1)
+    block_size = (32,32,1)
     GA = 40
-    sweep(y0,dy,t0,t_b,dt,2,block_size)
+    fpfv((np.ones(dims_test),))
+    # sweep(y0,dy,t0,t_b,dt,2,block_size)
