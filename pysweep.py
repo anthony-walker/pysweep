@@ -12,6 +12,7 @@ import math
 import numpy as np
 from collections import deque
 
+from pycuda.compiler import SourceModule
 #Parallel programming imports
 try:
    import pycuda.driver as cuda
@@ -31,6 +32,8 @@ import ctypes
 import platform
 import time
 
+#--------------------Global Variables------------------------------#
+shared_array = None
 
 def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
     """Use this function to perform swept rule>"""
@@ -46,8 +49,12 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
     max_swept_step = min(block_size[:-1])/(2*ops)
 
     #----------------Reading In Source Code-------------------------------#
-    source_code = source_code_read("./csrc/swept_source.cu")
-    source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+    try:
+        source_code = source_code_read("./csrc/swept_source.cu")
+        source_code += "\n"+source_code_read("./csrc/euler_source.cu")
+    except:
+        source_code = source_code_read("./pysweep/csrc/swept_source.cu")
+        source_code += "\n"+source_code_read("./pysweep/csrc/euler_source.cu")
     mod = SourceModule(source_code)
 
     #------------------Architecture-----------------------------------------
@@ -121,9 +128,9 @@ def arch_speed_comp(source_mod,cpu_fcn,block_size):
     shared_array_base = mp.Array(ctypes.c_double, shm_dim)
     shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
     shared_array = shared_array.reshape(block_size)
-
+    print("Woo")
     #Calling pool from number of cores with the dummy function
-    res = pool.map(cpu_fcn,range(10))
+    # res = pool.map(cpu_fcn,range(10))
 
     # rand_arr_2 = np.frombuffer(shared_arr.get_obj())
     #
