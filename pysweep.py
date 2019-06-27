@@ -152,48 +152,7 @@ def edges(arr,ops,shape_adj=-1):
     mask[(arr.ndim+shape_adj)* (slice(ops, -ops),)] = True
     return mask
 
-def fpfv(arr,idx,cts):
-    """This method is a five point finite volume method in 2D."""
-    #Five point finite volume method
 
-    #X-direction
-    direction_flux(arr[idx[0]-2,idx[0]],arr[idx[0]-1,idx[0]],arr[idx[0],idx[0]])
-
-
-
-
-def direction_flux(q1,q2):
-    """Use this method to determine the flux in a particular direction."""
-    P1 = pressure(q1)
-    P2 = pressure(q2)
-    tqL = flimiter(q1,q2,P1)
-    tqR = flimiter(q2,q1,)
-    flux = flux(tqL)
-
-def flimiter(qL,qR,num,den):
-    """Use this method to apply the flux limiter to get temporary state."""
-    return qL+0.5*min(pRatio,1)*(qL-qR) if (num > 0 and denom > 0) or (num < 0 and denom < 0) else qL
-
-def flux():
-
-    """Use this method to calculation the flux."""
-
-
-def pressure(q):
-    """Use this function to solve for pressure of the 2D Eulers equations.
-    q is set up as:
-    q[0] = rho
-    q[1] = rho*u
-    q[2] = rho*v
-    q[3] = rho*e
-    P = (GAMMA-1)*(rho*e-rho/2*(rho*u^2+rho*v^2))
-    """
-
-    GAMMA = 1.4
-    HALF = 0.5
-    rho_1_inv = 1/q1[0]
-    vss = (q1[1]*rho_1_inv)*(q1[1]*rho_1_inv)+(q1[2]*rho_1_inv)*(q1[2]*rho_1_inv)
-    return (GAMMA - 1)*(q1[3]-HALF*q1[0]*vss)
 
 def archs_phase_1(block_size,num_cpu,num_gpu):
     """Use this function to determine the array splits for the first phase (grid1)"""
