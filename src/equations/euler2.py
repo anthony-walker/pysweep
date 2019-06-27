@@ -1,6 +1,7 @@
 #Programmer: Anthony Walker
 #This file contains functions to solve the eulers equations in 2 dimensions with
-#the swept rule.
+#the swept rule or in a standard way
+
 import numpy as np
 #----------------------------------Globals-------------------------------------#
 gamma = 1.4
