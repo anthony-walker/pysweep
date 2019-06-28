@@ -26,19 +26,32 @@ import ctypes
 #Testing imports
 import platform
 import time
-import dev
+from src import *
+
+def getDeviceAttrs(devNum=0,print_device = False):
+    """Use this function to get device attributes and print them"""
+    device = cuda.Device(devNum)
+    dev_name = device.name()
+    dev_pci_bus_id = device.pci_bus_id()
+    dev_attrs = device.get_attributes()
+    dev_attrs["DEVICE_NAME"]=dev_name
+    if print_device:
+        for x in dev_attrs:
+            print(x,": ",dev_attrs[x])
+    return dev_attrs
+
 #--------------------Global Variables------------------------------#
 #------------------Shared Memory Arrays-----------------------------------------
 cpu_array = None
 gpu_array = None
 #------------------Architecture-----------------------------------------
 gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
-dev_attrs = dev.getDeviceAttrs(gpu_id[0])   #Getting device attributes
+dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 #----------------------End Global Variables------------------------#
 
-def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
+def sweep(eqnpath,ops,block_size,gpu_aff=None):
     """Use this function to perform swept rule>"""
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
@@ -67,9 +80,6 @@ def sweep(y0, dy, t0, t_b, dt,ops,block_size,gpu_aff=None):
         y0s = rank_split(y0,plane_shape,num_ranks)
         if gpu_aff is None:
             arch_speed_comp(mod,dummy_fcn,block_size)
-
-
-
     #----------------------------CUDA ------------------------------#
 
     #-------------------------END CUDA ---------------------------#
