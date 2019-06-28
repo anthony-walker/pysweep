@@ -9,11 +9,11 @@ dtdx = 0.001
 dtdy = 0.002
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,idx,t):
+def step(state,idx,ts):
     """This is the method that will be called by the swept solver."""
     dfdx,dfdy = dfdxy(state,idx)
-    state[idx] += dtdx*dfdx+dtdy*dfdy
-    return state
+    state[idx] += state[idx]+dtdx*dfdx+dtdy*dfdy
+    return state[idx]
 
 def dfdxy(state,idx):
     """This method is a five point finite volume method in 2D."""

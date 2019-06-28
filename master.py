@@ -1,6 +1,8 @@
 #Programmer: Anthony Walker
 #This is the main file for running and testing the swept solver
-from src import *
+from src.sweep import *
+from src.analytical import *
+from src.equations import *
 
 #Properties
 gamma = 1.4
@@ -18,4 +20,4 @@ def analytical():
 
 
 if __name__ == "__main__":
-    analytical()
+    sweep()

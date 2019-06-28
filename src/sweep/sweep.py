@@ -26,7 +26,6 @@ import ctypes
 #Testing imports
 import platform
 import time
-from src import *
 
 def getDeviceAttrs(devNum=0,print_device = False):
     """Use this function to get device attributes and print them"""
@@ -51,8 +50,16 @@ gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 #----------------------End Global Variables------------------------#
 
-def sweep(eqnpath,ops,block_size,gpu_aff=None):
-    """Use this function to perform swept rule>"""
+def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
+    """Use this function to perform swept rule
+    args:
+    y0 -  2D numpy array of initial conditions
+    ops - number of atomic operations
+    block_size - gpu block size (check architecture requirements)
+    cpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
+    gpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
+    
+    """
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     master_rank = 0 #master rank
@@ -163,7 +170,6 @@ def edges(arr,ops,shape_adj=-1):
     return mask
 
 
-
 def archs_phase_1(block_size,num_cpu,num_gpu):
     """Use this function to determine the array splits for the first phase (grid1)"""
     #Axes
@@ -190,7 +196,6 @@ def archs_phase_2(block_size,num_cpu,num_gpu):
     par_y = int(grid_shape[y_ax]/block_size[y_ax])
     # print("Par(x,y,t): ",par_x,", ",par_y,", ",par_t) #Printing partitions
 
-
 ### ----------------------------- COMPLETED FUNCTIONS -----------------------###
 def arch_work_blocks(plane_shape,block_size,gpu_affinity):
     """Use to determine the number of blocks for gpus vs cpus."""
@@ -208,7 +213,6 @@ def rank_split(y0,plane_shape,rank_size):
     """Use this function to equally split data along the largest axis for ranks."""
     major_axis = plane_shape.index(max(plane_shape))
     return np.array_split(y0,rank_size,axis=major_axis)
-
 
 def arch_query():
     """Use this method to query the system for information about its hardware"""
@@ -248,6 +252,7 @@ def arch_query():
         return gpu_sum, cpu_sum, gpu_id
     return None,None,gpu_id
 
+
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
     with open(filename,"r") as f:
@@ -258,6 +263,20 @@ def source_code_read(filename):
             line = f.readline()
     f.closed
     return source
+
+#Swept time space decomposition CPU functions
+def UpPyramid():
+    """This is the starting pyramid."""
+    pass
+
+def Octahedron():
+    """This is the steps in between UpPyramid and DownPyramid."""
+    pass
+
+def DownPyramid():
+    """This is the ending inverted pyramid."""
+    pass
+
 
 
 if __name__ == "__main__":
