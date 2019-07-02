@@ -58,7 +58,7 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     block_size - gpu block size (check architecture requirements)
     cpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
     gpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
-    
+
     """
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
@@ -163,12 +163,6 @@ def dummy_fcn(args):
             y *= y
     return (block,bID)
 
-def edges(arr,ops,shape_adj=-1):
-    """Use this function to generate boolean arrays for edge handling."""
-    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
-    mask[(arr.ndim+shape_adj)* (slice(ops, -ops),)] = True
-    return mask
-
 
 def archs_phase_1(block_size,num_cpu,num_gpu):
     """Use this function to determine the array splits for the first phase (grid1)"""
@@ -264,10 +258,19 @@ def source_code_read(filename):
     f.closed
     return source
 
+def edges(arr,ops,shape_adj=-1):
+    """Use this function to generate boolean arrays for edge handling."""
+    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
+    mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
+    return mask
+
 #Swept time space decomposition CPU functions
-def UpPyramid():
+def UpPyramid(arr, cpu_fcn):
     """This is the starting pyramid."""
-    pass
+    plane_shape = np.shape(arr)
+    iidx = np.ndindex(plane_shape)
+    print(edges(arr,2))
+    # cpu_fcn(arr,iidx)
 
 def Octahedron():
     """This is the steps in between UpPyramid and DownPyramid."""
@@ -282,7 +285,7 @@ def DownPyramid():
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (int(20*256),int(5*256),4)
-    dims_test = (10,10,2)
+    dims_test = (10,10,5)
     y0 = np.zeros(dims)+1
     dy = [0.1,0.1]
     t0 = 0
@@ -291,5 +294,5 @@ if __name__ == "__main__":
     order = 2
     block_size = (32,32,1)
     GA = 40
-    fpfv((np.ones(dims_test),))
+    UpPyramid(y0,0)
     # sweep(y0,dy,t0,t_b,dt,2,block_size)
