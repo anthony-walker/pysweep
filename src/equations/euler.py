@@ -9,11 +9,17 @@ dtdx = 0.001
 dtdy = 0.002
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,idx,ts):
-    """This is the method that will be called by the swept solver."""
-    dfdx,dfdy = dfdxy(state,idx)
-    state[idx] += state[idx]+dtdx*dfdx+dtdy*dfdy
-    return state[idx]
+def step(state,iidx,ts):
+    """This is the method that will be called by the swept solver.
+    state - 4D numpy array(x,y,t,variables)
+    iidx an iterable of indexs
+    ts - the current time step (for writing purposes)
+    """
+    for idx in iidx:
+        nidx = idx+(ts+1,)  #next step index
+        idx+=(ts,)  #current step index
+        dfdx,dfdy = dfdxy(state,idx)
+        state[nidx] += state[idx]+dtdx*dfdx+dtdy*dfdy
 
 def dfdxy(state,idx):
     """This method is a five point finite volume method in 2D."""
@@ -29,13 +35,14 @@ def dfdxy(state,idx):
     dfdx = direction_flux(state[idxx],Prx,True)
     dfdy = direction_flux(state[idxy],Pry,False)
     return dfdx, dfdx
-
+    
 def pressure_ratio(state):
     """Use this function to calculate the pressure ratio for fpfv."""
     #idxs should be in ascending order
-    Pr = np.zeros(len(state)-2)
+    sl = len(state)
+    Pr = np.zeros(sl-2)
     pct = 0
-    for i in range(1,len(state)-1):
+    for i in range(1,sl-1):
         try:
             Pr[pct] = ((pressure(state[i+1])-pressure(state[i]))/
                     (pressure(state[i])-pressure(state[i-1])))
@@ -79,7 +86,7 @@ def direction_flux(state,Pr,xy):
 
 def flimiter(qL,qR,Pr):
     """Use this method to apply the flux limiter to get temporary state."""
-    return qL+0.5*min(pRatio,1)*(qL-qR) if not np.isinf(Pr) and not np.isnan(Pr) and Pr > 0 else qL
+    return qL+0.5*min(Pr,1)*(qL-qR) if not np.isinf(Pr) and not np.isnan(Pr) and Pr > 0 else qL
 
 def eflux(left_state,right_state,xy):
     """Use this method to calculation the flux.
@@ -144,4 +151,4 @@ if __name__ == "__main__":
     #         for t in y:
     #             print(t)
     # Prx = pressure_ratio(TA,((2,5),(3,5),(4,5),(5,5),(6,5)),2)
-    step(TA,(5,5,2),2)
+    step(TA,[(2,5)],2)

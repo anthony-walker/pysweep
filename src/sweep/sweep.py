@@ -14,11 +14,15 @@ from collections import deque
 
 
 #GPU Imports
-import pycuda.driver as cuda
-import pycuda.autoinit
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    import pycuda.autoinit
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 import GPUtil
 from mpi4py import MPI
+
 #Multiprocessing Imports
 import multiprocessing as mp
 import ctypes
@@ -26,6 +30,16 @@ import ctypes
 #Testing imports
 import platform
 import time
+sys.path.insert(0, '/home/walkanth/pysweep/src/equations')
+import euler
+
+#Debuggin imports
+import warnings
+
+from sweep_tests import *
+warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
+
+
 
 def getDeviceAttrs(devNum=0,print_device = False):
     """Use this function to get device attributes and print them"""
@@ -48,6 +62,9 @@ gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting dev
 dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
+root_cores = int(np.sqrt(cores))
+#-----------------------------Functions----------------------------
+cpu_test_fcn = None
 #----------------------End Global Variables------------------------#
 
 def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
@@ -73,12 +90,9 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
 
     #----------------Reading In Source Code-------------------------------#
     #Try catch is for working at home
-    try:
-        source_code = source_code_read("./csrc/swept.h")
-        source_code += "\n"+source_code_read("./csrc/euler2D.h")
-    except:
-        source_code = source_code_read("./pysweep/csrc/swept.h")
-        source_code += "\n"+source_code_read("./pysweep/csrc/euler2D.h")
+    source_code = source_code_read("./src/sweep/sweep.h")
+    source_code += "\n"+source_code_read("./src/equations/euler.h")
+
     mod = SourceModule(source_code)
 
 
@@ -86,7 +100,7 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     if rank == master_rank:
         y0s = rank_split(y0,plane_shape,num_ranks)
         if gpu_aff is None:
-            arch_speed_comp(mod,dummy_fcn,block_size)
+            arch_speed_comp(y0, mod, cpu_fcn, block_size,ops)
     #----------------------------CUDA ------------------------------#
 
     #-------------------------END CUDA ---------------------------#
@@ -97,6 +111,80 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
 # gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
 # print(gpu_blocks,cpu_blocks)
 # print("Max: ",max_swept_step)
+
+
+
+def arch_speed_comp(arr,source_mod,cpu_fcn,block_size,ops):
+    """This function compares the speed of a block calculation to determine the affinity."""
+
+    num_tries = 1 #Number of tries to get performance ratio
+    hcs = lambda x: np.array_split(x,root_cores,axis=x.shape.index(max(x.shape)))   #Lambda function for creating blocks for cpu testing
+    cpu_test_blocks =  [item for subarr in hcs(arr) for item in hcs(subarr)]    #
+    cpu_test_fcn = sweep_lambda((UpPyramid,cpu_fcn,0,ops)) #Creating a function that can be called with only the block list
+    #------------------------Testing CPU Performance---------------------------#
+    pool = mp.Pool(cores)   #Pool allocation
+    cpu_performance = 0
+    for i in range(num_tries):
+        start_cpu = time.time()
+        cpu_res = pool.map_async(cpu_test_fcn,cpu_test_blocks)
+        nts = cpu_res.get()
+        stop_cpu = time.time()
+        cpu_performance += len(np.prod(block_size)*cpu_test_blocks)/(stop_cpu-start_cpu)
+    pool.close()
+    pool.join()
+    cpu_performance /= num_tries
+    print("Average CPU Performance:", cpu_performance)
+
+    #-------------------------Ending CPU Performance Testing--------------------#
+    #
+    # #------------------------Testing GPU Performance---------------------------#
+    # #Array
+    # gpu_test_blocks =  np.ones(block_size,dtype=np.float64)*2
+    # # print(gpu_test_blocks)
+    # print(type(block_size))
+    # start_gpu = cuda.Event()
+    # stop_gpu = cuda.Event()
+    # start_gpu.record()
+    # gpu_dummy_fcn = source_mod.get_function("dummy_fcn")
+    # gpu_dummy_fcn(cuda.InOut(gpu_test_blocks),grid=grid_size,block=block_size)
+    # stop_gpu.record()
+    # stop_gpu.synchronize()
+    # gpu_performance = np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
+    # # print(gpu_test_blocks)
+    # performance_ratio = gpu_performance/cpu_performance
+    # print(performance_ratio)
+    #-------------------------Ending CPU Performance Testing--------------------#
+
+
+#Swept time space decomposition CPU functions
+def UpPyramid(arr, cpu_fcn, ts, ops):
+    """This is the starting pyramid."""
+    plane_shape = np.shape(arr)
+    iidx = list(np.ndindex(plane_shape[:-2]))
+    #Bounds
+    lb = 0
+    ub = [plane_shape[0],plane_shape[1]]
+    #Going through all swept steps
+    t_start = ts
+    # pts = [iidx]    #This is strictly for debugging
+    while ub[0] > lb and ub[1] > lb:
+        lb += ops
+        ub = [x-ops for x in ub]
+        iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
+        if iidx:
+            cpu_fcn(arr,iidx,0)
+            # pts.append(iidx) #This is strictly for debugging
+        ts+=1
+    return ts
+    # return pts #This is strictly for debugging
+
+def Octahedron():
+    """This is the steps in between UpPyramid and DownPyramid."""
+    pass
+
+def DownPyramid():
+    """This is the ending inverted pyramid."""
+    pass
 
 def create_shared_arrays():
     """Use this function to create shared memory arrays for node communication."""
@@ -111,49 +199,6 @@ def create_shared_arrays():
     gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
     gpu_array = gpu_array.reshape(block_size)
 
-def arch_speed_comp(arr,source_mod,cpu_fcn,block_size):
-    """This function compares the speed of a block calculation to determine the affinity."""
-    num_tries = 10 #Number of tries to get performance ratio
-    pool = mp.Pool(cores)   #Pool allocation
-
-    #Creating test blocks
-    cpu_test_blocks = list()
-    for i in range(cores):
-        cpu_test_blocks.append((np.ones(block_size)*2,i))
-        # print(cpu_test_blocks[i][0])
-
-    #------------------------Testing CPU Performance---------------------------#
-    cpu_performance = 0
-    for i in range(num_tries):
-        start_cpu = time.time()
-        cpu_res = pool.map_async(cpu_fcn,cpu_test_blocks)
-        new_cpu_blocks = cpu_res.get()
-        stop_cpu = time.time()
-        cpu_performance += len(np.prod(block_size)*cpu_test_blocks)/(stop_cpu-start_cpu)
-    pool.close()
-    pool.join()
-    cpu_performance /= num_tries
-    print("Average CPU Performance:", cpu_performance)
-    #-------------------------Ending CPU Performance Testing--------------------#
-
-    #------------------------Testing GPU Performance---------------------------#
-    #Array
-    gpu_test_blocks =  np.ones(block_size,dtype=np.float64)*2
-    # print(gpu_test_blocks)
-    print(type(block_size))
-    start_gpu = cuda.Event()
-    stop_gpu = cuda.Event()
-    start_gpu.record()
-    gpu_dummy_fcn = source_mod.get_function("dummy_fcn")
-    gpu_dummy_fcn(cuda.InOut(gpu_test_blocks),grid=grid_size,block=block_size)
-    stop_gpu.record()
-    stop_gpu.synchronize()
-    gpu_performance = np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
-    # print(gpu_test_blocks)
-    performance_ratio = gpu_performance/cpu_performance
-    print(performance_ratio)
-    #-------------------------Ending CPU Performance Testing--------------------#
-
 def dummy_fcn(args):
     """This is a testing function for arch_speed_comp."""
     block = args[0]
@@ -163,88 +208,10 @@ def dummy_fcn(args):
             y *= y
     return (block,bID)
 
-
-def archs_phase_1(block_size,num_cpu,num_gpu):
-    """Use this function to determine the array splits for the first phase (grid1)"""
-    #Axes
-    x_ax = 1
-    y_ax = 2
-    #Getting shape of grid
-    grid_shape = np.shape(grid)
-    #Creating work element partition integers
-    par_x = int(grid_shape[x_ax]/block_size[x_ax])
-    par_y = int(grid_shape[y_ax]/block_size[y_ax])
-    #Split in y
-        #Split in x
-            #Add to list
-
-def archs_phase_2(block_size,num_cpu,num_gpu):
-    """Use this function to determine the array splits for the second phase (grid2)"""
-    #Axes
-    x_ax = 1
-    y_ax = 2
-    #Getting shape of grid
-    grid_shape = np.shape(grid)
-    #Creating work element partition integers
-    par_x = int(grid_shape[x_ax]/block_size[x_ax])
-    par_y = int(grid_shape[y_ax]/block_size[y_ax])
-    # print("Par(x,y,t): ",par_x,", ",par_y,", ",par_t) #Printing partitions
-
-### ----------------------------- COMPLETED FUNCTIONS -----------------------###
-def arch_work_blocks(plane_shape,block_size,gpu_affinity):
-    """Use to determine the number of blocks for gpus vs cpus."""
-    blocks_x = int(plane_shape[0]/block_size[0])
-    blocks_y = int(plane_shape[1]/block_size[1])
-    total_blocks = blocks_x*blocks_y
-    gpu_blocks = round(total_blocks/(1+1/gpu_affinity))
-    block_mod_y = gpu_blocks%blocks_y
-    if  block_mod_y!= 0:
-        gpu_blocks+=blocks_y-block_mod_y
-    cpu_blocks = total_blocks-gpu_blocks
-    return (gpu_blocks,cpu_blocks)
-
 def rank_split(y0,plane_shape,rank_size):
     """Use this function to equally split data along the largest axis for ranks."""
     major_axis = plane_shape.index(max(plane_shape))
     return np.array_split(y0,rank_size,axis=major_axis)
-
-def arch_query():
-    """Use this method to query the system for information about its hardware"""
-    #-----------------------------MPI setup--------------------------------
-    comm = MPI.COMM_WORLD
-    master_rank = 0 #master rank
-    num_ranks = comm.Get_size() #number of ranks
-    rank = comm.Get_rank()  #current rank
-    rank_info = None    #Set to none for later gather
-    cores = mp.cpu_count()  #getting cores of each rank with multiprocessing package
-
-                            #REMOVE ME AFTER TESTING
-    #####################################################################
-    #Subtracting cores for those used by virtual cluster.
-    # if rank == master_rank:
-    #     cores -= 14
-    #####################################################################
-
-    #Getting avaliable GPUs with GPUtil
-    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10)
-    gpus = 0
-    gpu_id = None
-    if gpu_ids:
-        gpus = len(gpu_ids)
-        gpu_id = gpu_ids[0]
-    #Gathering all of the information to the master rank
-    rank_info = comm.gather((rank, cores, gpus,gpu_id),root=0)
-    if rank == master_rank:
-        gpu_sum = 0
-        cpu_sum = 0
-        #Getting total number of cpu's and gpu
-        for ri in rank_info:
-            cpu_sum += ri[1]
-            gpu_sum += ri[2]
-            if ri[-1] is not None:
-                gpu_id = ri[3]
-        return gpu_sum, cpu_sum, gpu_id
-    return None,None,gpu_id
 
 
 def source_code_read(filename):
@@ -258,35 +225,26 @@ def source_code_read(filename):
     f.closed
     return source
 
+class sweep_lambda(object):
+    """This class is a function wrapper to create kind of a pickl-able lambda function."""
+    def __init__(self,args):
+        self.args = args
+    def __call__(self,x):
+        sweep_fcn,cpu_fcn,ts,ops = self.args
+        return sweep_fcn(x,cpu_fcn,ts,ops)
+
+#NOT USED CURRENTLY
 def edges(arr,ops,shape_adj=-1):
     """Use this function to generate boolean arrays for edge handling."""
     mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
     mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
     return mask
 
-#Swept time space decomposition CPU functions
-def UpPyramid(arr, cpu_fcn):
-    """This is the starting pyramid."""
-    plane_shape = np.shape(arr)
-    iidx = np.ndindex(plane_shape)
-    print(edges(arr,2))
-    # cpu_fcn(arr,iidx)
-
-def Octahedron():
-    """This is the steps in between UpPyramid and DownPyramid."""
-    pass
-
-def DownPyramid():
-    """This is the ending inverted pyramid."""
-    pass
-
-
-
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(20*256),int(5*256),4)
-    dims_test = (10,10,5)
-    y0 = np.zeros(dims)+1
+    dims = (int(256),int(256),10,4)
+    dims_test = (10,10,5,4)
+    y0 = np.zeros(dims)
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
@@ -294,5 +252,4 @@ if __name__ == "__main__":
     order = 2
     block_size = (32,32,1)
     GA = 40
-    UpPyramid(y0,0)
-    # sweep(y0,dy,t0,t_b,dt,2,block_size)
+    sweep(y0,2,block_size,euler.step,0)

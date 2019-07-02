@@ -5,8 +5,8 @@
   //Constants
   __device__ __constant__  int mss;
   __device__ __constant__ float dt;
-  __device__ __constant__ int nx;
-  __device__ __constant__ int ny;
+  // __device__ __constant__ int nx;
+  // __device__ __constant__ int ny;
   //Kernels
   __global__ void sweep(float *a)
   {
@@ -26,7 +26,7 @@
 
   __global__ void dummy_fcn(float *a)
   {
-    __shared__ float* shared_state[nx][ny]
+    // __shared__ float* shared_state[nx][ny];
     int blockId = blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
     int threadId = blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x;
     a[threadId] = a[threadId]*a[threadId];
