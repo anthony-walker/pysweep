@@ -14,9 +14,12 @@ from collections import deque
 
 
 #GPU Imports
-import pycuda.driver as cuda
-import pycuda.autoinit
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    import pycuda.autoinit
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 import GPUtil
 from mpi4py import MPI
 #Multiprocessing Imports
@@ -44,10 +47,10 @@ def getDeviceAttrs(devNum=0,print_device = False):
 cpu_array = None
 gpu_array = None
 #------------------Architecture-----------------------------------------
-gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
-dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
-gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
-cores = mp.cpu_count()  #Getting number of cpu cores
+# gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
+# dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
+# gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
+# cores = mp.cpu_count()  #Getting number of cpu cores
 #----------------------End Global Variables------------------------#
 
 def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
@@ -58,7 +61,7 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     block_size - gpu block size (check architecture requirements)
     cpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
     gpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
-    
+
     """
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
@@ -163,12 +166,6 @@ def dummy_fcn(args):
             y *= y
     return (block,bID)
 
-def edges(arr,ops,shape_adj=-1):
-    """Use this function to generate boolean arrays for edge handling."""
-    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
-    mask[(arr.ndim+shape_adj)* (slice(ops, -ops),)] = True
-    return mask
-
 
 def archs_phase_1(block_size,num_cpu,num_gpu):
     """Use this function to determine the array splits for the first phase (grid1)"""
@@ -264,10 +261,28 @@ def source_code_read(filename):
     f.closed
     return source
 
+#NOT USED CURRENTLY
+def edges(arr,ops,shape_adj=-1):
+    """Use this function to generate boolean arrays for edge handling."""
+    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
+    mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
+    return mask
+
 #Swept time space decomposition CPU functions
-def UpPyramid():
+def UpPyramid(arr, cpu_fcn, ts, ops=2):
     """This is the starting pyramid."""
-    pass
+    plane_shape = np.shape(arr)
+    iidx = np.ndindex(plane_shape[:-2])
+    #Bounds
+    lb = 0
+    ub = [plane_shape[0],plane_shape[1]]
+    #Going through all swept steps
+    while ub[0] > lb and ub[1] > lb:
+        lb += ops
+        ub = [x-ops for x in ub]
+        iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
+        cpu_fcn(arr,iidx)
+
 
 def Octahedron():
     """This is the steps in between UpPyramid and DownPyramid."""
@@ -282,8 +297,9 @@ def DownPyramid():
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (int(20*256),int(5*256),4)
-    dims_test = (10,10,2)
-    y0 = np.zeros(dims)+1
+    dims_test = (10,10,5,5)
+
+    y0 = np.zeros(dims_test)
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
@@ -291,5 +307,5 @@ if __name__ == "__main__":
     order = 2
     block_size = (32,32,1)
     GA = 40
-    fpfv((np.ones(dims_test),))
+    UpPyramid(y0,0,0)
     # sweep(y0,dy,t0,t_b,dt,2,block_size)

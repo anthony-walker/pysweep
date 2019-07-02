@@ -9,7 +9,7 @@ dtdx = 0.001
 dtdy = 0.002
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,idx,ts):
+def step(state,iidx):
     """This is the method that will be called by the swept solver."""
     dfdx,dfdy = dfdxy(state,idx)
     state[idx] += state[idx]+dtdx*dfdx+dtdy*dfdy
@@ -33,9 +33,10 @@ def dfdxy(state,idx):
 def pressure_ratio(state):
     """Use this function to calculate the pressure ratio for fpfv."""
     #idxs should be in ascending order
-    Pr = np.zeros(len(state)-2)
+    sl = len(state)
+    Pr = np.zeros(sl-2)
     pct = 0
-    for i in range(1,len(state)-1):
+    for i in range(1,sl-1):
         try:
             Pr[pct] = ((pressure(state[i+1])-pressure(state[i]))/
                     (pressure(state[i])-pressure(state[i-1])))
