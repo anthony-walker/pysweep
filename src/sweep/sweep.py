@@ -54,7 +54,7 @@ def getDeviceAttrs(devNum=0,print_device = False):
     return dev_attrs
 
 #--------------------Global Variables------------------------------#
-#------------------Shared Memory Arrays-----------------------------------------
+#------------------Shared Memory Arrays----------------------------#
 cpu_array = None
 gpu_array = None
 #------------------Architecture-----------------------------------------
@@ -63,8 +63,10 @@ dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 root_cores = int(np.sqrt(cores))
-#-----------------------------Functions----------------------------
+#-----------------------------Functions----------------------------#
 cpu_test_fcn = None
+#-------------------------------Constants--------------------------#
+SS = 0  #number of steps in Octahedron (Half Pyramid and DownPyramid)
 #----------------------End Global Variables------------------------#
 
 def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
@@ -178,11 +180,11 @@ def UpPyramid(arr, cpu_fcn, ts, ops):
     return ts
     # return pts #This is strictly for debugging
 
-def Octahedron():
+def Octahedron(arr, cpu_fcn, ts, ops):
     """This is the steps in between UpPyramid and DownPyramid."""
     pass
 
-def DownPyramid():
+def DownPyramid(arr, cpu_fcn, ts, ops):
     """This is the ending inverted pyramid."""
     pass
 
@@ -199,14 +201,6 @@ def create_shared_arrays():
     gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
     gpu_array = gpu_array.reshape(block_size)
 
-def dummy_fcn(args):
-    """This is a testing function for arch_speed_comp."""
-    block = args[0]
-    bID = args[1]
-    for x in block:
-        for y in x:
-            y *= y
-    return (block,bID)
 
 def rank_split(y0,plane_shape,rank_size):
     """Use this function to equally split data along the largest axis for ranks."""
@@ -239,6 +233,15 @@ def edges(arr,ops,shape_adj=-1):
     mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
     mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
     return mask
+
+def dummy_fcn(args):
+    """This is a testing function for arch_speed_comp."""
+    block = args[0]
+    bID = args[1]
+    for x in block:
+        for y in x:
+            y *= y
+    return (block,bID)
 
 if __name__ == "__main__":
     # print("Starting execution.")
