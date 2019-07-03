@@ -6,7 +6,7 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
 import numpy as np
-
+import time
 
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
@@ -28,8 +28,9 @@ a =  np.ones(block,dtype=np.float32)
 
 
 #Getting cuda source
-source_code = source_code_read("/home/walkanth/pysweep/csrc/swept_source.cu")
-source_code += "\n"+source_code_read("/home/walkanth/pysweep/csrc/euler_source.cu")
+source_code = source_code_read("./src/sweep/sweep.h")
+# print(source_code)
+# source_code += "\n"+source_code_read("/home/walkanth/pysweep/csrc/euler_source.cu")
 #Creating cuda source
 mod = SourceModule(source_code)
 
@@ -45,7 +46,7 @@ cuda.memcpy_htod(mss_ptr,mss)
 cuda.memcpy_htod(dt_ptr,dt)
 
 #Executing cuda source
-func = mod.get_function("sweep")
+func = mod.get_function("dummy_fcn")
 func(cuda.InOut(a),grid=(1,1,1),block=(1024,1,1))
 # for x in a:
 #     for y in x:

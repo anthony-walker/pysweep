@@ -18,6 +18,7 @@ try:
     import pycuda.driver as cuda
     import pycuda.autoinit
     from pycuda.compiler import SourceModule
+    import pycuda.gpuarray as gpuarray
 except Exception as e:
     print(e)
 import GPUtil
@@ -102,7 +103,7 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     if rank == master_rank:
         y0s = rank_split(y0,plane_shape,num_ranks)
         if gpu_aff is None:
-            arch_speed_comp(y0, mod, cpu_fcn, block_size,ops)
+            gpu_speed(y0, mod, cpu_fcn, block_size,ops)
     #----------------------------CUDA ------------------------------#
 
     #-------------------------END CUDA ---------------------------#
@@ -114,15 +115,44 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
 # print(gpu_blocks,cpu_blocks)
 # print("Max: ",max_swept_step)
 
+def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
+    """Use this function to measure the gpu's performance."""
+
+    for row in arr:
+        for col in row:
+            for i, t in enumerate(col):
+                if i == 0:
+                    t[:] = [1.2,2.3]#,3.4,4.5]
+                else:
+                    t[:] = 0.0
+    arr = arr.astype(np.float32)
+    arr_gpu = cuda.mem_alloc(arr.nbytes)
+    cuda.memcpy_htod(arr_gpu, arr)
+
+    gpu_fcn = source_mod.get_function("UpPyramid")
+    gpu_fcn(arr_gpu, block=block_size)
+    arr_doubled = np.empty_like(arr)
+    cuda.memcpy_dtoh(arr_doubled, arr_gpu)
 
 
-def arch_speed_comp(arr,source_mod,cpu_fcn,block_size,ops):
+
+def dummy_fcn(arr):
+    """This is a testing function for arch_speed_comp."""
+    iidx = np.ndindex(np.shape(arr))
+    for i,idx in enumerate(iidx):
+        arr[idx] *= i
+        # print(i,value)
+    return arr
+
+
+def cpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     """This function compares the speed of a block calculation to determine the affinity."""
 
     num_tries = 1 #Number of tries to get performance ratio
     hcs = lambda x: np.array_split(x,root_cores,axis=x.shape.index(max(x.shape)))   #Lambda function for creating blocks for cpu testing
     cpu_test_blocks =  [item for subarr in hcs(arr) for item in hcs(subarr)]    #
     cpu_test_fcn = sweep_lambda((UpPyramid,cpu_fcn,0,ops)) #Creating a function that can be called with only the block list
+
     #------------------------Testing CPU Performance---------------------------#
     pool = mp.Pool(cores)   #Pool allocation
     cpu_performance = 0
@@ -131,11 +161,12 @@ def arch_speed_comp(arr,source_mod,cpu_fcn,block_size,ops):
         cpu_res = pool.map_async(cpu_test_fcn,cpu_test_blocks)
         nts = cpu_res.get()
         stop_cpu = time.time()
-        cpu_performance += len(np.prod(block_size)*cpu_test_blocks)/(stop_cpu-start_cpu)
+        cpu_performance += len(np.prod(cpu_test_blocks[0].shape)*cpu_test_blocks)/(stop_cpu-start_cpu)
     pool.close()
     pool.join()
     cpu_performance /= num_tries
-    print("Average CPU Performance:", cpu_performance)
+    # print("Average CPU Performance:", cpu_performance)
+    return cpu_performance
 
     #-------------------------Ending CPU Performance Testing--------------------#
     #
@@ -159,7 +190,7 @@ def arch_speed_comp(arr,source_mod,cpu_fcn,block_size,ops):
 
 
 #Swept time space decomposition CPU functions
-def UpPyramid(arr, cpu_fcn, ts, ops):
+def UpPyramid(arr, fcn, ts, ops):
     """This is the starting pyramid."""
     plane_shape = np.shape(arr)
     iidx = list(np.ndindex(plane_shape[:-2]))
@@ -174,7 +205,7 @@ def UpPyramid(arr, cpu_fcn, ts, ops):
         ub = [x-ops for x in ub]
         iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
         if iidx:
-            cpu_fcn(arr,iidx,0)
+            fcn(arr,iidx,0)
             # pts.append(iidx) #This is strictly for debugging
         ts+=1
     return ts
@@ -234,25 +265,17 @@ def edges(arr,ops,shape_adj=-1):
     mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
     return mask
 
-def dummy_fcn(args):
-    """This is a testing function for arch_speed_comp."""
-    block = args[0]
-    bID = args[1]
-    for x in block:
-        for y in x:
-            y *= y
-    return (block,bID)
 
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (int(256),int(256),10,4)
-    dims_test = (10,10,5,4)
-    y0 = np.zeros(dims)
+    dims_test = (4,4,2,2)
+    y0 = np.zeros(dims_test)+1.0354
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
     dt = 0.001
     order = 2
-    block_size = (32,32,1)
+    block_size = (4,4,2)
     GA = 40
     sweep(y0,2,block_size,euler.step,0)

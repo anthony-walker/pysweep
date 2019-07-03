@@ -35,7 +35,7 @@ def dfdxy(state,idx):
     dfdx = direction_flux(state[idxx],Prx,True)
     dfdy = direction_flux(state[idxy],Pry,False)
     return dfdx, dfdx
-    
+
 def pressure_ratio(state):
     """Use this function to calculate the pressure ratio for fpfv."""
     #idxs should be in ascending order
@@ -97,7 +97,7 @@ def eflux(left_state,right_state,xy):
     q[3] = rho*e
     """
     #Initializing Flux
-    flux = np.zeros(len(left_state))
+    flux = np.zeros(len(left_state),dtype=np.float32)
     #Calculating flux
     #Velocities
     uL = left_state[1]/left_state[0]
