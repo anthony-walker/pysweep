@@ -55,19 +55,17 @@ for i in range(t):
 
 source_code = source_code_read("./src/sweep/sweep.h")
 source_mod = SourceModule(source_code)
-print(source_code)
 #Constants
-mss = np.array([4,],dtype=int)
-va = np.array([4,],dtype=np.float32)
-print(type(mss),type(va))
-mss_ptr,_ = source_mod.get_global("mss")
-v_ptr,_ = source_mod.get_global("vlen")
-print(v_ptr)
-# print(type(v_ptr),type(mss_ptr))
+nx_ptr,_ = source_mod.get_global("nx")
+ny_ptr,_ = source_mod.get_global("ny")
+nt_ptr,_ = source_mod.get_global("nt")
+nv_ptr,_ = source_mod.get_global("nv")
 #Copying to GPU memory
-print(type(mss),type(va))
-cuda.memcpy_htod(mss_ptr,mss)
-cuda.memcpy_htod(v_ptr,va)
+conv = lambda x:np.array([x,],dtype=int)
+cuda.memcpy_htod(nx_ptr,conv(x))
+cuda.memcpy_htod(ny_ptr,conv(y))
+cuda.memcpy_htod(nt_ptr,conv(t))
+cuda.memcpy_htod(nv_ptr,conv(v))
 
 
 #Copying global

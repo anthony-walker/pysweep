@@ -7,13 +7,21 @@
 
   __device__ __constant__  int mss;
 
+  __device__ __constant__  int nx;
+
+  __device__ __constant__  int ny;
+
+  __device__ __constant__  int nt;
+
+  __device__ __constant__  int nv;
+
   __device__ __constant__  float dt;
 
-  __device__ __constant__  int vlen;
+  // __device__ __constant__  int vlen;
 
   __global__ void UpPyramid(float *state)
   {
-    // __shared__ float * a_shared[blockDim.x][blockDim.y];
+    // __shared__ float
     // printf("(%f, %d)", dt,mss);
     int blockId = blockIdx.x + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockIdx.z;
     int threadId = blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x;
