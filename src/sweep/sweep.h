@@ -31,7 +31,7 @@
         ct *= blockDim.x;
     }
     ct = 0;
-    printf("( %d %f)",threadId,state[threadId+ct]);
+    printf("( %d %f)\n",threadId,state[threadId+ct]);
     // for(int i=4;i<=12;i+=4) //Time loop
     // {
     //     a[threadId+i] += a[threadId+iPrev];

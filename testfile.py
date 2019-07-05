@@ -43,15 +43,12 @@ v = 4
 gdx = 2
 gdy = 2
 #Creating test array
-arr = np.zeros((x,y,t,v))
-for i in range(t):
-    for row in arr:
-        for col in row:
-            col[i,0] = i
-            col[i,1] = 2*i
-            col[i,2] = 3*i
-            col[i,3] = 4*i
-# print(arr)
+arr = np.zeros((t,x,y,v))
+for i,item in enumerate(arr):
+    item[:,:,:] = i
+    # print("--------------------")
+    # print(item)
+    # print("--------------------")
 
 source_code = source_code_read("./src/sweep/sweep.h")
 source_mod = SourceModule(source_code)
@@ -68,7 +65,7 @@ cuda.memcpy_htod(nt_ptr,conv(t))
 cuda.memcpy_htod(nv_ptr,conv(v))
 
 
-#Copying global
+# Copying global
 
 
 # cuda.memcpy_htod(v_ptr,v)
