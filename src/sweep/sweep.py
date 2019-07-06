@@ -276,6 +276,6 @@ if __name__ == "__main__":
     t_b = 1
     dt = 0.001
     order = 2
-    block_size = (4,4,2)
+    block_size = (4,4,2,)
     GA = 40
     sweep(y0,2,block_size,euler.step,0)
