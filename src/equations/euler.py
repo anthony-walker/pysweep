@@ -11,10 +11,11 @@ dtdy = 0.002
 
 def step(state,iidx,ts):
     """This is the method that will be called by the swept solver.
-    state - 4D numpy array(x,y,t,variables)
+    state - 4D numpy array(t,x,y,v (variables length))
     iidx an iterable of indexs
     ts - the current time step (for writing purposes)
     """
+    print("step")
     for idx in iidx:
         nidx = idx+(ts+1,)  #next step index
         idx+=(ts,)  #current step index

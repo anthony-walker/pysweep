@@ -36,8 +36,8 @@ import euler
 
 #Debuggin imports
 import warnings
-
-from sweep_tests import *
+from euler import *
+from plot_sweep_tests import *
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
 
@@ -61,6 +61,8 @@ gpu_array = None
 #------------------Architecture-----------------------------------------
 gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
 dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
+for x in dev_attrs:
+    print(x,dev_attrs[x])
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 root_cores = int(np.sqrt(cores))
@@ -70,10 +72,11 @@ cpu_test_fcn = None
 SS = 0  #number of steps in Octahedron (Half Pyramid and DownPyramid)
 #----------------------End Global Variables------------------------#
 
-def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
+def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     """Use this function to perform swept rule
     args:
-    y0 -  2D numpy array of initial conditions
+    arr0 -  2D numpy array of initial conditions
+    targs - (t0,tf,dt) dt
     ops - number of atomic operations
     block_size - gpu block size (check architecture requirements)
     cpu_fcn - step function to execute swept cpu process (see cpu fcn guidelines)
@@ -88,22 +91,25 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     print("Rank: ",rank," Platform: ",platform.uname()[1])
 
     #---------------Data Input setup -------------------------#
-    plane_shape = np.shape(y0)  #Shape of initial conditions
+    plane_shape = np.shape(arr0)  #Shape of initial conditions
     max_swept_step = min(block_size[:-1])/(2*ops)
-
+    time_steps = int((targs[1]-targs[0])/targs[2])
+    arr = np.zeros((time_steps,)+arr0.shape,dtype=np.float32) #4D arr(t,x,y,v)
+    arr[0] = arr0
     #----------------Reading In Source Code-------------------------------#
-    #Try catch is for working at home
-    source_code = source_code_read("./src/sweep/sweep.h")
-    source_code += "\n"+source_code_read("./src/equations/euler.h")
-
+    source_code = source_code_read("./src/equations/euler.h")
+    source_code += "\n"+source_code_read("./src/sweep/sweep.h")
     mod = SourceModule(source_code)
-
+    print(source_code)
 
     #------------------Dividing work based on the architecture----------------#
     if rank == master_rank:
-        y0s = rank_split(y0,plane_shape,num_ranks)
+        arr0s = rank_split(arr0,plane_shape,num_ranks)
         if gpu_aff is None:
-            gpu_speed(y0, mod, cpu_fcn, block_size,ops)
+            gpu_speed(arr, mod, cpu_fcn, block_size,ops)
+            # pass
+        if False:
+            cpu_speed(arr, mod, cpu_fcn, block_size,ops)
     #----------------------------CUDA ------------------------------#
 
     #-------------------------END CUDA ---------------------------#
@@ -117,37 +123,28 @@ def sweep(y0,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
 
 def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     """Use this function to measure the gpu's performance."""
+    int_cast = lambda x:np.int32(x)
+    const_dict = {'nx':(int_cast,arr.shape[1]),'ny':(int_cast,arr.shape[2]),'nv':(int_cast,arr.shape[3]),'nt':(int_cast,arr.shape[0]),'nd':(int_cast,2)}
+    #Constants
+    for key in const_dict:
+        c_ptr,_ = source_mod.get_global(key)
+        cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
 
-    for row in arr:
-        for col in row:
-            for i, t in enumerate(col):
-                if i == 0:
-                    t[:] = [1.2,2.3]#,3.4,4.5]
-                else:
-                    t[:] = 0.0
+    gdx = int(arr.shape[1]/block_size[0])
+    gdy = int(arr.shape[2]/block_size[1])
+    grid_size = (gdx,gdy)
     arr = arr.astype(np.float32)
-    arr_gpu = cuda.mem_alloc(arr.nbytes)
-    cuda.memcpy_htod(arr_gpu, arr)
-
+    print(arr.shape)
+    print(grid_size)
+    print(block_size)
     gpu_fcn = source_mod.get_function("UpPyramid")
-    gpu_fcn(arr_gpu, block=block_size)
-    arr_doubled = np.empty_like(arr)
-    cuda.memcpy_dtoh(arr_doubled, arr_gpu)
-
-
-
-def dummy_fcn(arr):
-    """This is a testing function for arch_speed_comp."""
-    iidx = np.ndindex(np.shape(arr))
-    for i,idx in enumerate(iidx):
-        arr[idx] *= i
-        # print(i,value)
-    return arr
-
+    print(arr[0])
+    print("Split")
+    gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size)
+    print(arr[0])
 
 def cpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     """This function compares the speed of a block calculation to determine the affinity."""
-
     num_tries = 1 #Number of tries to get performance ratio
     hcs = lambda x: np.array_split(x,root_cores,axis=x.shape.index(max(x.shape)))   #Lambda function for creating blocks for cpu testing
     cpu_test_blocks =  [item for subarr in hcs(arr) for item in hcs(subarr)]    #
@@ -205,7 +202,7 @@ def UpPyramid(arr, fcn, ts, ops):
         ub = [x-ops for x in ub]
         iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
         if iidx:
-            fcn(arr,iidx,0)
+            step(arr,iidx,0)
             # pts.append(iidx) #This is strictly for debugging
         ts+=1
     return ts
@@ -233,10 +230,10 @@ def create_shared_arrays():
     gpu_array = gpu_array.reshape(block_size)
 
 
-def rank_split(y0,plane_shape,rank_size):
+def rank_split(arr0,plane_shape,rank_size):
     """Use this function to equally split data along the largest axis for ranks."""
     major_axis = plane_shape.index(max(plane_shape))
-    return np.array_split(y0,rank_size,axis=major_axis)
+    return np.array_split(arr0,rank_size,axis=major_axis)
 
 
 def source_code_read(filename):
@@ -258,24 +255,35 @@ class sweep_lambda(object):
         sweep_fcn,cpu_fcn,ts,ops = self.args
         return sweep_fcn(x,cpu_fcn,ts,ops)
 
-#NOT USED CURRENTLY
+#--------------------------------NOT USED CURRENTLY-----------------------------
 def edges(arr,ops,shape_adj=-1):
     """Use this function to generate boolean arrays for edge handling."""
     mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
     mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
     return mask
 
+def dummy_fcn(arr):
+    """This is a testing function for arch_speed_comp."""
+    iidx = np.ndindex(np.shape(arr))
+    for i,idx in enumerate(iidx):
+        arr[idx] *= i
+        # print(i,value)
+    return arr
+
+
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(256),int(256),10,4)
+    dims = (int(32),int(32),4)
     dims_test = (4,4,2,2)
-    y0 = np.zeros(dims_test)+1.0354
+    arr0 = np.ones(dims)*2
+
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
-    dt = 0.001
+    dt = 0.2
+    targs = (t0,t_b,dt)
     order = 2
-    block_size = (4,4,2,)
+    block_size = (4,4,1)
     GA = 40
-    sweep(y0,2,block_size,euler.step,0)
+    sweep(arr0,targs,2,block_size,euler.step,0)
