@@ -15,8 +15,8 @@
       float *flux = new float[4];
       for (int i = 0; i < 4; i++)
       {
-          state[idx+i] *= state[idx+i];
-          // printf("%0.2f\n",state[idx+i] );
+          // state[idx+i] *= state[idx+i];
+          // // printf("%0.2f\n",state[idx+i] );
       }
 
   }

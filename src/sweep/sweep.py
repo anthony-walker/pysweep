@@ -60,7 +60,7 @@ cpu_array = None
 gpu_array = None
 #------------------Architecture-----------------------------------------
 gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
-dev_attrs = getDeviceAttrs(gpu_id[0],True)   #Getting device attributes
+dev_attrs = getDeviceAttrs(gpu_id[0],False)   #Getting device attributes
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 root_cores = int(np.sqrt(cores))
@@ -103,7 +103,7 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     #------------------Dividing work based on the architecture----------------#
     if rank == master_rank:
         arr0s = rank_split(arr0,plane_shape,num_ranks)
-        if False:
+        if True:
             gpu_speed(arr, mod, cpu_fcn, block_size,ops)
             # pass
         if False:
@@ -131,6 +131,7 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     gdx = int(arr.shape[1]/block_size[0])
     gdy = int(arr.shape[2]/block_size[1])
     grid_size = (gdx,gdy)
+    shared_size = arr[0,:block_size[0],:block_size[1],:].nbytes
     arr = arr.astype(np.float32)
     print(arr.shape)
     print(grid_size)
@@ -138,7 +139,7 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     gpu_fcn = source_mod.get_function("UpPyramid")
     # print(arr[0])
     # print("Split")
-    gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size)
+    gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=shared_size)
     # print(arr[0])
 
 def cpu_speed(arr,cpu_fcn,block_size,ops):
@@ -283,7 +284,7 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(128),int(128),4)
+    dims = (int(64),int(64),4)
     arr0 = np.ones(dims)*2
     block_size = (32,32,1)
     dy = [0.1,0.1]

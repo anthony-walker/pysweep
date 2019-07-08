@@ -52,7 +52,7 @@ def create_blocks(arr,block_size):
     return blocks,num_blocks
 
 #Test dims
-dims = (100,int(128),int(128),4)
+dims = (1,int(128),int(128),4)
 
 block_size = (32,32,1)
 gdx = int(dims[1]/block_size[0])
@@ -68,7 +68,7 @@ for i,item in enumerate(arr):
     item[:,:,2] = i+1
     item[:,:,3] = i-1
     item[0,0,0] = 1234.00
-
+shared_size = arr[0,:block_size[0],:block_size[1],:].nbytes
 blocks,num_blocks = create_blocks(arr,block_size)
 
 stream1 = cuda.Stream()
@@ -89,8 +89,7 @@ for key in const_dict:
 arr = arr.astype(np.float32)
 gpu_fcn = source_mod.get_function("UpPyramid")
 gs = (gdx,gdy)
-print(1,1)
 # print(arr)
 print("-----------------------------------------------------------------------")
-gpu_fcn(cuda.InOut(arr),grid=gs, block=block_size)
+gpu_fcn(cuda.InOut(arr),grid=gs, block=block_size,shared=shared_size)
 # print(arr)
