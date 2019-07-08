@@ -42,18 +42,26 @@ def source_code_read(filename):
     f.closed
     return source
 
-#Test dims
-x = 32
-y = 32
-t = 2
-v = 4
+def create_blocks(arr,block_size):
+    """Use this function to create blocks from an array based on the given blocksize."""
+    sx = arr.shape[1]/block_size[0] #split x dimensions
+    sy = arr.shape[2]/block_size[1] #split y dimension
+    num_blocks = sx*sy  #number of blocks
+    hcs = lambda x,s: np.array_split(x,s,axis=x.shape.index(max(x.shape[1:])))   #Lambda function for creating blocks for cpu testing
+    blocks =  [item for subarr in hcs(arr,sx) for item in hcs(subarr,sy)]    #applying lambda function
+    return blocks,num_blocks
 
-#Test grid dims
-gdx = 2
-gdy = 2
+#Test dims
+dims = (100,int(128),int(128),4)
+
+block_size = (32,32,1)
+gdx = int(dims[1]/block_size[0])
+gdy = int(dims[2]/block_size[1])
+t = dims[0]
+v = dims[3]
 
 #Creating test array
-arr = np.zeros((t,x,y,v),dtype=np.float32)
+arr = np.zeros(dims,dtype=np.float32)
 for i,item in enumerate(arr):
     item[:,:,0] = i+1
     item[:,:,1] = i-1
@@ -61,8 +69,13 @@ for i,item in enumerate(arr):
     item[:,:,3] = i-1
     item[0,0,0] = 1234.00
 
+blocks,num_blocks = create_blocks(arr,block_size)
+
+stream1 = cuda.Stream()
+stream2 = cuda.Stream()
+
 int_cast = lambda x:np.int32(x)
-const_dict = {'nx':(int_cast,x),'ny':(int_cast,y),'nv':(int_cast,v),'nt':(int_cast,t),'nd':(int_cast,2)}
+const_dict = {'nx':(int_cast,block_size[0]),'ny':(int_cast,block_size[1]),'nv':(int_cast,v),'nt':(int_cast,t),'nd':(int_cast,2)}
 #Creating source code
 source_code = source_code_read("./src/equations/euler.h")
 source_code += source_code_read("./src/sweep/sweep.h")
@@ -71,13 +84,13 @@ source_mod = SourceModule(source_code)
 #Constants
 for key in const_dict:
     c_ptr,_ = source_mod.get_global(key)
-    cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
+    cuda.memcpy_htod_async(c_ptr,const_dict[key][0](const_dict[key][1]))
 
 arr = arr.astype(np.float32)
 gpu_fcn = source_mod.get_function("UpPyramid")
-bs = (int(4),int(4),1)
-gs = (int(x/bs[0]),int(y/bs[1]))
-print(arr)
+gs = (gdx,gdy)
+print(1,1)
+# print(arr)
 print("-----------------------------------------------------------------------")
-gpu_fcn(cuda.InOut(arr),grid=gs, block=bs)
-print(arr)
+gpu_fcn(cuda.InOut(arr),grid=gs, block=block_size)
+# print(arr)

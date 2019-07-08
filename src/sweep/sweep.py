@@ -60,9 +60,7 @@ cpu_array = None
 gpu_array = None
 #------------------Architecture-----------------------------------------
 gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
-dev_attrs = getDeviceAttrs(gpu_id[0])   #Getting device attributes
-for x in dev_attrs:
-    print(x,dev_attrs[x])
+dev_attrs = getDeviceAttrs(gpu_id[0],True)   #Getting device attributes
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 root_cores = int(np.sqrt(cores))
@@ -100,16 +98,16 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     source_code = source_code_read("./src/equations/euler.h")
     source_code += "\n"+source_code_read("./src/sweep/sweep.h")
     mod = SourceModule(source_code)
-    print(source_code)
+    # print(source_code)
 
     #------------------Dividing work based on the architecture----------------#
     if rank == master_rank:
         arr0s = rank_split(arr0,plane_shape,num_ranks)
-        if gpu_aff is None:
+        if False:
             gpu_speed(arr, mod, cpu_fcn, block_size,ops)
             # pass
         if False:
-            cpu_speed(arr, mod, cpu_fcn, block_size,ops)
+            cpu_speed(arr, cpu_fcn, block_size,ops)
     #----------------------------CUDA ------------------------------#
 
     #-------------------------END CUDA ---------------------------#
@@ -138,18 +136,21 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     print(grid_size)
     print(block_size)
     gpu_fcn = source_mod.get_function("UpPyramid")
-    print(arr[0])
-    print("Split")
+    # print(arr[0])
+    # print("Split")
     gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size)
-    print(arr[0])
+    # print(arr[0])
 
-def cpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
+def cpu_speed(arr,cpu_fcn,block_size,ops):
     """This function compares the speed of a block calculation to determine the affinity."""
-    num_tries = 1 #Number of tries to get performance ratio
-    hcs = lambda x: np.array_split(x,root_cores,axis=x.shape.index(max(x.shape)))   #Lambda function for creating blocks for cpu testing
-    cpu_test_blocks =  [item for subarr in hcs(arr) for item in hcs(subarr)]    #
-    cpu_test_fcn = sweep_lambda((UpPyramid,cpu_fcn,0,ops)) #Creating a function that can be called with only the block list
 
+    num_tries = 1 #Number of tries to get performance ratio
+    sx = arr.shape[1]/block_size[0] #split x dimensions
+    sy = arr.shape[2]/block_size[1] #split y dimension
+    num_blocks = sx*sy  #number of blocks
+    hcs = lambda x,s: np.array_split(x,s,axis=x.shape.index(max(x.shape)))   #Lambda function for creating blocks for cpu testing
+    cpu_test_blocks =  [item for subarr in hcs(arr,sx) for item in hcs(subarr,sy)]    #applying lambda function
+    cpu_test_fcn = sweep_lambda((UpPyramid,cpu_fcn,0,ops)) #Creating a function that can be called with only the block list
     #------------------------Testing CPU Performance---------------------------#
     pool = mp.Pool(cores)   #Pool allocation
     cpu_performance = 0
@@ -158,11 +159,11 @@ def cpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
         cpu_res = pool.map_async(cpu_test_fcn,cpu_test_blocks)
         nts = cpu_res.get()
         stop_cpu = time.time()
-        cpu_performance += len(np.prod(cpu_test_blocks[0].shape)*cpu_test_blocks)/(stop_cpu-start_cpu)
+        cpu_performance += np.prod(cpu_test_blocks[0].shape)*num_blocks/(stop_cpu-start_cpu)
     pool.close()
     pool.join()
     cpu_performance /= num_tries
-    # print("Average CPU Performance:", cpu_performance)
+    print("Average CPU Performance:", cpu_performance)
     return cpu_performance
 
     #-------------------------Ending CPU Performance Testing--------------------#
@@ -190,10 +191,10 @@ def cpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
 def UpPyramid(arr, fcn, ts, ops):
     """This is the starting pyramid."""
     plane_shape = np.shape(arr)
-    iidx = list(np.ndindex(plane_shape[:-2]))
+    iidx = list(np.ndindex(plane_shape[1:-1]))
     #Bounds
     lb = 0
-    ub = [plane_shape[0],plane_shape[1]]
+    ub = [plane_shape[1],plane_shape[2]]
     #Going through all swept steps
     t_start = ts
     # pts = [iidx]    #This is strictly for debugging
@@ -203,7 +204,7 @@ def UpPyramid(arr, fcn, ts, ops):
         iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
         if iidx:
             step(arr,iidx,0)
-            # pts.append(iidx) #This is strictly for debugging
+            # pts.append(iidx) #This is strictly for debuggings
         ts+=1
     return ts
     # return pts #This is strictly for debugging
@@ -229,6 +230,14 @@ def create_shared_arrays():
     gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
     gpu_array = gpu_array.reshape(block_size)
 
+def create_blocks(arr,block_size):
+    """Use this function to create blocks from an array based on the given blocksize."""
+    sx = arr.shape[1]/block_size[0] #split x dimensions
+    sy = arr.shape[2]/block_size[1] #split y dimension
+    num_blocks = sx*sy  #number of blocks
+    hcs = lambda x,s: np.array_split(x,s,axis=x.shape.index(max(x.shape[1:])))   #Lambda function for creating blocks for cpu testing
+    blocks =  [item for subarr in hcs(arr,sx) for item in hcs(subarr,sy)]    #applying lambda function
+    return blocks
 
 def rank_split(arr0,plane_shape,rank_size):
     """Use this function to equally split data along the largest axis for ranks."""
@@ -274,16 +283,14 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(32),int(32),4)
-    dims_test = (4,4,2,2)
+    dims = (int(128),int(128),4)
     arr0 = np.ones(dims)*2
-
+    block_size = (32,32,1)
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
     dt = 0.2
     targs = (t0,t_b,dt)
     order = 2
-    block_size = (4,4,1)
-    GA = 40
-    sweep(arr0,targs,2,block_size,euler.step,0)
+
+    sweep(arr0,targs,order,block_size,euler.step,0)

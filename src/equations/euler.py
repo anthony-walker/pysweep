@@ -15,10 +15,10 @@ def step(state,iidx,ts):
     iidx an iterable of indexs
     ts - the current time step (for writing purposes)
     """
-    print("step")
+    # print("step")
     for idx in iidx:
-        nidx = idx+(ts+1,)  #next step index
-        idx+=(ts,)  #current step index
+        nidx = (ts+1,)+idx  #next step index
+        idx=(ts,)+idx  #current step index
         dfdx,dfdy = dfdxy(state,idx)
         state[nidx] += state[idx]+dtdx*dfdx+dtdy*dfdy
 
@@ -27,15 +27,15 @@ def dfdxy(state,idx):
     #Five point finite volume method
     #Creating indices from given point (idx)
     ops = 2 #number of atomic operations
-    idxx=(slice(idx[0]-ops,idx[0]+ops+1,1),idx[1],idx[2])
-    idxy=(idx[0],slice(idx[1]-ops,idx[1]+ops+1,1),idx[2])
+    idxx=(idx[0],slice(idx[1]-ops,idx[1]+ops+1,1),idx[2])
+    idxy=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1))
     #Finding pressure ratio
     Prx = pressure_ratio(state[idxx])
     Pry = pressure_ratio(state[idxy])
     #Finding spatial derivatives
     dfdx = direction_flux(state[idxx],Prx,True)
     dfdy = direction_flux(state[idxy],Pry,False)
-    return dfdx, dfdx
+    return dfdx, dfdy
 
 def pressure_ratio(state):
     """Use this function to calculate the pressure ratio for fpfv."""
@@ -141,12 +141,12 @@ def espectral(left_state,right_state,xy):
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
 if __name__ == "__main__":
-    TA = np.ones((10,10,5,4))
-    TA[2,5,2,:] = [3.7,1.4,0.5,0]
-    TA[6,5,2,:] = [4.5,2.3,3.8,4]
-    TA[5,5,2,:] = [0.526,0.01,0.647,0.328]
-    TA[4,5,2,:] = [3.2,1.49,0.25,0.37]
-    TA[3,5,2,:] = [0.9,0.7,0.5,0.1]
+    TA = np.ones((5,10,10,4))
+    TA[2,2,5,:] = [3.7,1.4,0.5,0]
+    TA[2,6,5,:] = [4.5,2.3,3.8,4]
+    TA[2,5,5,:] = [0.526,0.01,0.647,0.328]
+    TA[2,4,5,:] = [3.2,1.49,0.25,0.37]
+    TA[2,3,5,:] = [0.9,0.7,0.5,0.1]
     # for x in TA:
     #     for y in x:
     #         for t in y:

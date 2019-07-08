@@ -12,6 +12,7 @@
   __device__
   void step(float *state, int idx)
   {
+      float *flux = new float[4];
       for (int i = 0; i < 4; i++)
       {
           state[idx+i] *= state[idx+i];
