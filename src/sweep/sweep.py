@@ -298,7 +298,7 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (4,int(32),int(32))
+    dims = (4,int(128),int(128))
     arr0 = np.zeros(dims)
     arr0[1,:,:] = 2.0
     arr0[2,:,:] = 4.0

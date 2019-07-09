@@ -91,3 +91,13 @@ __global__ void UpPyramid(float *state)
     }
 
 }
+
+
+// float **fluxx = new float*[SS];
+// float **fluxy = new float*[SS];
+// for (int i = 0; i < SS; i++)
+// {
+//     fluxx[i] = new float[NV];
+//     fluxy[i] = new float[NV];
+// }
+// float fluxy[ss][NV];

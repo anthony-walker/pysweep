@@ -3,6 +3,7 @@
     The equation specific functions (2D Euler).
 */
 __device__ __constant__  const int SS=5; //stencil size
+__device__ __constant__ const int NVC=4;
 
 void  pressureRatio(float *state)
 {
@@ -11,36 +12,35 @@ void  pressureRatio(float *state)
 }
 
 __device__
-float  dfdxy(float *state, int idx)
+float  dfdxy(float *flux, int idx)
 {
 
-  int sgid_shift = blockDim.x*blockDim.y;
-  int var_shift = sgid_shift*gridDim.x*gridDim.y;//This is the variable used to shift between values
 
-  return state[idx+1*sgid_shift]*state[idx+1*sgid_shift];
+  return 0.0;
 }
 
   __device__
-  void step(float *state, int idx,int k)
+  void step(float *state, int idx)
   {
       int XS = blockDim.x;
-     // Creating flux stencils
-      // float **fluxx = new float*[SS];
-      // float **fluxy = new float*[SS];
-      // for (int i = 0; i < SS; i++)
-      // {
-      //     fluxx[i] = new float[NV];
-      //     fluxy[i] = new float[NV];
-      // }
-      // float fluxy[ss][NV];
-      // for (int i = -2; i <= OPS; i++)
-      // {
-      //     for (int j = 0; j < NV; j++) {
-      //         fluxx[i][j] = state[idx+j*VARS+i*XS];
-      //         fluxy[i][j] = state[idx+j*VARS+i];
-      //     }
-      // }
-      // printf("%0.2f,%0.2f,%0.2f,%0.2f\n",state[idx+0*sgid_shift],state[idx+1*sgid_shift],state[idx+2*sgid_shift],state[idx+3*sgid_shift] );
+     // Creating local flux vectors
+     float *fluxx = new float[SS*NVC];
+     float *fluxy = new float[SS*NVC];
+     int fidx = 0;
+     int idxp = 0;
+      for (int i = -2; i <= OPS; i++)
+      {
+          for (int j = 0; j < NV; j++) {
+
+              idxp = idx+j*VARS;
+              // printf("%d,%d\n",idxp+i*XS,idxp);
+              // fluxx[fidx] = state[idx+j*VARS+i*XS];
+              // fluxy[fidx] = state[idx+j*VARS+i];
+              fidx++;
+          }
+      }
+      delete[] fluxx;
+      delete[] fluxy;
   }
 
 

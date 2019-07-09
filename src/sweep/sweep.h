@@ -66,7 +66,7 @@ __global__ void UpPyramid(float *state)
         if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
         {
             // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
-            step(shared_state,sgid,k);
+            step(shared_state,sgid);
         }
 
 
