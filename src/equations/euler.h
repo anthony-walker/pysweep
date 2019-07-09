@@ -10,14 +10,19 @@
 #define TWO             2.0
 
   __device__
-  void step(float *state, int idx)
+  void step(float *state, int idx,int k)
   {
-      float *flux = new float[4];
+      const int ss = 5; //Stencil size
+      const int nv = 4;
+      float fluxx[ss][nv];
+      float fluxy[ss][nv];
+
       for (int i = 0; i < 4; i++)
       {
-          // state[idx+i] *= state[idx+i];
-          // // printf("%0.2f\n",state[idx+i] );
+          state[idx+i] = k+1;
+          // printf("%0.2f\n",state[idx+i] );
       }
+
 
   }
 

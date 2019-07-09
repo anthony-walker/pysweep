@@ -121,26 +121,23 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
 
 def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     """Use this function to measure the gpu's performance."""
-    int_cast = lambda x:np.int32(x)
-    const_dict = {'nx':(int_cast,arr.shape[1]),'ny':(int_cast,arr.shape[2]),'nv':(int_cast,arr.shape[3]),'nt':(int_cast,arr.shape[0]),'nd':(int_cast,2)}
     #Constants
-    for key in const_dict:
-        c_ptr,_ = source_mod.get_global(key)
-        cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
-
-    gdx = int(arr.shape[1]/block_size[0])
-    gdy = int(arr.shape[2]/block_size[1])
-    grid_size = (gdx,gdy)
-    shared_size = arr[0,:block_size[0],:block_size[1],:].nbytes
+    int_cast = lambda x:np.int32(x)
+    const_dict = {'nv':(int_cast,arr.shape[3])}
+    constant_copy(source_mod,**const_dict)
+    arr[0,:,:,:] = 2
+    grid_size = (int(arr.shape[1]/block_size[0]),int(arr.shape[2]/block_size[1]))   #Grid size
+    shared_size = arr[0,:block_size[0],:block_size[1],:].nbytes #Creating size of shared array
     arr = arr.astype(np.float32)
-    print(arr.shape)
-    print(grid_size)
-    print(block_size)
+    # print(arr.shape)
+    # print(grid_size)
+    # print(block_size)
+    # print(shared_size)
     gpu_fcn = source_mod.get_function("UpPyramid")
-    # print(arr[0])
+    print(arr[0])
     # print("Split")
     gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=shared_size)
-    # print(arr[0])
+    print(arr[0])
 
 def cpu_speed(arr,cpu_fcn,block_size,ops):
     """This function compares the speed of a block calculation to determine the affinity."""
@@ -240,6 +237,12 @@ def create_blocks(arr,block_size):
     blocks =  [item for subarr in hcs(arr,sx) for item in hcs(subarr,sy)]    #applying lambda function
     return blocks
 
+def constant_copy(source_mod,**const_kwargs):
+    """Use this function to copy constant args to cuda memory."""
+    for key in const_kwargs:
+        c_ptr,_ = source_mod.get_global(key)
+        cuda.memcpy_htod(c_ptr,const_kwargs[key][0](const_kwargs[key][1]))
+
 def rank_split(arr0,plane_shape,rank_size):
     """Use this function to equally split data along the largest axis for ranks."""
     major_axis = plane_shape.index(max(plane_shape))
@@ -284,13 +287,13 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(64),int(64),4)
-    arr0 = np.ones(dims)*2
+    dims = (int(128),int(128),4)
+    arr0 = np.zeros(dims)
     block_size = (32,32,1)
     dy = [0.1,0.1]
     t0 = 0
     t_b = 1
-    dt = 0.2
+    dt = 0.1
     targs = (t0,t_b,dt)
     order = 2
 
