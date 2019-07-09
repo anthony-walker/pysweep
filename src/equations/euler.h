@@ -14,16 +14,15 @@
   {
       const int ss = 5; //Stencil size
       const int nv = 4;
+      int sgid_shift = blockDim.x*blockDim.y;
+      int var_shift = sgid_shift*gridDim.x*gridDim.y;//This is the variable used to shift between values
       float fluxx[ss][nv];
       float fluxy[ss][nv];
-
-      for (int i = 0; i < 4; i++)
+      for (int i = 0; i < nv; i++)
       {
-          state[idx+i] = k+1;
-          // printf("%0.2f\n",state[idx+i] );
+          state[idx+i*sgid_shift] *= state[idx+i*sgid_shift];
       }
-
-
+      printf("%0.2f,%0.2f,%0.2f,%0.2f\n",state[idx+0*sgid_shift],state[idx+1*sgid_shift],state[idx+2*sgid_shift],state[idx+3*sgid_shift] );
   }
 
 __device__
