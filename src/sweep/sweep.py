@@ -90,7 +90,7 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
 
     #---------------Data Input setup -------------------------#
     plane_shape = np.shape(arr0)  #Shape of initial conditions
-    max_swept_step = min(block_size[:-1])/(2*ops)
+    max_swept_step = min(block_size[2:])/(2*ops)
     time_steps = int((targs[1]-targs[0])/targs[2])
     arr = np.zeros((time_steps,)+arr0.shape,dtype=np.float32) #4D arr(t,x,y,v)
     arr[0] = arr0
@@ -123,21 +123,21 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops):
     """Use this function to measure the gpu's performance."""
     #Constants
     int_cast = lambda x:np.int32(x)
-    const_dict = {'nv':(int_cast,arr.shape[3])}
+    const_dict = {'nv':(int_cast,arr.shape[1])}
     constant_copy(source_mod,**const_dict)
-    arr[0,:,:,:] = 2
-    grid_size = (int(arr.shape[1]/block_size[0]),int(arr.shape[2]/block_size[1]))   #Grid size
-    shared_size = arr[0,:block_size[0],:block_size[1],:].nbytes #Creating size of shared array
+
+    grid_size = (int(arr.shape[2]/block_size[0]),int(arr.shape[3]/block_size[1]))   #Grid size
+    shared_size = arr[0,:,:block_size[0],:block_size[1]].nbytes #Creating size of shared array
     arr = arr.astype(np.float32)
     # print(arr.shape)
     # print(grid_size)
     # print(block_size)
     # print(shared_size)
     gpu_fcn = source_mod.get_function("UpPyramid")
-    print(arr[0])
+    # print(arr[0])
     # print("Split")
     gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=shared_size)
-    print(arr[0])
+    # print(arr[0])
 
 def cpu_speed(arr,cpu_fcn,block_size,ops):
     """This function compares the speed of a block calculation to determine the affinity."""
@@ -287,8 +287,12 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (int(128),int(128),4)
+    dims = (4,int(128),int(128))
     arr0 = np.zeros(dims)
+    arr0[1,:,:] = 1.0
+    arr0[2,:,:] = 2.0
+    arr0[3,:,:] = 3.0
+
     block_size = (32,32,1)
     dy = [0.1,0.1]
     t0 = 0
