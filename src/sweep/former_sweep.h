@@ -56,3 +56,38 @@ __device__ float **Array2D(int nv)
 
 // int idxy = gid%(blockDim.y); //Getting y index from global,
 // int idxx = gid/(blockDim.y); //Getting x index from global, Using type int truncates appropriately
+
+
+__global__ void UpPyramid(float *state)
+{
+    //Creating flattened shared array ptr (x,y,v) length
+    extern __shared__ float shared_state[];    //Shared state specified externally
+    //Creating indexing
+    int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
+    int sgid_shift = blockDim.x*blockDim.y;
+    int var_shift = sgid_shift*gridDim.x*gridDim.y;//This is the variable used to shift between values
+    int time_shift = var_shift*NV; //Use this variable to shift in time and for sgid
+    int sgid = gid%(sgid_shift); //Shared global index
+    // Filling shared state array with variables initial variables
+    __syncthreads(); //Sync threads here to ensure all initial values are copied
+
+    for (int k = 0; k < 2; k++)
+    {
+        for (int i = 0; i < NV; i++)
+        {
+            shared_state[sgid+i*sgid_shift] = state[gid+i*var_shift+k*time_shift];
+        }
+        __syncthreads(); //Sync threads here to ensure all initial values are copied
+        // Solving step function
+
+        step(shared_state,sgid,k);
+
+        __syncthreads();   //Sync threads after solving
+        // Place values back in original matrix
+        for (int j = 0; j < NV; j++)
+        {
+            state[gid+j*var_shift+(k+1)*time_shift]=shared_state[sgid+j*sgid_shift];
+        }
+    }
+
+}

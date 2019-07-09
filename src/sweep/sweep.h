@@ -5,13 +5,22 @@ This file contains cuda/c++ source code for launching the pycuda swept rule.
 Other information can be found in the euler.h file
 */
 
-
 //Constant Memory Values
-__device__ __constant__  int mss=8;
+__device__ __constant__ const int ZERO=0;
+__device__ __constant__ const float QUARTER=0.25;
+__device__ __constant__ const float HALF=0.5;
+__device__ __constant__ const int ONE=1;
+__device__ __constant__ const int TWO=2;
+__device__ __constant__ int SGIDS; //shift in shared data
+__device__ __constant__ int VARS; //shift in variables in data
+__device__ __constant__ int TIMES; //shift in times in data
+__device__ __constant__  int MSS; //max swept steps
+__device__ __constant__  int NV; //number of variables
+__device__ __constant__ int OPS; //number of atomic operations
+__device__ __constant__  float DTDX;
+__device__ __constant__  float DTDY;
 
-__device__ __constant__  int nv;
-
-__device__ __constant__  float dt;
+//!!(@#
 
 __device__ int getGlobalIdx_2D_2D()
 {
@@ -20,41 +29,53 @@ __device__ int getGlobalIdx_2D_2D()
     return threadId;
 }
 
-// /*
-//     Use this function to create and return the GPU UpPyramid
-// */
+/*
+    Use this function to create and return the GPU UpPyramid
+*/
 __global__ void UpPyramid(float *state)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
+    //Creating swept boundaries
+    int lxy = 0; //Lower swept bound
+    int ux = blockDim.x; //upper x
+    int uy = blockDim.y;//blockDim.y; //upper y
     //Creating indexing
     int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
-    int sgid_shift = blockDim.x*blockDim.y;
-    int var_shift = sgid_shift*gridDim.x*gridDim.y;//This is the variable used to shift between values
-    int time_shift = var_shift*nv; //Use this variable to shift in time and for sgid
-    int sgid = gid%(sgid_shift); //Shared global index
-    // printf("%d,%d, %d, %d\n",gid,sgid,var_shift,time_shift );
-    // printf("%d,%d,%d,%d\n",gid,gid+1*var_shift,gid+2*var_shift,gid+3*var_shift );
-    // printf("%f,%f,%f,%f\n",state[gid],state[gid+var_shift],state[gid+var_shift*2],state[gid+var_shift*3]);
+    int sgid = gid%(SGIDS); //Shared global index
+    int tlx = sgid/blockDim.x;  //Location x
+    int tly = sgid%blockDim.y;  //Location y
 
     // Filling shared state array with variables initial variables
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-    int k = 0;
-    for (int i = 0; i < nv; i++)
+    for (int k = 0; k < 2; k++)
     {
-        shared_state[sgid+i*sgid_shift] = state[gid+i*var_shift];
+        for (int i = 0; i < NV; i++)
+        {
+            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES];
+        }
+        __syncthreads(); //Sync threads here to ensure all initial values are copied
+
+        //Update swept bounds
+        ux -= OPS;
+        uy -= OPS;
+        lxy += OPS;
+
+        // Solving step function
+        if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
+        {
+            // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
+            step(shared_state,sgid,k);
+        }
+
+
+        __syncthreads();   //Sync threads after solving
+        // Place values back in original matrix
+        for (int j = 0; j < NV; j++)
+        {
+            state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+        }
     }
-    __syncthreads(); //Sync threads here to ensure all initial values are copied
-    // Solving step function
-
-    step(shared_state,sgid,k);
-
-    __syncthreads();   //Sync threads after solving
-    // Place values back in original matrix
-    // for (int j = 0; j < nv; j++)
-    // {
-    //     state[gid+shift*(k+1)+j]=shared_state[sgid+j];
-    // }
 
 }

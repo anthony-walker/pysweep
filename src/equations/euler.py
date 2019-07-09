@@ -11,14 +11,14 @@ dtdy = 0.002
 
 def step(state,iidx,ts):
     """This is the method that will be called by the swept solver.
-    state - 4D numpy array(t,x,y,v (variables length))
+    state - 4D numpy array(t,v,x,y (v is variables length))
     iidx an iterable of indexs
     ts - the current time step (for writing purposes)
     """
-    # print("step")
+    vSlice = slice(0,state.shape[1],1)
     for idx in iidx:
-        nidx = (ts+1,)+idx  #next step index
-        idx=(ts,)+idx  #current step index
+        nidx = (ts+1,vSlice)+idx  #next step index
+        idx=(ts,vSlice)+idx  #current step index
         dfdx,dfdy = dfdxy(state,idx)
         state[nidx] += state[idx]+dtdx*dfdx+dtdy*dfdy
 
@@ -27,8 +27,10 @@ def dfdxy(state,idx):
     #Five point finite volume method
     #Creating indices from given point (idx)
     ops = 2 #number of atomic operations
-    idxx=(idx[0],slice(idx[1]-ops,idx[1]+ops+1,1),idx[2])
-    idxy=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1))
+    idxx=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1),idx[3])
+    idxy=(idx[0],idx[1],idx[2],slice(idx[3]-ops,idx[3]+ops+1,1))
+
+
     #Finding pressure ratio
     Prx = pressure_ratio(state[idxx])
     Pry = pressure_ratio(state[idxy])
@@ -40,13 +42,13 @@ def dfdxy(state,idx):
 def pressure_ratio(state):
     """Use this function to calculate the pressure ratio for fpfv."""
     #idxs should be in ascending order
-    sl = len(state)
+    sl = state.shape[1]
     Pr = np.zeros(sl-2)
     pct = 0
     for i in range(1,sl-1):
         try:
-            Pr[pct] = ((pressure(state[i+1])-pressure(state[i]))/
-                    (pressure(state[i])-pressure(state[i-1])))
+            Pr[pct] = ((pressure(state[:,i+1])-pressure(state[:,i]))/
+                    (pressure(state[:,i])-pressure(state[:,i-1])))
         except:
             Pr[pct] = np.nan
         pct+=1
@@ -72,15 +74,15 @@ def direction_flux(state,Pr,xy):
     ONE = 1    #Constant value of 1
     idx = 2     #This is the index of the point in state (stencil data)
     #Initializing Flux
-    flux = np.zeros(len(state[idx]))
+    flux = np.zeros(len(state[:,idx]))
     #Atomic Operation 1
-    tsl = flimiter(state[idx-1],state[idx],Pr[idx-2])
-    tsr = flimiter(state[idx],state[idx-1],ONE/Pr[idx-1])
+    tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
+    tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
     flux += eflux(tsl,tsr,xy)
     flux += espectral(tsl,tsr,xy)
     #Atomic Operation 2
-    tsl = flimiter(state[idx],state[idx+1],Pr[idx-1])
-    tsr = flimiter(state[idx+1],state[idx],ONE/Pr[idx])
+    tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
+    tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
     flux -= eflux(tsl,tsr,xy)
     flux -= espectral(tsl,tsr,xy)
     return flux
