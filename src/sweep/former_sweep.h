@@ -101,3 +101,33 @@ __global__ void UpPyramid(float *state)
 //     fluxy[i] = new float[NV];
 // }
 // float fluxy[ss][NV];
+
+
+
+__device__
+void step(float *state, int idx)
+{
+    int XS = blockDim.x;
+   // Creating local flux vectors
+   float *fluxx = new float[SS*NVC];
+   float *fluxy = new float[SS*NVC];
+   int fidx = 0;
+   int idxp = 0;
+
+    for (int i = -2; i <= OPS; i++)
+    {
+        for (int j = 0; j < NV; j++) {
+
+            idxp = idx+j*VARS;
+            printf("%d,%d,%d\n",fidx,idxp+i*XS,idxp);
+            // fluxx[fidx] = state[idxp+i*XS];
+            // fluxy[fidx] = state[idxp+i];
+            // fluxx[0] = 5.0;
+            // fluxy[0] = 10.0;
+            // printf("%f,%d,%d\n",fluxx[fidx],idxp+i*XS,idxp);
+            fidx++;
+        }
+    }
+    delete[] fluxx;
+    delete[] fluxy;
+}
