@@ -135,10 +135,10 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 1;  //spectral radius idx
-    //Pressure ratio
-    Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
-    Pr[1] = pressureRatio(wpoint,cpoint,epoint);
-    Pr[2] = pressureRatio(cpoint,epoint,eepoint);
+    // //Pressure ratio
+    // Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
+    // Pr[1] = pressureRatio(wpoint,cpoint,epoint);
+    // Pr[2] = pressureRatio(cpoint,epoint,eepoint);
 
     //West
     flimiter(temp_left,wpoint,cpoint,Pr[0]);
@@ -217,6 +217,7 @@ void step(float *shared_state, int idx)
   get_dfdx(dfdxy,shared_state,idx);
   get_dfdy(dfdxy,shared_state,idx);
   __syncthreads();
+  shared_state[idx+0*SGIDS] += dfdxy[0];
   // for (int i = 0; i < NVC; i++)
   // {
   //   shared_state[idx+i*SGIDS] += dfdxy[i];
