@@ -168,6 +168,7 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     #Getting GPU Function
     gpu_fcn = source_mod.get_function("UpPyramid")
     print(gpu_fcn.num_regs)
+    print(shared_size,grid_size,block_size)
     gpu_performance = 0 #Allocating gpu performance
     #------------------------Testing GPU Performance---------------------------#
     for i in range(num_tries):
@@ -305,7 +306,7 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (4,int(128),int(128))
+    dims = (4,int(32),int(32))
     arr0 = np.zeros(dims)
     arr0[0,:,:] = 0.1
     arr0[1,:,:] = 0.0
@@ -313,10 +314,10 @@ if __name__ == "__main__":
     arr0[3,:,:] = 0.125
 
 
-    block_size = (32,16,1)
+    block_size = (16,8,1)
     dy = [0.1,0.1]
     t0 = 0
-    t_b = 100
+    t_b = 1
     dt = 1
     targs = (t0,t_b,dt)
     order = 2

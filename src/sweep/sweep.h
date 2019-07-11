@@ -43,12 +43,13 @@ __global__ void UpPyramid(float *state)
     int uy = blockDim.y;//blockDim.y; //upper y
     //Creating indexing
     int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
+
     int sgid = gid%(SGIDS); //Shared global index
     int tlx = sgid/blockDim.x;  //Location x
     int tly = sgid%blockDim.y;  //Location y
     // float fluxUpdate[4];
     // Filling shared state array with variables initial variables
-
+    // printf("%d,%d,%d\n",gid,sgid,sgid+SGIDS);
     for (int k = 0; k < 1; k++)
     {
         for (int i = 0; i < NV; i++)
@@ -66,7 +67,7 @@ __global__ void UpPyramid(float *state)
         // Solving step function
         if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
         {
-            // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
+            // printf("%d,%d,%d,%d,%d\n",lxy,ux,uy,tlx,tly);
             step(shared_state,sgid);
         }
         __syncthreads();
