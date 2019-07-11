@@ -4,9 +4,6 @@
 */
 #define SQUAREROOT(x)   sqrt(x)
 #define ABSOLUTE(x)   abs(x)
-#define MIN(x,y)   min(x,y)
-#define ISNAN(x)   isnan(x)
-#define ARRCPY(a,b,c) memcpy(a,b,c)
 
 __device__ __constant__  const int SS=5; //stencil size
 __device__ __constant__ const int NVC=4; //Number of variables
@@ -19,24 +16,21 @@ __device__ __constant__ const int NR = 3;
 __device__
 void getPoint(float * curr_point,float *shared_state, int idx)
 {
-    printf("%d,%d,%d,%d\n",idx,idx+SGIDS,idx+2*SGIDS,idx+3*SGIDS);
-    // printf("%0.2f,%0.2f,%0.2f,%0.2f\n",shared_state[idx],shared_state[idx+SGIDS],shared_state[idx+2*SGIDS],shared_state[idx+3*SGIDS]);
-
-    // curr_point[0]=shared_state[idx];
-    // curr_point[1]=shared_state[idx+SGIDS];
-    // curr_point[2]=shared_state[idx+SGIDS*2];
-    // curr_point[3]=shared_state[idx+SGIDS*3];
+    curr_point[0]=shared_state[idx];
+    curr_point[1]=shared_state[idx+SGIDS];
+    curr_point[2]=shared_state[idx+SGIDS*2];
+    curr_point[3]=shared_state[idx+SGIDS*3];
 }
 
 /*
   Use this function to determine the pressure
 */
 __device__
-float pressure(float *point)
+float pressure(float *shared_state, int idx)
 {
-  float rho = point[0];
+  float rho = shared_state[idx];
   float rho_inv = 1/rho;
-  float vss = point[1]*point[1]*rho_inv+point[2]*point[2]*rho_inv;
+  float vss = shared_state[idx+1*SGIDS]*shared_state[idx+1*SGIDS]*rho_inv+shared_state[idx+2*SGIDS]*shared_state[idx+2*SGIDS]*rho_inv;
   return GAM_M1*(point[3]-HALF*rho*vss);
 }
 
@@ -44,7 +38,7 @@ float pressure(float *point)
   Use this function to find the pressure ratio around 3 points
 */
 __device__
-float  pressureRatio(float *wpoint,float *point,float *epoint)
+float  pressureRatio(float *shared_state, int idx, int shift)
 {
   float Pr;
   float p = pressure(point);
@@ -59,34 +53,42 @@ __device__
 void  flimiter(float *temp_state, float *left_point, float *right_point , float Pr)
 {
 
-  // for (int i = 0; i < NVC; i++)
-  // {
-  //     temp_state[i] = left_point[i];
-  //     __syncthreads();
-  // }
-  printf("%d,%d,%d\n",sizeof(temp_state),sizeof(right_point),sizeof(left_point) );
-  // printf("%d,%d,%f,%f,%f,%f\n",0,sizeof(temp_state), temp_state[0], temp_state[1], temp_state[2], temp_state[3]);
-  // ARRCPY(temp_state,left_point,sizeof(temp_state));
-  // printf("%d,%d,%f,%f,%f,%f\n",0,sizeof(temp_state), temp_state[0], temp_state[1], temp_state[2], temp_state[3]);
-  // if (ISNAN(Pr) || (Pr<1.0e-8))
-  // {
-  //   for (int i = 0; i < NVC; i++)
-  //   {
-  //       temp_state[i] = left_point[i];
-  //   }
-// }
-  // else
-  // {
-  //   float coef = HALF*MIN(Pr, ONE);
-  //   for (int j = 0; j < NVC; j++)
-  //   {
-  //       temp_state[j] = (left_point[j] + coef*(left_point[j] - right_point[j]));
-  //       __syncthreads();
-  //   }
-  // }
-
-
+  if (isnan(Pr) || (Pr<1.0e-8)){
+    for (int i = 0; i < NVC; i++)
+    {
+        temp_state[i] = left_point[i];
+    }
+  }
+  else
+  {
+    for (int j = 0; j < NVC; j++)
+    {
+        temp_state[j] = (left_point[j] + HALF*min(Pr, ONE)*(left_point[j] - right_point[j]));
+    }
+  }
 }
+
+/*
+Use this function to obtain the flux for each system variable
+*/
+__device__
+void  efluxx(float* flux, float *left_state, float *right_state, int dir)
+{
+  float rhoL = left_state[0];
+  float rhoR = right_state[0];
+  float uL = left_state[1]/rhoL;
+  float uR = right_state[1]/rhoR;
+  float vL = left_state[2]/rhoL;
+  float vR = right_state[2]/rhoR;
+  // __syncthreads();
+  float pL = pressure(left_state);
+  float pR = pressure(right_state);
+  flux[0] += dir*(left_state[1]+right_state[1]);
+  flux[1] += dir*(left_state[1]*uL+pL+right_state[1]*uR+pR);
+  flux[2] += dir*(left_state[1]*vL+right_state[1]*vR);
+  flux[3] += dir*((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
+ }
+
 /*
   Use this function to apply the roe average and obtain the spectral radius
 */
@@ -112,63 +114,39 @@ void espectral(float* flux,float *left_state, float *right_state, int dir, int d
     flux[i] += rs*(left_state[i]-right_state[i]);
   }
 }
-/*
-Use this function to obtain the flux for each system variable
-*/
-__device__
-void  efluxx(float *flux, float *left_state, float *right_state, int dir)
-{
-  float rhoL = left_state[0];
-  float rhoR = right_state[0];
-  float uL = left_state[1]/rhoL;
-  float uR = right_state[1]/rhoR;
-  float vL = left_state[2]/rhoL;
-  float vR = right_state[2]/rhoR;
-
-  float pL = pressure(left_state);
-  float pR = pressure(right_state);
-  flux[0] += dir*(left_state[1]+right_state[1]);
-  flux[1] += dir*(left_state[1]*uL+pL+right_state[1]*uR+pR);
-  flux[2] += dir*(left_state[1]*vL+right_state[1]*vR);
-  flux[3] += dir*((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
- }
 
 /*
   Use this function to determine the flux in the x direction
 */
 __device__
-void get_dfdx(float *dfdx, float *shared_state, int idx)
+void get_dfdx(float *shared_state, int idx)
 {
   //Constants and Initializing
-    // float cpoint[NVC];
-    // getPoint(cpoint,shared_state,idx);
+    float cpoint[NVC];
+    getPoint(cpoint,shared_state,idx);
     float epoint[NVC];
     getPoint(epoint,shared_state,idx+blockDim.y);
-    // float wpoint[NVC];
-    // getPoint(wpoint,shared_state,idx-blockDim.y);
+    float wpoint[NVC];
+    getPoint(wpoint,shared_state,idx-blockDim.y);
     float eepoint[NVC];
     getPoint(eepoint,shared_state,idx+2*blockDim.y);
-    // float wwpoint[NVC];
-    // getPoint(wwpoint,shared_state,idx-2*blockDim.y);
+    float wwpoint[NVC];
+    getPoint(wwpoint,shared_state,idx-2*blockDim.y);
     float Pr[NR]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 1;  //spectral radius idx
-    // __syncthreads();
-    // printf("%d,%d,%d,%d,%d\n",sizeof(wwpoint),sizeof(wpoint),sizeof(cpoint),sizeof(epoint),sizeof(eepoint));
-    // __syncthreads();
     //Pressure ratio
-    // Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
-    // Pr[1] = pressureRatio(wpoint,cpoint,epoint);
-    // Pr[2] = pressureRatio(cpoint,epoint,eepoint);
-    // printf("%f,%f,%f,%f,%f\n",wwpoint[3],wpoint[3],cpoint[3],epoint[3],eepoint[3]);
-    // printf("%f\n",eepoint[3]);
-    //West
+    Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
+    Pr[1] = pressureRatio(wpoint,cpoint,epoint);
+    Pr[2] = pressureRatio(cpoint,epoint,eepoint);
+
+    // //West
     // flimiter(temp_left,wpoint,cpoint,Pr[0]);
     // flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
     // efluxx(dfdx,temp_left,temp_right,ONE);
     // espectral(dfdx,temp_left,temp_right,ONE,spi);
-    //
+    // //
     // //East
     // flimiter(temp_left,cpoint,epoint,Pr[1]);
     // flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
@@ -237,12 +215,8 @@ __device__
 void step(float *shared_state, int idx)
 {
 // printf("%d\n",sizeof(shared_state));
-  float dfdxy[NVC]={0,0,0,0};
-  // shared_state[idx]=dfdxy[0];
-  // printf("%f\n",dfdxy[0]);
+  // float flux[NVC]={0};
   // get_dfdy(dfdxy,shared_state,idx);
-  get_dfdx(dfdxy,shared_state,idx);
-  // printf("%f\n",dfdxy[0]);
-  // shared_state[idx]=dfdxy[0];
+  get_dfdx(shared_state,idx);
 
 }

@@ -153,7 +153,7 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     """Use this function to measure the gpu's performance."""
     #Creating Execution model parameters
     grid_size = (int(arr.shape[2]/block_size[0]),int(arr.shape[3]/block_size[1]))   #Grid size
-    shared_size = 2*(arr[0,:,:block_size[0],:block_size[1]].nbytes) #Creating size of shared array
+    shared_size = (arr[0,:,:block_size[0],:block_size[1]].nbytes) #Creating size of shared array
 
     #Creating events to record
     start_gpu = cuda.Event()
@@ -171,13 +171,13 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     gpu_performance = 0 #Allocating gpu performance
     #------------------------Testing GPU Performance---------------------------#
     for i in range(num_tries):
-        start_gpu.record()
+        # start_gpu.record()
         gpu_fcn(arr_gpu,grid=grid_size, block=block_size,shared=shared_size)
-        stop_gpu.record()
-        stop_gpu.synchronize()
-        gpu_performance += np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
-    gpu_performance /= num_tries    #finding average by division of number of tries
-    print("Average GPU Performance:", gpu_performance)
+        # stop_gpu.record()
+        # stop_gpu.synchronize()
+        # gpu_performance += np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
+    # gpu_performance /= num_tries    #finding average by division of number of tries
+    # print("Average GPU Performance:", gpu_performance)
     #-------------------------Ending CPU Performance Testing--------------------#
 
 
@@ -303,18 +303,17 @@ def dummy_fcn(arr):
     return arr
 
 
-
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (4,int(128),int(128))
     arr0 = np.zeros(dims)
-    # arr0[0,:,:] = 0.1
-    # arr0[1,:,:] = 0.0
-    # arr0[2,:,:] = 0.2
-    # arr0[3,:,:] = 0.125
+    arr0[0,:,:] = 0.1
+    arr0[1,:,:] = 0.0
+    arr0[2,:,:] = 0.2
+    arr0[3,:,:] = 0.125
 
 
-    block_size = (32,32,1)
+    block_size = (32,16,1)
     dy = [0.1,0.1]
     t0 = 0
     t_b = 100
