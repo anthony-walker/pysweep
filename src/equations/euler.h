@@ -6,7 +6,7 @@
 #define ABSOLUTE(x)   abs(x)
 #define MIN(x,y)   min(x,y)
 #define ISNAN(x)   isnan(x)
-#define ARRCPY(a,b,c) memcpy(a,b,c)
+#define ARRCPY(a,b,c) memcpy(a,b,c) //Not working as expected
 
 __device__ __constant__  const int SS=5; //stencil size
 __device__ __constant__ const int NVC=4; //Number of variables
@@ -19,13 +19,10 @@ __device__ __constant__ const int NR = 3;
 __device__
 void getPoint(float * curr_point,float *shared_state, int idx)
 {
-    printf("%d,%d,%d,%d\n",idx,idx+SGIDS,idx+2*SGIDS,idx+3*SGIDS);
-    // printf("%0.2f,%0.2f,%0.2f,%0.2f\n",shared_state[idx],shared_state[idx+SGIDS],shared_state[idx+2*SGIDS],shared_state[idx+3*SGIDS]);
-
-    // curr_point[0]=shared_state[idx];
-    // curr_point[1]=shared_state[idx+SGIDS];
-    // curr_point[2]=shared_state[idx+SGIDS*2];
-    // curr_point[3]=shared_state[idx+SGIDS*3];
+    curr_point[0]=shared_state[idx];
+    curr_point[1]=shared_state[idx+SGIDS];
+    curr_point[2]=shared_state[idx+SGIDS*2];
+    curr_point[3]=shared_state[idx+SGIDS*3];
 }
 
 /*
@@ -59,33 +56,20 @@ __device__
 void  flimiter(float *temp_state, float *left_point, float *right_point , float Pr)
 {
 
-  // for (int i = 0; i < NVC; i++)
-  // {
-  //     temp_state[i] = left_point[i];
-  //     __syncthreads();
-  // }
-  printf("%d,%d,%d\n",sizeof(temp_state),sizeof(right_point),sizeof(left_point) );
-  // printf("%d,%d,%f,%f,%f,%f\n",0,sizeof(temp_state), temp_state[0], temp_state[1], temp_state[2], temp_state[3]);
-  // ARRCPY(temp_state,left_point,sizeof(temp_state));
-  // printf("%d,%d,%f,%f,%f,%f\n",0,sizeof(temp_state), temp_state[0], temp_state[1], temp_state[2], temp_state[3]);
-  // if (ISNAN(Pr) || (Pr<1.0e-8))
-  // {
-  //   for (int i = 0; i < NVC; i++)
-  //   {
-  //       temp_state[i] = left_point[i];
-  //   }
-// }
-  // else
-  // {
-  //   float coef = HALF*MIN(Pr, ONE);
-  //   for (int j = 0; j < NVC; j++)
-  //   {
-  //       temp_state[j] = (left_point[j] + coef*(left_point[j] - right_point[j]));
-  //       __syncthreads();
-  //   }
-  // }
+    for (int i = 0; i < NVC; i++)
+    {
+        temp_state[i] += left_point[i];
+    }
 
-
+    if (!(ISNAN(Pr)) || !(Pr<1.0e-8))
+    {
+        float coef = HALF*MIN(Pr, ONE);
+        for (int j = 0; j < NVC; j++)
+        {
+            temp_state[j] +=  coef*(left_point[j] - right_point[j]);
+        }
+    }
+    __syncthreads();    //May or may not help thread divergence
 }
 /*
   Use this function to apply the roe average and obtain the spectral radius
@@ -140,40 +124,37 @@ __device__
 void get_dfdx(float *dfdx, float *shared_state, int idx)
 {
   //Constants and Initializing
-    // float cpoint[NVC];
-    // getPoint(cpoint,shared_state,idx);
+    float cpoint[NVC];
+    getPoint(cpoint,shared_state,idx);
     float epoint[NVC];
     getPoint(epoint,shared_state,idx+blockDim.y);
-    // float wpoint[NVC];
-    // getPoint(wpoint,shared_state,idx-blockDim.y);
+    float wpoint[NVC];
+    getPoint(wpoint,shared_state,idx-blockDim.y);
     float eepoint[NVC];
     getPoint(eepoint,shared_state,idx+2*blockDim.y);
-    // float wwpoint[NVC];
-    // getPoint(wwpoint,shared_state,idx-2*blockDim.y);
+    float wwpoint[NVC];
+    getPoint(wwpoint,shared_state,idx-2*blockDim.y);
     float Pr[NR]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 1;  //spectral radius idx
-    // __syncthreads();
-    // printf("%d,%d,%d,%d,%d\n",sizeof(wwpoint),sizeof(wpoint),sizeof(cpoint),sizeof(epoint),sizeof(eepoint));
-    // __syncthreads();
-    //Pressure ratio
-    // Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
-    // Pr[1] = pressureRatio(wpoint,cpoint,epoint);
-    // Pr[2] = pressureRatio(cpoint,epoint,eepoint);
-    // printf("%f,%f,%f,%f,%f\n",wwpoint[3],wpoint[3],cpoint[3],epoint[3],eepoint[3]);
-    // printf("%f\n",eepoint[3]);
+
+    // Pressure ratio
+    Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
+    Pr[1] = pressureRatio(wpoint,cpoint,epoint);
+    Pr[2] = pressureRatio(cpoint,epoint,eepoint);
+
     //West
-    // flimiter(temp_left,wpoint,cpoint,Pr[0]);
-    // flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
-    // efluxx(dfdx,temp_left,temp_right,ONE);
-    // espectral(dfdx,temp_left,temp_right,ONE,spi);
-    //
-    // //East
-    // flimiter(temp_left,cpoint,epoint,Pr[1]);
-    // flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
-    // efluxx(dfdx,temp_left,temp_right,-ONE);
-    // espectral(dfdx,temp_left,temp_right,ONE,spi);
+    flimiter(temp_left,wpoint,cpoint,Pr[0]);
+    flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
+    efluxx(dfdx,temp_left,temp_right,ONE);
+    espectral(dfdx,temp_left,temp_right,ONE,spi);
+
+    //East
+    flimiter(temp_left,cpoint,epoint,Pr[1]);
+    flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
+    efluxx(dfdx,temp_left,temp_right,-ONE);
+    espectral(dfdx,temp_left,temp_right,ONE,spi);
 }
 /*
 Use this function to obtain the flux for each system variable
@@ -236,13 +217,13 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
 __device__
 void step(float *shared_state, int idx)
 {
-// printf("%d\n",sizeof(shared_state));
-  float dfdxy[NVC]={0,0,0,0};
-  // shared_state[idx]=dfdxy[0];
-  // printf("%f\n",dfdxy[0]);
-  // get_dfdy(dfdxy,shared_state,idx);
-  get_dfdx(dfdxy,shared_state,idx);
-  // printf("%f\n",dfdxy[0]);
-  // shared_state[idx]=dfdxy[0];
-
+  float dfdx[NVC]={0,0,0,0};
+  float dfdy[NVC]={0,0,0,0};
+  get_dfdy(dfdx,shared_state,idx);
+  get_dfdx(dfdx,shared_state,idx);
+  __syncthreads();
+  for (int i = 0; i < NVC; i++)
+  {
+      shared_state[idx+i*SGIDS]+=dfdx[i]+dfdy[i];
+  }
 }

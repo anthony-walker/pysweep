@@ -167,18 +167,16 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
 
     #Getting GPU Function
     gpu_fcn = source_mod.get_function("UpPyramid")
-    print(gpu_fcn.num_regs)
-    print(shared_size,grid_size,block_size)
     gpu_performance = 0 #Allocating gpu performance
     #------------------------Testing GPU Performance---------------------------#
     for i in range(num_tries):
-        # start_gpu.record()
+        start_gpu.record()
         gpu_fcn(arr_gpu,grid=grid_size, block=block_size,shared=shared_size)
-        # stop_gpu.record()
-        # stop_gpu.synchronize()
-        # gpu_performance += np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
-    # gpu_performance /= num_tries    #finding average by division of number of tries
-    # print("Average GPU Performance:", gpu_performance)
+        stop_gpu.record()
+        stop_gpu.synchronize()
+        gpu_performance += np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
+    gpu_performance /= num_tries    #finding average by division of number of tries
+    print("Average GPU Performance:", gpu_performance)
     #-------------------------Ending CPU Performance Testing--------------------#
 
 

@@ -49,13 +49,12 @@ __global__ void UpPyramid(float *state)
     int tly = sgid%blockDim.y;  //Location y
     // float fluxUpdate[4];
     // Filling shared state array with variables initial variables
-    // printf("%d,%d,%d\n",gid,sgid,sgid+SGIDS);
+    // printf("%d,%d,%d,%d,%d\n",gid,sgid,sgid+SGIDS,sgid+2*SGIDS,sgid+3*SGIDS);
     for (int k = 0; k < 1; k++)
     {
         for (int i = 0; i < NV; i++)
         {
             shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
-            // shared_state[sgid+i*SGIDS+SGNVS] = state[gid+i*VARS+k*TIMES]; //next time step
         }
         __syncthreads(); //Sync threads here to ensure all initial values are copied
 
@@ -65,12 +64,10 @@ __global__ void UpPyramid(float *state)
         lxy += OPS;
 
         // Solving step function
-        if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
+        if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
         {
-            // printf("%d,%d,%d,%d,%d\n",lxy,ux,uy,tlx,tly);
             step(shared_state,sgid);
         }
-        __syncthreads();
 
         // Place values back in original matrix
         for (int j = 0; j < NV; j++)
