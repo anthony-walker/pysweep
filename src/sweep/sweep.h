@@ -46,7 +46,7 @@ __global__ void UpPyramid(float *state)
     int sgid = gid%(SGIDS); //Shared global index
     int tlx = sgid/blockDim.x;  //Location x
     int tly = sgid%blockDim.y;  //Location y
-    float * buffer = new float[NV];
+
     // Filling shared state array with variables initial variables
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
@@ -65,13 +65,13 @@ __global__ void UpPyramid(float *state)
         lxy += OPS;
 
         // Solving step function
-        // if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
-        // {
-        //     // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
-        //     step(shared_state,sgid);
-        // }
+        if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
+        {
+            // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
+            step(shared_state,sgid);
+        }
 
-        __syncthreads();   //Sync threads after solving
+
         // Place values back in original matrix
         for (int j = 0; j < NV; j++)
         {

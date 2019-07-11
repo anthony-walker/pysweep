@@ -2,6 +2,9 @@
     Programmer: Anthony Walker
     The equation specific functions (2D Euler).
 */
+#define SQUAREROOT(x)   sqrt(x)
+#define ABSOLUTE(x)   abs(x)
+
 __device__ __constant__  const int SS=5; //stencil size
 __device__ __constant__ const int NVC=4; //Number of variables
 __device__ __constant__ const float GAMMA=1.4; //Gamma
@@ -93,8 +96,8 @@ void espectral(float* flux,float *left_state, float *right_state, int dir, int d
 {
   //Initializing values and determining spectral state
   float spec_state[NVC]={0};
-  float rootrhoL = sqrt(left_state[0]);
-  float rootrhoR = sqrt(left_state[1]);
+  float rootrhoL = SQUAREROOT(left_state[0]);
+  float rootrhoR = SQUAREROOT(left_state[1]);
   spec_state[0] = rootrhoL*rootrhoR;
   float denom = 1/(spec_state[0]);
   for (int i = 1; i < NVC; i++)
@@ -104,7 +107,7 @@ void espectral(float* flux,float *left_state, float *right_state, int dir, int d
     spec_state[i] *= spec_state[0]*denom; //Puts in flux form to find pressure
   }
   //Updating flux with spectral value
-  float rs = dir*(sqrt(GAMMA*pressure(spec_state)/spec_state[0])+abs(spec_state[dim]/spec_state[0]));
+  float rs = dir*(SQUAREROOT(GAMMA*pressure(spec_state)/spec_state[0])+ABSOLUTE(spec_state[dim]/spec_state[0]));
   for (int i = 0; i < NVC; i++)
   {
     flux[i] += rs*(left_state[i]-right_state[i]);
@@ -131,7 +134,7 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     float Pr[NR]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
-
+    int spi = 1;  //spectral radius idx
     //Pressure ratio
     Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
     Pr[1] = pressureRatio(wpoint,cpoint,epoint);
@@ -141,20 +144,83 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     flimiter(temp_left,wpoint,cpoint,Pr[0]);
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
     efluxx(dfdx,temp_left,temp_right,ONE);
-    espectral(dfdx,temp_left,temp_right,ONE,1);
+    espectral(dfdx,temp_left,temp_right,ONE,spi);
 
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
     efluxx(dfdx,temp_left,temp_right,-ONE);
-    espectral(dfdx,temp_left,temp_right,ONE,1);
+    espectral(dfdx,temp_left,temp_right,ONE,spi);
+}
+/*
+Use this function to obtain the flux for each system variable
+*/
+__device__
+void  efluxy(float* flux,float *left_state, float *right_state, int dir)
+{
+  float rhoL = left_state[0];
+  float rhoR = right_state[0];
+  float uL = left_state[1]/rhoL;
+  float uR = right_state[1]/rhoR;
+  float vL = left_state[2]/rhoL;
+  float vR = right_state[2]/rhoR;
+  float pL = pressure(left_state);
+  float pR = pressure(right_state);
+  flux[0] += dir*(left_state[1]+right_state[1]);
+  flux[1] += dir*(left_state[2]*uL+right_state[2]*uR);
+  flux[2] += dir*(left_state[2]*vL+pL+right_state[2]*vR+pR);
+  flux[3] += dir*((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
+ }
+/*
+  Use this function to determine the flux in the x direction
+*/
+__device__
+void get_dfdy(float *dfdy, float *shared_state, int idx)
+{
+  //Constants and Initializing
+    float cpoint[NVC];
+    getPoint(cpoint,shared_state,idx);
+    float epoint[NVC];
+    getPoint(epoint,shared_state,idx+1);
+    float wpoint[NVC];
+    getPoint(wpoint,shared_state,idx-1);
+    float eepoint[NVC];
+    getPoint(eepoint,shared_state,idx+2);
+    float wwpoint[NVC];
+    getPoint(wwpoint,shared_state,idx-2);
+    float Pr[NR]={0};
+    float temp_left[NVC]={0};
+    float temp_right[NVC]={0};
+    int spi = 2;  //spectral radius idx
+    //Pressure ratio
+    Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
+    Pr[1] = pressureRatio(wpoint,cpoint,epoint);
+    Pr[2] = pressureRatio(cpoint,epoint,eepoint);
+
+    //West
+    flimiter(temp_left,wpoint,cpoint,Pr[0]);
+    flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
+    efluxy(dfdy,temp_left,temp_right,ONE);
+    espectral(dfdy,temp_left,temp_right,ONE,spi);
+
+    //East
+    flimiter(temp_left,cpoint,epoint,Pr[1]);
+    flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
+    efluxy(dfdy,temp_left,temp_right,-ONE);
+    espectral(dfdy,temp_left,temp_right,ONE,spi);
 }
 
 __device__
 void step(float *shared_state, int idx)
 {
-  float dfdx[NVC]={0};
-  get_dfdx(dfdx,shared_state,idx);
-  // get_dfdx(shared_state,idx);
+  float dfdxy[NVC]={0};
+  get_dfdx(dfdxy,shared_state,idx);
+  get_dfdy(dfdxy,shared_state,idx);
+  __syncthreads();
+  // for (int i = 0; i < NVC; i++)
+  // {
+  //   shared_state[idx+i*SGIDS] += dfdxy[i];
+  // }
+
 
 }

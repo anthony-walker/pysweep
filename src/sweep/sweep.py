@@ -108,7 +108,7 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
         if True:
             gpu_speed(arr, source_mod, cpu_fcn, block_size,ops,num_tries=20)
             # pass
-        if True:
+        if False:
             cpu_speed(arr, cpu_fcn, block_size,ops,num_tries=1)
     #----------------------------CUDA ------------------------------#
 
@@ -161,6 +161,10 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
 
     #Making sure array is correct type
     arr = arr.astype(np.float32)
+    arr_gpu = cuda.mem_alloc(arr.nbytes)
+    cuda.memcpy_htod(arr_gpu,arr)
+
+
     #Getting GPU Function
     gpu_fcn = source_mod.get_function("UpPyramid")
     print(gpu_fcn.num_regs)
@@ -168,7 +172,7 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     #------------------------Testing GPU Performance---------------------------#
     for i in range(num_tries):
         start_gpu.record()
-        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=shared_size)
+        gpu_fcn(arr_gpu,grid=grid_size, block=block_size,shared=shared_size)
         stop_gpu.record()
         stop_gpu.synchronize()
         gpu_performance += np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
@@ -304,10 +308,10 @@ if __name__ == "__main__":
     # print("Starting execution.")
     dims = (4,int(128),int(128))
     arr0 = np.zeros(dims)
-    arr0[0,:,:] = 0.1
-    arr0[1,:,:] = 0.0
-    arr0[2,:,:] = 0.2
-    arr0[3,:,:] = 0.125
+    # arr0[0,:,:] = 0.1
+    # arr0[1,:,:] = 0.0
+    # arr0[2,:,:] = 0.2
+    # arr0[3,:,:] = 0.125
 
 
     block_size = (32,32,1)
