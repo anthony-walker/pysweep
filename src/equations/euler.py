@@ -132,13 +132,14 @@ def espectral(left_state,right_state,xy):
     rootrhoR = np.sqrt(right_state[0])
     tL = left_state/left_state[0] #Temporary variable to access e, u, v, and w - Left
     tR = right_state/right_state[0] #Temporary variable to access e, u, v, and w -  Right
+
     #Calculations
     denom = 1/(rootrhoL+rootrhoR)
     spec_state[0] += rootrhoL*rootrhoR
     spec_state[1] += (rootrhoL*tL[1]+rootrhoR*tR[1])*denom
     spec_state[2] += (rootrhoL*tL[2]+rootrhoR*tR[2])*denom
     spec_state[3] += (rootrhoL*tL[3]+rootrhoR*tR[3])*denom
-    P = pressure(spec_state)
+    P = pressure(spec_state*spec_state[0])
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 

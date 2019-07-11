@@ -6,17 +6,18 @@ Other information can be found in the euler.h file
 */
 
 //Constant Memory Values
-__device__ __constant__ const int ZERO=0;
+__device__ __constant__ const float ZERO=0;
 __device__ __constant__ const float QUARTER=0.25;
 __device__ __constant__ const float HALF=0.5;
-__device__ __constant__ const int ONE=1;
-__device__ __constant__ const int TWO=2;
+__device__ __constant__ const float ONE=1;
+__device__ __constant__ const float TWO=2;
 __device__ __constant__ int SGIDS; //shift in shared data
 __device__ __constant__ int VARS; //shift in variables in data
 __device__ __constant__ int TIMES; //shift in times in data
 __device__ __constant__  int MSS; //max swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
+__device__ __constant__ int SGNVS;
 __device__ __constant__  float DTDX;
 __device__ __constant__  float DTDY;
 
@@ -45,7 +46,7 @@ __global__ void UpPyramid(float *state)
     int sgid = gid%(SGIDS); //Shared global index
     int tlx = sgid/blockDim.x;  //Location x
     int tly = sgid%blockDim.y;  //Location y
-
+    float * buffer = new float[NV];
     // Filling shared state array with variables initial variables
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
@@ -53,7 +54,8 @@ __global__ void UpPyramid(float *state)
     {
         for (int i = 0; i < NV; i++)
         {
-            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES];
+            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
+            shared_state[sgid+i*SGIDS+SGNVS] = state[gid+i*VARS+k*TIMES]; //next time step
         }
         __syncthreads(); //Sync threads here to ensure all initial values are copied
 
@@ -63,12 +65,11 @@ __global__ void UpPyramid(float *state)
         lxy += OPS;
 
         // Solving step function
-        if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
-        {
-            // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
-            step(shared_state,sgid);
-        }
-
+        // if (tlx<ux && tlx>=lxy && tly<uy && tly>=lxy)
+        // {
+        //     // printf("%d,%d,%d,%d,%d\n",sgid,ux,lxy,tlx,tly);
+        //     step(shared_state,sgid);
+        // }
 
         __syncthreads();   //Sync threads after solving
         // Place values back in original matrix

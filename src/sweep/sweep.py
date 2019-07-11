@@ -60,7 +60,9 @@ cpu_array = None
 gpu_array = None
 #------------------Architecture-----------------------------------------
 gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
+GPUtil.showUtilization()
 dev_attrs = getDeviceAttrs(gpu_id[0],False)   #Getting device attributes
+print(dev_attrs["DEVICE_NAME"])
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 root_cores = int(np.sqrt(cores))
@@ -92,8 +94,7 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     source_code = source_code_read("./src/sweep/sweep.h")
     split_source_code = source_code.split("//!!(@#\n")
     source_code = split_source_code[0]+"\n"+source_code_read("./src/equations/euler.h")+"\n"+split_source_code[1]
-    source_mod = SourceModule(source_code)
-
+    source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
     #---------------Data Input setup -------------------------#
     time_steps = int((targs[1]-targs[0])/targs[2])  #Number of time steps
     arr = np.zeros((time_steps,)+arr0.shape,dtype=np.float32) #4D arr(t,v,x,y)
@@ -107,7 +108,7 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
         if True:
             gpu_speed(arr, source_mod, cpu_fcn, block_size,ops,num_tries=20)
             # pass
-        if False:
+        if True:
             cpu_speed(arr, cpu_fcn, block_size,ops,num_tries=1)
     #----------------------------CUDA ------------------------------#
 
@@ -142,6 +143,7 @@ def constant_copy(source_mod,ps,block_size,ops):
     const_dict['VARS'] = (int_cast,VARS)
     const_dict['TIMES'] = (int_cast,TIMES)
     const_dict['OPS'] = (int_cast,ops)
+    const_dict['SGNVS'] = (int_cast,SGIDS*NV)
     for key in const_dict:
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
@@ -151,7 +153,8 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     """Use this function to measure the gpu's performance."""
     #Creating Execution model parameters
     grid_size = (int(arr.shape[2]/block_size[0]),int(arr.shape[3]/block_size[1]))   #Grid size
-    shared_size = arr[0,:,:block_size[0],:block_size[1]].nbytes #Creating size of shared array
+    shared_size = 2*(arr[0,:,:block_size[0],:block_size[1]].nbytes) #Creating size of shared array
+
     #Creating events to record
     start_gpu = cuda.Event()
     stop_gpu = cuda.Event()
@@ -160,6 +163,7 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     arr = arr.astype(np.float32)
     #Getting GPU Function
     gpu_fcn = source_mod.get_function("UpPyramid")
+    print(gpu_fcn.num_regs)
     gpu_performance = 0 #Allocating gpu performance
     #------------------------Testing GPU Performance---------------------------#
     for i in range(num_tries):
@@ -300,15 +304,17 @@ if __name__ == "__main__":
     # print("Starting execution.")
     dims = (4,int(128),int(128))
     arr0 = np.zeros(dims)
-    arr0[1,:,:] = 2.0
-    arr0[2,:,:] = 4.0
-    arr0[3,:,:] = 8.0
+    arr0[0,:,:] = 0.1
+    arr0[1,:,:] = 0.0
+    arr0[2,:,:] = 0.2
+    arr0[3,:,:] = 0.125
+
 
     block_size = (32,32,1)
     dy = [0.1,0.1]
     t0 = 0
-    t_b = 1
-    dt = 0.5
+    t_b = 100
+    dt = 1
     targs = (t0,t_b,dt)
     order = 2
 
