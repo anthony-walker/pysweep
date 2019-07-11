@@ -21,7 +21,10 @@ __device__ __constant__ int SGNVS;
 __device__ __constant__  float DTDX;
 __device__ __constant__  float DTDY;
 
+
+
 //!!(@#
+
 
 __device__ int getGlobalIdx_2D_2D()
 {
@@ -33,7 +36,9 @@ __device__ int getGlobalIdx_2D_2D()
 /*
     Use this function to create and return the GPU UpPyramid
 */
-__global__ void UpPyramid(float *state)
+__global__ void
+__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
+UpPyramid(float *state)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -50,7 +55,7 @@ __global__ void UpPyramid(float *state)
     // float fluxUpdate[4];
     // Filling shared state array with variables initial variables
     // printf("%d,%d,%d,%d,%d\n",gid,sgid,sgid+SGIDS,sgid+2*SGIDS,sgid+3*SGIDS);
-    for (int k = 0; k < 1; k++)
+    for (int k = 0; k < MSS; k++)
     {
         for (int i = 0; i < NV; i++)
         {

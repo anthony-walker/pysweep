@@ -62,7 +62,6 @@ gpu_array = None
 gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10) #getting devices by load
 GPUtil.showUtilization()
 dev_attrs = getDeviceAttrs(gpu_id[0],False)   #Getting device attributes
-print(dev_attrs["DEVICE_NAME"])
 gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
 cores = mp.cpu_count()  #Getting number of cpu cores
 root_cores = int(np.sqrt(cores))
@@ -72,7 +71,7 @@ cpu_test_fcn = None
 SS = 0  #number of steps in Octahedron (Half Pyramid and DownPyramid)
 #----------------------End Global Variables------------------------#
 
-def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
+def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None,test_tries=1):
     """Use this function to perform swept rule
     args:
     arr0 -  2D numpy array of initial conditions
@@ -96,7 +95,7 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     source_code = split_source_code[0]+"\n"+source_code_read("./src/equations/euler.h")+"\n"+split_source_code[1]
     source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
     #---------------Data Input setup -------------------------#
-    time_steps = int((targs[1]-targs[0])/targs[2])  #Number of time steps
+    time_steps = int((targs[1]-targs[0])/targs[2])+1  #Number of time steps +1 becuase initial time step
     arr = np.zeros((time_steps,)+arr0.shape,dtype=np.float32) #4D arr(t,v,x,y)
     arr[0] = arr0
     arr_shape = np.shape(arr)  #Shape of array
@@ -105,22 +104,9 @@ def sweep(arr0,targs,ops,block_size, cpu_fcn, gpu_fcn ,gpu_aff=None):
     #------------------Dividing work based on the architecture----------------#
     if rank == master_rank:
         arr0s = rank_split(arr0,arr_shape[1:],num_ranks)
-        if True:
-            gpu_speed(arr, source_mod, cpu_fcn, block_size,ops,num_tries=20)
-            # pass
-        if False:
-            cpu_speed(arr, cpu_fcn, block_size,ops,num_tries=1)
-    #----------------------------CUDA ------------------------------#
-
-    #-------------------------END CUDA ---------------------------#
-
-# (gpu_sum,cpu_sum,gpu_id) = arch_query()    #This gets architecture information from ranks
-# gpu_affinity *= gpu_sum/cpu_sum #Adjust affinity by number of gpu/cpu_cores
-# print(gpu_affinity)
-# gpu_blocks,cpu_blocks = arch_work_blocks(plane_shape,block_size,gpu_affinity)
-# print(gpu_blocks,cpu_blocks)
-# print("Max: ",max_swept_step)
-
+        if gpu_aff is None:
+            gpu_aff = gpu_speed(arr, source_mod, cpu_fcn, block_size,ops,num_tries=test_tries)/cpu_speed(arr, cpu_fcn, block_size,ops,num_tries=test_tries)
+            print(gpu_aff)
 
 def constant_copy(source_mod,ps,block_size,ops):
     """Use this function to copy constant args to cuda memory."""
@@ -164,11 +150,12 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
     arr_gpu = cuda.mem_alloc(arr.nbytes)
     cuda.memcpy_htod(arr_gpu,arr)
 
-
     #Getting GPU Function
     gpu_fcn = source_mod.get_function("UpPyramid")
-    gpu_performance = 0 #Allocating gpu performance
+    # print(gpu_fcn.num_regs)
+
     #------------------------Testing GPU Performance---------------------------#
+    gpu_performance = 0 #Allocating gpu performance
     for i in range(num_tries):
         start_gpu.record()
         gpu_fcn(arr_gpu,grid=grid_size, block=block_size,shared=shared_size)
@@ -176,9 +163,9 @@ def gpu_speed(arr,source_mod,cpu_fcn,block_size,ops,num_tries=1):
         stop_gpu.synchronize()
         gpu_performance += np.prod(grid_size)*np.prod(block_size)/(start_gpu.time_till(stop_gpu)*1e-3 )
     gpu_performance /= num_tries    #finding average by division of number of tries
-    print("Average GPU Performance:", gpu_performance)
-    #-------------------------Ending CPU Performance Testing--------------------#
-
+    # print("Average GPU Performance:", gpu_performance)
+    return gpu_performance
+    #-------------------------Ending GPU Performance Testing--------------------#
 
 
 def cpu_speed(arr,cpu_fcn,block_size,ops,num_tries=1):
@@ -190,6 +177,7 @@ def cpu_speed(arr,cpu_fcn,block_size,ops,num_tries=1):
     hcs = lambda x,s: np.array_split(x,s,axis=x.shape.index(max(x.shape)))   #Lambda function for creating blocks for cpu testing
     cpu_test_blocks =  [item for subarr in hcs(arr,sx) for item in hcs(subarr,sy)]    #applying lambda function
     cpu_test_fcn = sweep_lambda((UpPyramid,cpu_fcn,0,ops)) #Creating a function that can be called with only the block list
+
     #------------------------Testing CPU Performance---------------------------#
     pool = mp.Pool(cores)   #Pool allocation
     cpu_performance = 0
@@ -202,7 +190,7 @@ def cpu_speed(arr,cpu_fcn,block_size,ops,num_tries=1):
     pool.close()
     pool.join()
     cpu_performance /= num_tries
-    print("Average CPU Performance:", cpu_performance)
+    # print("Average CPU Performance:", cpu_performance)
     return cpu_performance
 
     #-------------------------Ending CPU Performance Testing--------------------#
@@ -304,7 +292,7 @@ def dummy_fcn(arr):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (4,int(32),int(32))
+    dims = (4,int(128),int(128))
     arr0 = np.zeros(dims)
     arr0[0,:,:] = 0.1
     arr0[1,:,:] = 0.0
@@ -312,12 +300,11 @@ if __name__ == "__main__":
     arr0[3,:,:] = 0.125
 
 
-    block_size = (16,8,1)
+    block_size = (32,32,1)
     dy = [0.1,0.1]
     t0 = 0
-    t_b = 1
+    t_b = 100
     dt = 1
     targs = (t0,t_b,dt)
     order = 2
-
-    sweep(arr0,targs,order,block_size,euler.step,0)
+    sweep(arr0,targs,order,block_size,euler.step,0,test_tries=5)

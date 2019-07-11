@@ -30,10 +30,11 @@ def dfdxy(state,idx):
     idxx=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1),idx[3])
     idxy=(idx[0],idx[1],idx[2],slice(idx[3]-ops,idx[3]+ops+1,1))
 
-
+    # print(idxx)
     #Finding pressure ratio
     Prx = pressure_ratio(state[idxx])
     Pry = pressure_ratio(state[idxy])
+
     #Finding spatial derivatives
     dfdx = direction_flux(state[idxx],Prx,True)
     dfdy = direction_flux(state[idxy],Pry,False)
@@ -144,12 +145,12 @@ def espectral(left_state,right_state,xy):
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
 if __name__ == "__main__":
-    TA = np.ones((5,10,10,4))
-    TA[2,2,5,:] = [3.7,1.4,0.5,0]
-    TA[2,6,5,:] = [4.5,2.3,3.8,4]
-    TA[2,5,5,:] = [0.526,0.01,0.647,0.328]
-    TA[2,4,5,:] = [3.2,1.49,0.25,0.37]
-    TA[2,3,5,:] = [0.9,0.7,0.5,0.1]
+    TA = np.ones((5,4,10,10))
+    TA[2,:,5,5] = [3.7,1.4,0.5,0]
+    TA[2,:,5,5] = [4.5,2.3,3.8,4]
+    TA[2,:,5,5] = [0.526,0.01,0.647,0.328]
+    TA[2,:,5,5] = [3.2,1.49,0.25,0.37]
+    TA[2,:,5,5] = [0.9,0.7,0.5,0.1]
     # for x in TA:
     #     for y in x:
     #         for t in y:

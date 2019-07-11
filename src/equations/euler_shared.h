@@ -10,6 +10,9 @@ __device__ __constant__ const int NVC=4; //Number of variables
 __device__ __constant__ const float GAMMA=1.4; //Gamma
 __device__ __constant__ const float GAM_M1=GAMMA-1;
 __device__ __constant__ const int NR = 3;
+__device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
+__device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
+
 /*
   Use this function to get point data
 */
