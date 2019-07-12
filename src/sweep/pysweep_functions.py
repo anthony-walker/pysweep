@@ -1,6 +1,9 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing the swept rule.
+import numpy as np
 from pysweep_lambda import sweep_lambda
+import pycuda.driver as cuda
+
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
     with open(filename,"r") as f:
