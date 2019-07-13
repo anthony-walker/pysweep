@@ -71,11 +71,17 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
     """
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
+    print(MPI.Get_group())
     master_rank = 0 #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
     print("Rank: ",rank," Platform: ",platform.uname()[1])
 
+    #Getting GPU info
+    gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10000) #getting devices by load
+    num_gpus = len(gpi_id)
+
+    gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
     #----------------Reading In Source Code-------------------------------#
     source_code = source_code_read("./src/sweep/sweep.h")
     split_source_code = source_code.split("//!!(@#\n")
@@ -106,10 +112,9 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
 
     #---------------------------Splitting data among ranks----------------------------------#
     if rank == master_rank:
-        gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10000) #getting devices by load
         print(num_ranks)
 
-    gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
+
     cores = mp.cpu_count()  #Getting number of cpu cores
     root_cores = int(np.sqrt(cores))
     # arr = np.zeros((time_steps,)+arr0.shape,dtype=dType.type) #4D arr(t,v,x,y)
@@ -122,7 +127,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
 
 def create_shared_array(comm,arr_shape,dType):
     """Use this function to create shared memory arrays for node communication."""
-
     arr_bytes = int(np.prod(arr_shape)*dType.itemsize) #4D arr(t,v,x,y)
     itemsize = int(dType.itemsize)
     #Creating MPI Window for shared memory
