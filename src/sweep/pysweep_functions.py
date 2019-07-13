@@ -4,6 +4,54 @@ import numpy as np
 from pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
 
+def affinity_split(affinity,block_size,arr_shape,total_gpus):
+    """Use this function to split the given data based on rank information and the affinity.
+    affinity -  a value between zero and one. (GPU work/CPU work)/Total Work
+    block_size -  gpu block size
+    arr_shape - shape of array initial conditions array (v,x,y)
+    Assuming total number of gpus is the same as the number of cpus
+    """
+    #Getting number of GPU blocks based on affinity
+    blocks_per_row = arr_shape[2]/block_size[1]
+    blocks_per_column = arr_shape[1]/block_size[0]
+    num_blocks = int(blocks_per_row*blocks_per_column)
+    gpu_blocks = round(affinity*num_blocks)
+    #Rounding blocks to the nearest column
+    col_mod = gpu_blocks%blocks_per_column
+    col_perc = col_mod/blocks_per_column
+    gpu_blocks += round(col_perc)*blocks_per_column-col_mod
+    #Getting number of columns and rows
+    num_columns = gpu_blocks/blocks_per_column
+    num_rows = blocks_per_row
+    #Region Indicies
+    gpu_slices = (slice(0,arr_shape[0],1),slice(0,block_size[0]*num_columns,1),slice(0,block_size[1]*num_rows,1))
+    # cpu_slices = (slice(0,arr_shape[0],1),slice(block_size[0]*(num_columns,block_size[0]*num_columns,1),slice(0,block_size[1]*num_rows,1))
+
+
+
+
+
+def get_gpu_ranks(rank_info):
+    """Use this funciton to determine which ranks with have a GPU.
+        given: rank_info - a list of tuples of (rank, processor, gpu_ids, gpu_rank)
+        returns: new_rank_inf, total_gpus
+    """
+    total_gpus = 0
+    total_cpus = 0
+    new_rank_info = list()
+    assigned_ctr = dict()
+    for ri in rank_info:
+        temp = ri
+        if ri[1] not in assigned_ctr:
+            assigned_ctr[ri[1]] = len(ri[2])
+            total_gpus+=len(ri[2])
+            total_cpus+=1
+        if assigned_ctr[ri[1]] > 0:
+            temp = ri[:-1]+(True,)
+            assigned_ctr[ri[1]]-=1
+        new_rank_info.append(temp)
+    return new_rank_info, total_gpus,total_cpus
+
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
     with open(filename,"r") as f:
@@ -14,7 +62,6 @@ def source_code_read(filename):
             line = f.readline()
     f.closed
     return source
-
 
 def constant_copy(source_mod,ps,grid_size,block_size,ops,add_const=None):
     """Use this function to copy constant args to cuda memory.

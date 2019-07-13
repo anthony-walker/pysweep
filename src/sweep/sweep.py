@@ -67,62 +67,71 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
     dy - spatial step on y axis
     ops - number of atomic operations
     block_size - gpu block size (check your architecture requirements)
-    affinity -  the GPU affinity (GPU work/CPU work)
+    affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
+
+    #Getting GPU info
+    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10000) #getting devices by load
+
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
-    print(MPI.Get_group())
+    processor = MPI.Get_processor_name()
     master_rank = 0 #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-    print("Rank: ",rank," Platform: ",platform.uname()[1])
+    gpu_rank = False    #Says whether or not the rank is a GPU rank
+    rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank))
 
-    #Getting GPU info
-    gpu_id = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10000) #getting devices by load
-    num_gpus = len(gpi_id)
+    #Max Swept Step
+    MPSS = int(min(block_size[:-1])/(2*ops)) #Max Pyramid Swept Step
+    MOSS = int(min(block_size[:-1])/(ops))   #Max Octahedron Swept Step
 
-    gpu = cuda.Device(gpu_id[0])    #Getting device with id via cuda
-    #----------------Reading In Source Code-------------------------------#
-    source_code = source_code_read("./src/sweep/sweep.h")
-    split_source_code = source_code.split("//!!(@#\n")
-    source_code = split_source_code[0]+"\n"+source_code_read(kernel_source)+"\n"+split_source_code[1]
-    source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
-
-    #---------------Data Input setup -------------------------#
+    #----------------Data Input setup -------------------------#
     time_steps = int((targs[1]-targs[0])/targs[2])+1  #Number of time steps +1 becuase initial time step
-    arr_shape = (time_steps,)+arr0.shape
+    arr_shape = (MOSS,)+arr0.shape
     itemsize = int(dType.itemsize)
-
-    #Getting number of bytes for shared memory
-    if rank == master_rank:
-        arr_bytes = int(np.prod(arr_shape)*dType.itemsize) #4D arr(t,v,x,y)
-    else:
-        arr_bytes = 0
-
-    #Creating MPI Window for shared memory
-    win = MPI.Win.Allocate_shared(arr_bytes, itemsize, comm=comm)
-    shared_buff, itemsize = win.Shared_query(master_rank)
-    arr = np.ndarray(buffer=shared_buff, dtype=dType.type, shape=arr_shape)
-
-    #Assigning initial conditions
-    if rank == master_rank:
-        arr[0] = arr0
-
-    comm.Barrier()  #Ensure that all initial data has been written to the shared array and sync ranks
-
-    #---------------------------Splitting data among ranks----------------------------------#
-    if rank == master_rank:
-        print(num_ranks)
-
-
-    cores = mp.cpu_count()  #Getting number of cpu cores
-    root_cores = int(np.sqrt(cores))
-    # arr = np.zeros((time_steps,)+arr0.shape,dtype=dType.type) #4D arr(t,v,x,y)
-    #
     # arr_shape = np.shape(arr)  #Shape of array
     # #Grid size
     # grid_size = (int(arr_shape[2]/block_size[0]),int(arr_shape[3]/block_size[1]))
     # MSS,NV,SGIDS,VARS,TIMES,const_dict = constant_copy(source_mod,arr_shape,grid_size,block_size,ops)  #Copy data into constants and returning them for other use
+
+    #Determine which ranks are GPU ranks and create shared array data
+    if rank == master_rank:
+        new_rank_info, total_gpus,total_cpus = get_gpu_ranks(rank_info)
+        affinity_split(affinity,block_size,arr0.shape,total_gpus)
+        arr_bytes = int(np.prod(arr_shape)*dType.itemsize) #4D arr(t,v,x,y)
+    else:
+        new_rank_info = None
+        arr_bytes = 0
+
+    #Scattering new rank information
+    updated_rank_info = comm.scatter(new_rank_info)
+    #Updating gpu_rank bools
+    gpu_rank = updated_rank_info[3]
+
+
+
+
+    # #Creating MPI Window for shared memory
+    # win = MPI.Win.Allocate_shared(arr_bytes, itemsize, comm=comm)
+    # shared_buff, itemsize = win.Shared_query(master_rank)
+    # arr = np.ndarray(buffer=shared_buff, dtype=dType.type, shape=arr_shape)
+    # #Assigning initial conditions
+    # if rank == master_rank:
+    #     arr[0] = arr0
+    # comm.Barrier()  #Ensure that all initial data has been written to the shared array and sync ranks
+
+    #GPU Swept Calculations
+    # if gpu_rank:
+    #     #----------------Reading In Source Code-------------------------------#
+    #     source_code = source_code_read("/home/walkanth/pysweep/src/sweep/sweep.h")
+    #     split_source_code = source_code.split("//!!(@#\n")
+    #     source_code = split_source_code[0]+"\n"+source_code_read(kernel_source)+"\n"+split_source_code[1]
+    #     source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
+    # else:   #CPU Swept Calculations
+    #     pass
+
+
 
 
 def create_shared_array(comm,arr_shape,dType):
@@ -156,7 +165,7 @@ def rank_split(arr0,rank_size):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (4,int(32),int(32))
+    dims = (4,int(256),int(256))
     arr0 = np.zeros(dims)
     arr0[0,:,:] = 0.1
     arr0[1,:,:] = 0.0
@@ -165,8 +174,8 @@ if __name__ == "__main__":
 
     #GPU Arguments
     block_size = (32,32,1)
-    kernel = "./src/equations/euler.h"
-    affinity = 40
+    kernel = "/home/walkanth/pysweep/src/equations/euler.h"
+    affinity = 0.9
 
     #Time testing arguments
     t0 = 0
