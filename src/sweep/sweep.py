@@ -30,19 +30,19 @@ import ctypes
 import GPUtil
 
 #Swept imports
-from pysweep_lambda import sweep_lambda
-from pysweep_dev import *
-from pysweep_functions import *
-
+from .pysweep_lambda import sweep_lambda
+from .pysweep_dev import *
+from .pysweep_functions import *
+import importlib.util
 #Testing and Debugging
-import platform
-import time
-sys.path.insert(0, '/home/walkanth/pysweep/src/equations')
-import euler
-import warnings
-from euler import *
-from pysweep_plot_tests import *
-warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
+# import platform
+# import time
+# sys.path.insert(0, '/home/walkanth/pysweep/src/equations')
+# import euler
+# import warnings
+# from euler import *
+# from pysweep_plot_tests import *
+# warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 #--------------------Global Variables------------------------------#
 
 #----------------------End Global Variables------------------------#
@@ -157,7 +157,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
     local_shape = (MOSS,)+get_slices_shape(regions[0])
     local_array = np.zeros(local_shape,dtype=dType)
     local_array[:,:,:,:] = shared_arr[regions[0]]
-
+    #First step is the up pyramid
+    UpPyramid(local_array, ops, gpu_rank)
+    GST+=1  #Increment global swept step
+    comm.Barrier()
 
 def rank_split(arr0,rank_size):
     """Use this function to equally split data among the ranks"""

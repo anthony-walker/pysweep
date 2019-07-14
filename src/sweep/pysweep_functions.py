@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing the swept rule.
 import numpy as np
-from pysweep_lambda import sweep_lambda
+from .pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 #MPI imports
@@ -190,28 +190,31 @@ def constant_copy(source_mod,ps,grid_size,block_size,ops,add_const=None):
         cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
     return MSS,NV,SGIDS,VARS,TIMES,const_dict
 
-def UpPyramid(arr, ops):
+def UpPyramid(arr, ops,gpu_rank):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
     fcn - the function that solves the problem in question
     ops -  the number of atomic operations
     """
-    plane_shape = np.shape(arr)
-    iidx = list(np.ndindex(plane_shape[2:]))
-    #Bounds
-    lb = 0
-    ub = [plane_shape[2],plane_shape[3]]
-    #Going through all swept steps
-    # pts = [iidx]    #This is strictly for debugging
-    while ub[0] > lb and ub[1] > lb:
-        lb += ops
-        ub = [x-ops for x in ub]
-        iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
-        if iidx:
-            step(arr,iidx,0)
-            # pts.append(iidx) #This is strictly for debuggings
-    # return pts #This is strictly for
+    if gpu_rank:
+        pass
+    else:   #CPUs do this
+        plane_shape = arr.shape
+        iidx = list(np.ndindex(plane_shape[2:]))
+        #Bounds
+        lb = 0
+        ub = [plane_shape[2],plane_shape[3]]
+        #Going through all swept steps
+        # pts = [iidx]    #This is strictly for debugging
+        while ub[0] > lb and ub[1] > lb:
+            lb += ops
+            ub = [x-ops for x in ub]
+            iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
+            if iidx:
+                step(arr,iidx,0)
+                # pts.append(iidx) #This is strictly for debuggings
+        # return pts #This is strictly for
 
 def Octahedron(arr,  ops):
     """This is the step(s) in between UpPyramid and DownPyramid."""
