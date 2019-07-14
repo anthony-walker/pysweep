@@ -74,3 +74,15 @@ def arch_query():
                 gpu_id = ri[3]
         return gpu_sum, cpu_sum, gpu_id
     return None,None,gpu_id
+
+
+    # #----------------------------Creating shared arrays-------------------------#
+    # global cpu_array
+    # cpu_array_base = mp.Array(ctypes.c_double, shm_dim)
+    # cpu_array = np.ctypeslib.as_array(cpu_array_base.get_obj())
+    # cpu_array = cpu_array.reshape(block_size)
+    #
+    # global gpu_array
+    # gpu_array_base = mp.Array(ctypes.c_double, shm_dim)
+    # gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
+    # gpu_array = gpu_array.reshape(block_size)
