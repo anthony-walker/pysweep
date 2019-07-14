@@ -1,6 +1,6 @@
 #Programmer: Anthony Walker
 #This fill contains multiple methods for development testing
-from pysweep_lambda import sweep_lambda
+from .pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
 
 def create_blocks(arr,block_size):

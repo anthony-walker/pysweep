@@ -15,6 +15,7 @@ def step(state,iidx,ts):
     iidx an iterable of indexs
     ts - the current time step (for writing purposes)
     """
+    print("Woo")
     vSlice = slice(0,state.shape[1],1)
     for idx in iidx:
         nidx = (ts+1,vSlice)+idx  #next step index

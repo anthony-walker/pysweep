@@ -1,15 +1,30 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing the swept rule.
 import numpy as np
-from pysweep_lambda import sweep_lambda
+from .pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 #MPI imports
 from mpi4py import MPI
 
-def create_map():
-    """Use this function to create local maps for process communication."""
-    smap = set() #Each rank has its own map
+def build_source_mod(kernel_source):
+    """Use this function to build the given and swept source module together.
+    -NEED TO UPDAT THIS TO GET PATH OF SWEPT SOURCE IN LIEU OF HARDWIRED
+    """
+    #GPU Swept Calculations
+    #----------------Reading In Source Code-------------------------------#
+    source_code = source_code_read("/home/walkanth/pysweep/src/sweep/sweep.h")
+    split_source_code = source_code.split("//!!(@#\n")
+    source_code = split_source_code[0]+"\n"+source_code_read(kernel_source)+"\n"+split_source_code[1]
+    source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
+    return source_mod
 
+def get_slices_shape(slices):
+    """Use this function to convert slices into a shape tuple."""
+    stuple = tuple()
+    for s in slices:
+        stuple+=(s.stop-s.start,)
+    return stuple
 
 def affinity_split(affinity,block_size,arr_shape,total_gpus):
     """Use this function to split the given data based on rank information and the affinity.
@@ -35,58 +50,66 @@ def affinity_split(affinity,block_size,arr_shape,total_gpus):
     cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
     return gpu_slices, cpu_slices
 
-def region_split(rank,gargs,cargs,block_size):
-    """Use this function to separate the CPU data ."""
-
-    region = None   #region
+def region_split(rank,gargs,cargs,block_size,MOSS):
+    """Use this function to obtain the regions to for reading and writing
+        from the shared array. region 1 is standard region 2 is offset by split.
+        Note: The rows are divided into regions. So, each rank gets a row or set of rows
+        so to speak. This is because affinity split is based on columns.
+    """
+    region1 = None   #region1
+    region2 = None   #region2
+    SPLITX = int(block_size[0]/2)
+    SPLITY = int(block_size[1]/2)
     #Unpack arguments
-    gpu_comm,gpu_master_rank,new_gpu_shape,total_gpus,gpu_rank = gargs
-    cpu_comm,cpu_master_rank,new_cpu_shape,total_cpus = cargs
+    gpu_comm,gpu_master_rank,gpu_shape,total_gpus,gpu_rank = gargs
+    cpu_comm,cpu_master_rank,cpu_shape,total_cpus = cargs
+    stv = (slice(0,MOSS,1),slice(0,gpu_shape[0],1))
     #GPU ranks go in here
     if gpu_rank:
         #Getting gpu blocks
-        gpu_blocks = int(new_gpu_shape[3]/block_size[1])
+        gpu_blocks = int(gpu_shape[2]/block_size[1])
         blocks_per_gpu = int(gpu_blocks/total_gpus)
         #creating gpu indicies
         if gpu_master_rank == rank:
-            stuple = tuple()
-            #Creating slice prefixes
-            for i in range(len(new_gpu_shape)-1):
-                stuple+=(slice(0,new_gpu_shape[i],1),)
+            stx1=(slice(0,gpu_shape[1],1),)
+            stx2=(slice(SPLITX,gpu_shape[1]+SPLITX,1),)
             #Creating regions
             prev = 0
-            region = list()    #a list of slices one for each region
+            region1 = list()    #a list of slices one for each region
+            region2 = list()    #a list of slices one for each region
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
-                region.append(stuple+(slice(prev*block_size[1],i*block_size[1],1),))
+                region1.append(stv+stx1+(slice(prev*block_size[1],i*block_size[1],1),))
+                region2.append(stv+stx2+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
                 prev = i
-        region = gpu_comm.scatter(region)
-
+        region1 = gpu_comm.scatter(region1)
+        region2 = gpu_comm.scatter(region2)
     #CPU ranks go in here
     else:
         #Getting cpu blocks
-        cpu_blocks = int(new_cpu_shape[3]/block_size[1])
+        cpu_blocks = int(cpu_shape[2]/block_size[1])
         blocks_per_cpu = int(np.ceil(cpu_blocks/total_cpus))   #Ensures all blocks will be given to a cpu core
         #creating cpu indicies
         if cpu_master_rank == rank:
-            stuple = tuple()
+            stuple1 = tuple()
+            stuple2 = tuple()
             #Creating slice prefixes
-            for i in range(len(new_cpu_shape)-1):
-                stuple+=(slice(0,new_cpu_shape[i],1),)
+            stx1=(slice(0,cpu_shape[1],1),)
+            stx2=(slice(SPLITX,cpu_shape[1]+SPLITX,1),)
             #Creating regions
             prev = 0
-            region = list()    #a list of slices one for each region
+            region1 = list()    #a list of slices one for each region
+            region2 = list()    #a list of slices one for each region
             for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
-                region.append(stuple+(slice(prev*block_size[1],i*block_size[1],1),))
+                region1.append(stv+stx1+(slice(prev*block_size[1],i*block_size[1],1),))
+                region2.append(stv+stx2+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
                 prev = i
-            if len(region)<total_cpus:
-                for i in range(abs(len(region)-total_cpus)):
-                    region.append(stuple+(slice(0,0,1),))
-        region = cpu_comm.scatter(region)
-    return region
-
-def extended_shape(orig_shape,block_size):
-    """Use this function to develop extended array shapes."""
-    return (orig_shape[0],orig_shape[1]+int(block_size[0]/2),orig_shape[2])
+            if len(region1)<total_cpus:
+                for i in range(abs(len(region1)-total_cpus)):
+                    region1.append(stuple+(slice(0,0,1),))
+                    region2.append(stuple2+(slice(0,0,1),))
+        region1 = cpu_comm.scatter(region1)
+        region2 = cpu_comm.scatter(region2)
+    return region1, region2
 
 def get_gpu_ranks(rank_info):
     """Use this funciton to determine which ranks with have a GPU.
@@ -167,28 +190,31 @@ def constant_copy(source_mod,ps,grid_size,block_size,ops,add_const=None):
         cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
     return MSS,NV,SGIDS,VARS,TIMES,const_dict
 
-def UpPyramid(arr, ops):
+def UpPyramid(arr, ops,gpu_rank):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
     fcn - the function that solves the problem in question
     ops -  the number of atomic operations
     """
-    plane_shape = np.shape(arr)
-    iidx = list(np.ndindex(plane_shape[2:]))
-    #Bounds
-    lb = 0
-    ub = [plane_shape[2],plane_shape[3]]
-    #Going through all swept steps
-    # pts = [iidx]    #This is strictly for debugging
-    while ub[0] > lb and ub[1] > lb:
-        lb += ops
-        ub = [x-ops for x in ub]
-        iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
-        if iidx:
-            step(arr,iidx,0)
-            # pts.append(iidx) #This is strictly for debuggings
-    # return pts #This is strictly for
+    if gpu_rank:
+        pass
+    else:   #CPUs do this
+        plane_shape = arr.shape
+        iidx = list(np.ndindex(plane_shape[2:]))
+        #Bounds
+        lb = 0
+        ub = [plane_shape[2],plane_shape[3]]
+        #Going through all swept steps
+        # pts = [iidx]    #This is strictly for debugging
+        while ub[0] > lb and ub[1] > lb:
+            lb += ops
+            ub = [x-ops for x in ub]
+            iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
+            if iidx:
+                step(arr,iidx,0)
+                # pts.append(iidx) #This is strictly for debuggings
+        # return pts #This is strictly for
 
 def Octahedron(arr,  ops):
     """This is the step(s) in between UpPyramid and DownPyramid."""
@@ -212,3 +238,10 @@ def dummy_fcn(arr):
         arr[idx] *= i
         # print(i,value)
     return arr
+def create_map():
+    """Use this function to create local maps for process communication."""
+    smap = set() #Each rank has its own map
+
+def extended_shape(orig_shape,block_size):
+    """Use this function to develop extended array shapes."""
+    return (orig_shape[0],orig_shape[1]+int(block_size[0]/2),orig_shape[2])
