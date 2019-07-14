@@ -157,10 +157,14 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
     local_shape = (MOSS,)+get_slices_shape(regions[0])
     local_array = np.zeros(local_shape,dtype=dType)
     local_array[:,:,:,:] = shared_arr[regions[0]]
+<<<<<<< HEAD
     #First step is the up pyramid
     UpPyramid(local_array, ops, gpu_rank)
     GST+=1  #Increment global swept step
     comm.Barrier()
+=======
+
+>>>>>>> 468e4caa7ec7209d6fa37fbb54c91caed0dccb16
 
 def rank_split(arr0,rank_size):
     """Use this function to equally split data among the ranks"""
