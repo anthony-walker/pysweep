@@ -3,6 +3,13 @@
 import numpy as np
 from pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
+#MPI imports
+from mpi4py import MPI
+
+def create_map():
+    """Use this function to create local maps for process communication."""
+    smap = set() #Each rank has its own map
+
 
 def affinity_split(affinity,block_size,arr_shape,total_gpus):
     """Use this function to split the given data based on rank information and the affinity.
@@ -24,12 +31,62 @@ def affinity_split(affinity,block_size,arr_shape,total_gpus):
     num_columns = gpu_blocks/blocks_per_column
     num_rows = blocks_per_row
     #Region Indicies
-    gpu_slices = (slice(0,arr_shape[0],1),slice(0,block_size[0]*num_columns,1),slice(0,block_size[1]*num_rows,1))
-    # cpu_slices = (slice(0,arr_shape[0],1),slice(block_size[0]*(num_columns,block_size[0]*num_columns,1),slice(0,block_size[1]*num_rows,1))
+    gpu_slices = (slice(0,arr_shape[0],1),slice(0,int(block_size[0]*num_columns),1),slice(0,int(block_size[1]*num_rows),1))
+    cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
+    return gpu_slices, cpu_slices
 
+def region_split(rank,gargs,cargs,block_size):
+    """Use this function to separate the CPU data ."""
 
+    region = None   #region
+    #Unpack arguments
+    gpu_comm,gpu_master_rank,new_gpu_shape,total_gpus,gpu_rank = gargs
+    cpu_comm,cpu_master_rank,new_cpu_shape,total_cpus = cargs
+    #GPU ranks go in here
+    if gpu_rank:
+        #Getting gpu blocks
+        gpu_blocks = int(new_gpu_shape[3]/block_size[1])
+        blocks_per_gpu = int(gpu_blocks/total_gpus)
+        #creating gpu indicies
+        if gpu_master_rank == rank:
+            stuple = tuple()
+            #Creating slice prefixes
+            for i in range(len(new_gpu_shape)-1):
+                stuple+=(slice(0,new_gpu_shape[i],1),)
+            #Creating regions
+            prev = 0
+            region = list()    #a list of slices one for each region
+            for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
+                region.append(stuple+(slice(prev*block_size[1],i*block_size[1],1),))
+                prev = i
+        region = gpu_comm.scatter(region)
 
+    #CPU ranks go in here
+    else:
+        #Getting cpu blocks
+        cpu_blocks = int(new_cpu_shape[3]/block_size[1])
+        blocks_per_cpu = int(np.ceil(cpu_blocks/total_cpus))   #Ensures all blocks will be given to a cpu core
+        #creating cpu indicies
+        if cpu_master_rank == rank:
+            stuple = tuple()
+            #Creating slice prefixes
+            for i in range(len(new_cpu_shape)-1):
+                stuple+=(slice(0,new_cpu_shape[i],1),)
+            #Creating regions
+            prev = 0
+            region = list()    #a list of slices one for each region
+            for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
+                region.append(stuple+(slice(prev*block_size[1],i*block_size[1],1),))
+                prev = i
+            if len(region)<total_cpus:
+                for i in range(abs(len(region)-total_cpus)):
+                    region.append(stuple+(slice(0,0,1),))
+        region = cpu_comm.scatter(region)
+    return region
 
+def extended_shape(orig_shape,block_size):
+    """Use this function to develop extended array shapes."""
+    return (orig_shape[0],orig_shape[1]+int(block_size[0]/2),orig_shape[2])
 
 def get_gpu_ranks(rank_info):
     """Use this funciton to determine which ranks with have a GPU.
@@ -37,20 +94,31 @@ def get_gpu_ranks(rank_info):
         returns: new_rank_inf, total_gpus
     """
     total_gpus = 0
-    total_cpus = 0
     new_rank_info = list()
     assigned_ctr = dict()
+    devices = dict()
     for ri in rank_info:
         temp = ri
         if ri[1] not in assigned_ctr:
             assigned_ctr[ri[1]] = len(ri[2])
+            ri[2].reverse()
+            devices[ri[1]] = ri[2].copy()   #Device ids
             total_gpus+=len(ri[2])
-            total_cpus+=1
+
         if assigned_ctr[ri[1]] > 0:
-            temp = ri[:-1]+(True,)
+            temp = ri[:-2]+(True,)+(devices[ri[1]].pop(),)
             assigned_ctr[ri[1]]-=1
         new_rank_info.append(temp)
-    return new_rank_info, total_gpus,total_cpus
+    return new_rank_info, total_gpus
+
+def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):
+    """Use this function to create shared memory arrays for node communication."""
+    itemsize = int(dType.itemsize)
+    #Creating MPI Window for shared memory
+    win = MPI.Win.Allocate_shared(arr_bytes, itemsize, comm=comm)
+    shared_buf, itemsize = win.Shared_query(0)
+    arr = np.ndarray(buffer=shared_buf, dtype=dType.type, shape=arr_shape)
+    return arr
 
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
