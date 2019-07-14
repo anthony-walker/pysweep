@@ -33,11 +33,7 @@ import GPUtil
 from .pysweep_lambda import sweep_lambda
 from .pysweep_dev import *
 from .pysweep_functions import *
-<<<<<<< HEAD
 import importlib.util
-=======
-
->>>>>>> 719c015568759513bf30f62e0d62a37b7e1b55d0
 #Testing and Debugging
 # import platform
 # import time
@@ -161,20 +157,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
     local_shape = (MOSS,)+get_slices_shape(regions[0])
     local_array = np.zeros(local_shape,dtype=dType)
     local_array[:,:,:,:] = shared_arr[regions[0]]
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 719c015568759513bf30f62e0d62a37b7e1b55d0
     #First step is the up pyramid
     UpPyramid(local_array, ops, gpu_rank)
     GST+=1  #Increment global swept step
     comm.Barrier()
-<<<<<<< HEAD
-=======
-=======
-
->>>>>>> 468e4caa7ec7209d6fa37fbb54c91caed0dccb16
->>>>>>> 719c015568759513bf30f62e0d62a37b7e1b55d0
 
 def rank_split(arr0,rank_size):
     """Use this function to equally split data among the ranks"""
