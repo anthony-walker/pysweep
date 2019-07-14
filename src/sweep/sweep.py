@@ -47,7 +47,7 @@ import importlib.util
 
 #----------------------End Global Variables------------------------#
 
-def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dtype('float32')):
+def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType = np.dtype('float32')):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -58,6 +58,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
     block_size - gpu block size (check your architecture requirements)
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
+
     #Global swept step
     GST = 0 #This is a variable to track which swept step the simulation is on
 
@@ -104,10 +105,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
         for ri in new_rank_info:
             if ri[3]:
                 gpu_ranks.append(ri[0])
-                source_mod = build_source_mod(kernel_source) #Building CUDA source code
             else:
                 cpu_ranks.append(ri[0])
-                source_mod = None
 
         #Getting slices for data
         gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
@@ -123,17 +122,26 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
         gpu_shape = None
         cpu_shape = None
 
+
     #Scattering new rank information
     new_rank_info = comm.scatter(new_rank_info)
     #Updating gpu_rank bools
     gpu_rank = new_rank_info[3]
-    # #Broadcasting new shapes and number of gpus
+
+    #Broadcasting new shapes and number of gpus
     total_gpus = comm.bcast(total_gpus,root=master_rank)
     total_cpus = comm.bcast(total_cpus,root=master_rank)
     gpu_ranks = comm.bcast(gpu_ranks,root=master_rank)
     cpu_ranks = comm.bcast(cpu_ranks,root=master_rank)
     gpu_shape = comm.bcast(gpu_shape,root=master_rank)
     cpu_shape = comm.bcast(cpu_shape,root=master_rank)
+
+
+    #Specifying which source mod to use
+    if gpu_rank:
+        source_mod = build_gpu_source(gpu_source) #Building CUDA source code
+    else:
+        source_mod = build_cpu_source(cpu_source) #Building Python source code
 
     #New master ranks for each architecture
     gpu_master_rank = gpu_ranks[0] if len(gpu_ranks)>0 else None
@@ -153,12 +161,15 @@ def sweep(arr0,targs,dx,dy,ops,block_size,kernel_source,affinity=1,dType = np.dt
 
     #Getting region and offset region for each rank (CPU or GPU)
     regions = region_split(rank,gargs,cargs,block_size,MOSS)
+
     #Initializing local array and filling with arr0
-    local_shape = (MOSS,)+get_slices_shape(regions[0])
+    # print(rank,regions[0])
+    local_shape = get_slices_shape(regions[0])
     local_array = np.zeros(local_shape,dtype=dType)
     local_array[:,:,:,:] = shared_arr[regions[0]]
+    # print(rank,local_array.shape)
     #First step is the up pyramid
-    UpPyramid(local_array, ops, gpu_rank)
+    UpPyramid(source_mod,local_array, ops, gpu_rank,block_size)
     GST+=1  #Increment global swept step
     comm.Barrier()
 
@@ -169,7 +180,7 @@ def rank_split(arr0,rank_size):
 
 if __name__ == "__main__":
     # print("Starting execution.")
-    dims = (4,int(256),int(256))
+    dims = (4,int(32),int(32))
     arr0 = np.zeros(dims)
     arr0[0,:,:] = 0.1
     arr0[1,:,:] = 0.5
@@ -177,9 +188,10 @@ if __name__ == "__main__":
     arr0[3,:,:] = 0.125
 
     #GPU Arguments
-    block_size = (32,32,1)
+    block_size = (8,8,1)
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
-    affinity = 0.8
+    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    affinity = 0.9
     #Time testing arguments
     t0 = 0
     t_b = 1
@@ -191,4 +203,4 @@ if __name__ == "__main__":
     dy = 0.1
     ops = 2
 
-    sweep(arr0,targs,dx,dy,ops,block_size,kernel,affinity)
+    sweep(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity)

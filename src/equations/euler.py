@@ -15,13 +15,13 @@ def step(state,iidx,ts):
     iidx an iterable of indexs
     ts - the current time step (for writing purposes)
     """
-    print("Woo")
     vSlice = slice(0,state.shape[1],1)
     for idx in iidx:
         nidx = (ts+1,vSlice)+idx  #next step index
         idx=(ts,vSlice)+idx  #current step index
         dfdx,dfdy = dfdxy(state,idx)
         state[nidx] += state[idx]+dtdx*dfdx+dtdy*dfdy
+    return state
 
 def dfdxy(state,idx):
     """This method is a five point finite volume method in 2D."""
@@ -144,6 +144,10 @@ def espectral(left_state,right_state,xy):
     P = pressure(spec_state*spec_state[0])
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
+
+def test_mod_load():
+    """Use this function to test created cu source module."""
+    print("Module sucessfully loaded.")
 
 if __name__ == "__main__":
     TA = np.ones((5,4,10,10))

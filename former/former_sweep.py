@@ -86,3 +86,29 @@ def arch_query():
     # gpu_array_base = mp.Array(ctypes.c_double, shm_dim)
     # gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
     # gpu_array = gpu_array.reshape(block_size)
+
+
+def CPU_UpPyramid(args):
+    """Use this function to solve a block on the CPU."""
+    block,source_mod,ops = args
+    plane_shape = block.shape
+    bsx = block.shape[2]
+    bsy = block.shape[3]
+    iidx = list(np.ndindex(plane_shape[2:]))
+    #Bounds
+    lb = 0
+    ub = [plane_shape[2],plane_shape[3]]
+    #Going through all swept steps
+    # pts = [iidx]    #This is strictly for debugging
+    while ub[0] >= lb and ub[1] >= lb:
+
+        lb += ops
+        ub = [x-ops for x in ub]
+        iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
+        print(lb,ub)
+        print(iidx)
+        if iidx:
+            block = source_mod.step(block,iidx,0)
+            # pts.append(iidx) #This is strictly for debuggings
+    # return pts #This is strictly for
+    return block

@@ -6,10 +6,22 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 #MPI imports
 from mpi4py import MPI
+import importlib
+#Multiprocessing
+import multiprocessing as mp
 
-def build_source_mod(kernel_source):
+def build_cpu_source(cpu_source):
+    """Use this function to build source module from cpu code."""
+    module_name = cpu_source.split("/")[-1]
+    module_name = module_name.split(".")[0]
+    spec = importlib.util.spec_from_file_location(module_name, cpu_source)
+    source_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(source_mod)
+    return source_mod
+
+def build_gpu_source(kernel_source):
     """Use this function to build the given and swept source module together.
-    -NEED TO UPDAT THIS TO GET PATH OF SWEPT SOURCE IN LIEU OF HARDWIRED
+    -NEED TO UPDATE THIS TO GET PATH OF SWEPT SOURCE IN LIEU OF HARDWIRED
     """
     #GPU Swept Calculations
     #----------------Reading In Source Code-------------------------------#
@@ -190,7 +202,7 @@ def constant_copy(source_mod,ps,grid_size,block_size,ops,add_const=None):
         cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
     return MSS,NV,SGIDS,VARS,TIMES,const_dict
 
-def UpPyramid(arr, ops,gpu_rank):
+def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -200,21 +212,23 @@ def UpPyramid(arr, ops,gpu_rank):
     if gpu_rank:
         pass
     else:   #CPUs do this
-        plane_shape = arr.shape
-        iidx = list(np.ndindex(plane_shape[2:]))
-        #Bounds
-        lb = 0
-        ub = [plane_shape[2],plane_shape[3]]
-        #Going through all swept steps
-        # pts = [iidx]    #This is strictly for debugging
-        while ub[0] > lb and ub[1] > lb:
-            lb += ops
-            ub = [x-ops for x in ub]
-            iidx = [x for x in iidx if x[0]>=lb and x[1]>=lb and x[0]<ub[0] and x[1]<ub[1]]
-            if iidx:
-                step(arr,iidx,0)
-                # pts.append(iidx) #This is strictly for debuggings
-        # return pts #This is strictly for
+        bsx = int(arr.shape[2]/block_size[0])
+        bsy =  int(arr.shape[3]/block_size[1])
+        cpu_blocks = bsx*bsy
+        hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
+        blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
+        cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,ops))
+
+        # blocks[0] = cpu_fcn(blocks[0])
+        # for row in blocks[0][1,0,:,:]:
+        #     print(row)
+        rmap = list(map(cpu_fcn,blocks))
+        # for row in rmap[0][1,0,:,:]:
+        #     print(row)
+    #-------------------------Ending CPU Performance Testing--------------------#
+
+
+
 
 def Octahedron(arr,  ops):
     """This is the step(s) in between UpPyramid and DownPyramid."""
@@ -223,6 +237,33 @@ def Octahedron(arr,  ops):
 def DownPyramid(arr, ops):
     """This is the ending inverted pyramid."""
     pass
+#--------------------------------CPU Specific Swept Functions------------------
+
+def CPU_UpPyramid(args):
+    """Use this function to solve a block on the CPU."""
+    block,source_mod,ops = args
+    plane_shape = block.shape
+    bsx = block.shape[2]
+    bsy = block.shape[3]
+    iidx = tuple(np.ndindex(plane_shape[2:]))
+    #Removing elements for swept step
+
+
+    # print(len(iidx),bsx
+    ts = 0
+    while len(iidx)>0:
+        #Adjusting indices
+        tl = tuple()
+        iidx = iidx[ops*bsx:-ops*bsx]
+        bsy-=2*ops
+        for i in range(1,bsy+1,1):
+            tl+=iidx[i*bsx-bsx+ops:i*bsx-ops]
+        bsx-=2*ops
+        iidx = tl
+        #Calculating Step
+        block = source_mod.step(block,iidx,ts)
+        ts+=1
+    return block
 
 #--------------------------------NOT USED CURRENTLY-----------------------------
 def edges(arr,ops,shape_adj=-1):
