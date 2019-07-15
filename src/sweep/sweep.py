@@ -76,6 +76,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-1])/(2*ops)) #Max Pyramid Swept Step
     MOSS = int(min(block_size[:-1])/(ops))   #Max Octahedron Swept Step
+
     #Splits for shared array
     SPLITX = int(block_size[0]/2)    #Split computation shift
     SPLITY = int(block_size[1]/2)    #Split computation shift
@@ -113,16 +114,14 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
                 cpu_ranks.append(ri[0])
         #Getting slices for data
         gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
-        gpu_shape = get_slices_shape(gpu_slices)
-        cpu_shape =  get_slices_shape(cpu_slices)
     else:
         new_rank_info = None
         total_gpus=None
         total_cpus = None
         gpu_ranks = None
         cpu_ranks = None
-        gpu_shape = None
-        cpu_shape = None
+        gpu_slices = None
+        cpu_slices = None
 
     #Scattering new rank information
     new_rank_info = comm.scatter(new_rank_info)
@@ -133,8 +132,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     total_cpus = comm.bcast(total_cpus,root=master_rank)
     gpu_ranks = comm.bcast(gpu_ranks,root=master_rank)
     cpu_ranks = comm.bcast(cpu_ranks,root=master_rank)
-    gpu_shape = comm.bcast(gpu_shape,root=master_rank)
-    cpu_shape = comm.bcast(cpu_shape,root=master_rank)
+    gpu_slices = comm.bcast(gpu_slices,root=master_rank)
+    cpu_slices = comm.bcast(cpu_slices,root=master_rank)
 
     #New master ranks for each architecture
     gpu_master_rank = gpu_ranks[0] if len(gpu_ranks)>0 else None
@@ -149,11 +148,12 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     cpu_comm = comm.Create_group(cpu_group)
 
     #Grouping architecture arguments
-    gargs = (gpu_comm,gpu_master_rank,gpu_shape,total_gpus,gpu_rank)
-    cargs = (cpu_comm,cpu_master_rank,cpu_shape,total_cpus)
+    gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
+    cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
 
     #Getting region and offset region for each rank (CPU or GPU)
     regions = region_split(rank,gargs,cargs,block_size,MOSS)
+
     local_array = local_array_create(shared_arr,regions[0],dType)
     # Specifying which source mod to use
     if gpu_rank:
@@ -186,6 +186,11 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     else:
         LAB = True
 
+    #Transfer Initial edges
+    if LAB and rank == master_rank:
+        edge_comm(shared_arr,SPLITX,SPLITY)
+    comm.Barrier()
+
     #UpPyramid Step
     if LAB:
         UpPyramid(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[0],shared_arr) #THis modifies shared array
@@ -193,31 +198,28 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     comm.Barrier()
 
     #Communicate edges
-    if LAB:
+    if LAB and rank == master_rank:
         edge_comm(shared_arr,SPLITX,SPLITY)
     comm.Barrier()
 
     #Octahedron steps
     while(GST<MGST):
-        print(GST%2)
-        local_array = shared_arr[regions[GST%2]]
+        if LAB:
+            #Reading local array
+            local_array = shared_arr[regions[GST%2]]
+            #Octahedron Step
+            Octahedron(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[0],shared_arr)
+            #Writing to shared
+            shared_arr[regions[GST%2]] = local_array[:,:,:,:]
+            comm.Barrier()  #Write barrier
+            if rank == master_rank:
+                edge_comm(shared_arr,SPLITX,SPLITY)
+        comm.Barrier() #Edge transfer barrier
         GST+=1
 
     #CUDA clean up - One of the last steps
     if gpu_rank:
         cuda_context.pop()
-        # pass
-
-
-def shared_write(arr,shared_arr):
-    """Use this funciton to write back into the shared array."""
-    pass
-
-
-def rank_split(arr0,rank_size):
-    """Use this function to equally split data among the ranks"""
-    major_axis = plane_shape.index(max(plane_shape))
-    return np.array_split(arr0,rank_size,axis=major_axis)
 
 if __name__ == "__main__":
     # print("Starting execution.")

@@ -19,7 +19,7 @@ def analytical():
 
 def swept():
     """Use this function to execute the swept rule."""
-    dims = (4,int(40),int(40))
+    dims = (4,int(16),int(16))
     arr0 = np.zeros(dims)
     arr0[0,:,:] = 0.1
     arr0[1,:,:] = 0.5
@@ -27,10 +27,10 @@ def swept():
     arr0[3,:,:] = 0.125
 
     #GPU Arguments
-    block_size = (10,10,1)
+    block_size = (8,8,1)
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
-    affinity = 0.8
+    affinity = 0.5
     #Time testing arguments
     t0 = 0
     t_b = 1

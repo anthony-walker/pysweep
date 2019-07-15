@@ -89,48 +89,44 @@ def region_split(rank,gargs,cargs,block_size,MOSS):
     SPLITX = int(block_size[0]/2)
     SPLITY = int(block_size[1]/2)
     #Unpack arguments
-    gpu_comm,gpu_master_rank,gpu_shape,total_gpus,gpu_rank = gargs
-    cpu_comm,cpu_master_rank,cpu_shape,total_cpus = cargs
-    stv = (slice(0,MOSS,1),slice(0,gpu_shape[0],1))
+    gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank = gargs
+    cpu_comm,cpu_master_rank,total_cpus,cpu_slices = cargs
+    stv = (slice(0,MOSS,1),gpu_slices[0])
     #GPU ranks go in here
     if gpu_rank:
         #Getting gpu blocks
-        gpu_blocks = int(gpu_shape[2]/block_size[1])
+        gpu_blocks = int((gpu_slices[2].stop-gpu_slices[2].start)/block_size[1])
         blocks_per_gpu = int(gpu_blocks/total_gpus)
         #creating gpu indicies
         if gpu_master_rank == rank:
-            stx1=(slice(0,gpu_shape[1],1),)
-            stx2=(slice(SPLITX,gpu_shape[1]+SPLITX,1),)
+            shift_slice=(slice(SPLITX+gpu_slices[1].start,gpu_slices[1].stop+SPLITX,1),)
             #Creating regions
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
-                region1.append(stv+stx1+(slice(prev*block_size[1],i*block_size[1],1),))
-                region2.append(stv+stx2+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
+                region1.append(stv+(gpu_slices[1],)+(slice(prev*block_size[1],i*block_size[1],1),))
+                region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
                 prev = i
         region1 = gpu_comm.scatter(region1)
         region2 = gpu_comm.scatter(region2)
     #CPU ranks go in here
     else:
         #Getting cpu blocks
-        cpu_blocks = int(cpu_shape[2]/block_size[1])
+        cpu_blocks = int((cpu_slices[2].stop-cpu_slices[2].start)/block_size[1])
         blocks_per_cpu = int(np.ceil(cpu_blocks/total_cpus))   #Ensures all blocks will be given to a cpu core
         #creating cpu indicies
         if cpu_master_rank == rank:
-            stuple1 = tuple()
-            stuple2 = tuple()
             #Creating slice prefixes
-            stx1=(slice(0,cpu_shape[1],1),)
-            stx2=(slice(SPLITX,cpu_shape[1]+SPLITX,1),)
+            shift_slice=(slice(cpu_slices[1].start+SPLITX,cpu_slices[1].stop+SPLITX,1),)
             #Creating regions
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
-            if stx1[0].stop>0:
+            if cpu_slices[0].stop>0:
                 for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
-                    region1.append(stv+stx1+(slice(prev*block_size[1],i*block_size[1],1),))
-                    region2.append(stv+stx2+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
+                    region1.append(stv+(cpu_slices[1],)+(slice(prev*block_size[1],i*block_size[1],1),))
+                    region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
                     prev = i
             else:
                 for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
@@ -239,12 +235,39 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr
                 arr = np.concatenate(temp,axis=2)
             else:
                 arr = temp[0]
+    #Writing to shared array
     shared_arr[region] = arr[:,:,:,:]
 
 
-def Octahedron(arr,  ops):
-    """This is the step(s) in between UpPyramid and DownPyramid."""
-    pass
+
+def Octahedron(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr):
+    """
+    This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
+    arr-the array that will be solved (t,v,x,y)
+    fcn - the function that solves the problem in question
+    ops -  the number of atomic operations
+    """
+    if gpu_rank:
+        pass
+    else:   #CPUs do this
+        bsx = int(arr.shape[2]/block_size[0])
+        bsy =  int(arr.shape[3]/block_size[1])
+        cpu_blocks = bsx*bsy
+        hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
+        blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
+        cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,ops))
+        blocks = list(map(cpu_fcn,blocks))
+        #Rebuild blocks into array
+        if len(blocks)>1:
+            temp = []
+            for i in range(bsy,len(blocks)+1,bsy):
+                temp.append(np.concatenate(blocks[i-bsy:i],axis=3))
+            if len(temp)>1:
+                arr = np.concatenate(temp,axis=2)
+            else:
+                arr = temp[0]
+    shared_arr[region] = arr[:,:,:,:]
+
 
 def DownPyramid(arr, ops):
     """This is the ending inverted pyramid."""
@@ -274,24 +297,25 @@ def CPU_UpPyramid(args):
         ts+=1
     return block
 
-#--------------------------------NOT USED CURRENTLY-----------------------------
-def edges(arr,ops,shape_adj=-1):
-    """Use this function to generate boolean arrays for edge handling."""
-    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
-    mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
-    return mask
-
-def dummy_fcn(arr):
-    """This is a testing function for arch_speed_comp."""
-    iidx = np.ndindex(np.shape(arr))
-    for i,idx in enumerate(iidx):
-        arr[idx] *= i
-        # print(i,value)
-    return arr
-def create_map():
-    """Use this function to create local maps for process communication."""
-    smap = set() #Each rank has its own map
-
-def extended_shape(orig_shape,block_size):
-    """Use this function to develop extended array shapes."""
-    return (orig_shape[0],orig_shape[1]+int(block_size[0]/2),orig_shape[2])
+def CPU_Octahedron(args):
+    """Use this function to solve a block on the CPU."""
+    block,source_mod,ops = args
+    plane_shape = block.shape
+    bsx = block.shape[2]
+    bsy = block.shape[3]
+    iidx = tuple(np.ndindex(plane_shape[2:]))
+    #Removing elements for swept step
+    ts = 0
+    while len(iidx)>0:
+        #Adjusting indices
+        tl = tuple()
+        iidx = iidx[ops*bsx:-ops*bsx]
+        bsy-=2*ops
+        for i in range(1,bsy+1,1):
+            tl+=iidx[i*bsx-bsx+ops:i*bsx-ops]
+        bsx-=2*ops
+        iidx = tl
+        #Calculating Step
+        block = source_mod.step(block,iidx,ts)
+        ts+=1
+    return block

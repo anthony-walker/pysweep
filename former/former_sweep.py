@@ -112,3 +112,9 @@ def CPU_UpPyramid(args):
             # pts.append(iidx) #This is strictly for debuggings
     # return pts #This is strictly for
     return block
+
+    
+def rank_split(arr0,rank_size):
+    """Use this function to equally split data among the ranks"""
+    major_axis = plane_shape.index(max(plane_shape))
+    return np.array_split(arr0,rank_size,axis=major_axis)
