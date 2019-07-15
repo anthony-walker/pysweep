@@ -166,41 +166,26 @@ def source_code_read(filename):
     f.closed
     return source
 
-def constant_copy(source_mod,ps,grid_size,block_size,ops,add_const=None):
+def constant_copy(source_mod,const_dict,add_const=None):
     """Use this function to copy constant args to cuda memory.
         source_mod - the source module obtained from pycuda and source code
-        ps - shape of the 4D array (t,v,x,y)
-        block_size -  size of blocks to run on GPU
-        grid_size -  size of GPU grid
-        ops - number of atomic operations
-        add_const - additional dictionary with key(global):(cast_fcn, data)
-        Note, the key should match the global in the source_mod and the cast_fcn
-        should convert the data to the appropriate type.
-        e.g.  int_cast = lambda x:np.int32(x) add_const = {SOME_CONST:(int_cast,myInt)}
+        const_dict - dictionary of constants where the key is the global
+        add_const - additional dictionary with constants. Note, they should have
+                    the correct type.
     """
     #Functions to cast data to appropriate gpu types
     int_cast = lambda x:np.int32(x)
     float_cast = lambda x:np.float32(x)
-
-    #Dictionary for constants
-    const_dict = dict()
+    casters = {type(0.1):float_cast,type(1):int_cast}
     #Generating constants
-    MSS = min(block_size[2:])/(2*ops) #Max swept step
-    NV = ps[1]  #Number of variables in given initial array
-    SGIDS = block_size[0]*block_size[1]
-    VARS =  SGIDS*grid_size[0]*grid_size[1]
-    TIMES = VARS*NV
-    const_dict['MSS'] = (int_cast,MSS)
-    const_dict['NV'] = (int_cast,NV)
-    const_dict['SGIDS'] = (int_cast,SGIDS)
-    const_dict['VARS'] = (int_cast,VARS)
-    const_dict['TIMES'] = (int_cast,TIMES)
-    const_dict['OPS'] = (int_cast,ops)
-    const_dict['SGNVS'] = (int_cast,SGIDS*NV)
     for key in const_dict:
         c_ptr,_ = source_mod.get_global(key)
-        cuda.memcpy_htod(c_ptr,const_dict[key][0](const_dict[key][1]))
-    return MSS,NV,SGIDS,VARS,TIMES,const_dict
+        cst = const_dict[key]
+        cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
+
+    for key in add_const:
+        c_ptr,_ = source_mod.get_global(key)
+        cuda.memcpy_htod(c_ptr,add_const[key])
 
 def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
     """
@@ -210,7 +195,13 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
     ops -  the number of atomic operations
     """
     if gpu_rank:
-        pass
+        #Creating GPU important dimensions
+        grid_size = (int(arr.shape[2]/block_size[0]),int(arr.shape[3]/block_size[1]))   #Grid size
+        shared_size = (arr[0,:,:block_size[0],:block_size[1]].nbytes) #Creating size of shared array
+        #Getting GPU Function
+        gpu_fcn = source_mod.get_function("UpPyramid")
+        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=shared_size)
+        cuda.Context.synchronize()
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
@@ -218,13 +209,8 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
         hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
         blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
         cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,ops))
-
-        # blocks[0] = cpu_fcn(blocks[0])
-        # for row in blocks[0][1,0,:,:]:
-        #     print(row)
-        rmap = list(map(cpu_fcn,blocks))
-        # for row in rmap[0][1,0,:,:]:
-        #     print(row)
+        blocks = list(map(cpu_fcn,blocks))
+        #Rebuild blocks
     #-------------------------Ending CPU Performance Testing--------------------#
 
 

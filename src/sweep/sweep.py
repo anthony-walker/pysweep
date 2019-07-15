@@ -15,7 +15,7 @@ from collections import deque
 
 #CUDA Imports
 import pycuda.driver as cuda
-import pycuda.autoinit
+# import pycuda.autoinit
 from pycuda.compiler import SourceModule
 # import pycuda.gpuarray as gpuarray
 
@@ -47,7 +47,7 @@ import importlib.util
 
 #----------------------End Global Variables------------------------#
 
-def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType = np.dtype('float32')):
+def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType = np.dtype('float32'),add_consts=dict()):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -75,12 +75,11 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     deviceID = None
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,deviceID))
 
-    #Max Swept Steps from block_size
+    #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-1])/(2*ops)) #Max Pyramid Swept Step
     MOSS = int(min(block_size[:-1])/(ops))   #Max Octahedron Swept Step
     SPLITX = int(block_size[0]/2)    #Split computation shift
     SPLITY = int(block_size[1]/2)    #Split computation shift
-
     #----------------Data Input setup -------------------------#
     time_steps = int((targs[1]-targs[0])/targs[2])+1  #Number of time steps +1 becuase initial time step
     itemsize = int(dType.itemsize)
@@ -122,12 +121,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         gpu_shape = None
         cpu_shape = None
 
-
     #Scattering new rank information
     new_rank_info = comm.scatter(new_rank_info)
     #Updating gpu_rank bools
     gpu_rank = new_rank_info[3]
-
     #Broadcasting new shapes and number of gpus
     total_gpus = comm.bcast(total_gpus,root=master_rank)
     total_cpus = comm.bcast(total_cpus,root=master_rank)
@@ -135,13 +132,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     cpu_ranks = comm.bcast(cpu_ranks,root=master_rank)
     gpu_shape = comm.bcast(gpu_shape,root=master_rank)
     cpu_shape = comm.bcast(cpu_shape,root=master_rank)
-
-
-    #Specifying which source mod to use
-    if gpu_rank:
-        source_mod = build_gpu_source(gpu_source) #Building CUDA source code
-    else:
-        source_mod = build_cpu_source(cpu_source) #Building Python source code
 
     #New master ranks for each architecture
     gpu_master_rank = gpu_ranks[0] if len(gpu_ranks)>0 else None
@@ -167,11 +157,41 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     local_shape = get_slices_shape(regions[0])
     local_array = np.zeros(local_shape,dtype=dType)
     local_array[:,:,:,:] = shared_arr[regions[0]]
+
+    #Specifying which source mod to use
+    if gpu_rank:
+        #Creating cuda device and Context
+        cuda.init()
+        cuda_device = cuda.Device(new_rank_info[-1])
+        cuda_context = cuda_device.make_context()
+        #Creating grid size
+        grid_size = (int(local_shape[2]/block_size[0]),int(local_shape[3]/block_size[1]))   #Grid size
+        #Creating constants
+        NV = local_shape[1]
+        SGIDS = block_size[0]*block_size[1]
+        VARS =  SGIDS*grid_size[0]*grid_size[1]
+        TIMES = VARS*NV
+        DX = dx
+        DY = dy
+        DT = targs[2]
+        const_dict = ({"NV":NV,"DX":DX,"DT":DX,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
+                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS})
+        #Building CUDA source code
+        source_mod = build_gpu_source(gpu_source)
+        # constant_copy(source_mod,const_dict,add_consts)
+    else:
+        source_mod = build_cpu_source(cpu_source) #Building Python source code
+
+
     # print(rank,local_array.shape)
     #First step is the up pyramid
-    UpPyramid(source_mod,local_array, ops, gpu_rank,block_size)
-    GST+=1  #Increment global swept step
-    comm.Barrier()
+    # UpPyramid(source_mod,local_array, ops, gpu_rank,block_size)
+    # GST+=1  #Increment global swept step
+    # comm.Barrier()
+
+    #CUDA clean up - One of the last steps
+    if gpu_rank:
+        cuda_context.pop()
 
 def rank_split(arr0,rank_size):
     """Use this function to equally split data among the ranks"""
