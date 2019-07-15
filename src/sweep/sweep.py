@@ -15,7 +15,7 @@ from collections import deque
 
 #CUDA Imports
 import pycuda.driver as cuda
-# import pycuda.autoinit
+import pycuda.autoinit  #Cor debugging only
 from pycuda.compiler import SourceModule
 # import pycuda.gpuarray as gpuarray
 
@@ -39,10 +39,10 @@ import importlib.util
 # import time
 # sys.path.insert(0, '/home/walkanth/pysweep/src/equations')
 # import euler
-# import warnings
+import warnings
 # from euler import *
 # from pysweep_plot_tests import *
-# warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
+warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 #--------------------Global Variables------------------------------#
 
 #----------------------End Global Variables------------------------#
@@ -59,8 +59,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
 
-    #Global swept step
-    GST = 0 #This is a variable to track which swept step the simulation is on
 
     #Getting GPU info
     gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
@@ -72,17 +70,22 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
     gpu_rank = False    #Says whether or not the rank is a GPU rank
-    deviceID = None
-    rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,deviceID))
+    #None is in place for device ID
+    rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
 
     #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-1])/(2*ops)) #Max Pyramid Swept Step
     MOSS = int(min(block_size[:-1])/(ops))   #Max Octahedron Swept Step
+    #Splits for shared array
     SPLITX = int(block_size[0]/2)    #Split computation shift
     SPLITY = int(block_size[1]/2)    #Split computation shift
     #----------------Data Input setup -------------------------#
     time_steps = int((targs[1]-targs[0])/targs[2])+1  #Number of time steps +1 becuase initial time step
     itemsize = int(dType.itemsize)
+    #Global swept step
+    GST = 0 #This is a variable to track which swept step the simulation is on
+    MGST =   2 if time_steps<MOSS else int(np.ceil(time_steps/MOSS))
+
     #Create shared process array for data transfer
     shared_shape = (MOSS,arr0.shape[0],arr0.shape[1]+SPLITX,arr0.shape[2]+SPLITY)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
@@ -91,11 +94,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         shared_arr[0,:,:arr0.shape[1],:arr0.shape[2]] = arr0[:,:,:]
     comm.Barrier()  #Ensure that all initial data has been written to the shared array and sync ranks
 
-
     #Determine which ranks are GPU ranks and create shared array data
     if rank == master_rank:
-        new_rank_info, total_gpus = get_gpu_ranks(rank_info)
-        total_gpus = num_ranks if num_ranks<total_gpus else total_gpus
+        new_rank_info, total_gpus = get_gpu_ranks(rank_info,affinity)
+        if affinity==0:
+            total_gpus = 0
+        else:
+            total_gpus = num_ranks if num_ranks<total_gpus else total_gpus
         total_cpus = num_ranks-total_gpus
         affinity = affinity if total_cpus != 0 else 1   #sets affinity to 1 if there are no cpus avaliable
         # total_cpus = total_cpus if total_cpus%2==0 else total_cpus-total_cpus%2 #Making total cpus divisible by 2
@@ -106,12 +111,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
                 gpu_ranks.append(ri[0])
             else:
                 cpu_ranks.append(ri[0])
-
         #Getting slices for data
         gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
         gpu_shape = get_slices_shape(gpu_slices)
         cpu_shape =  get_slices_shape(cpu_slices)
-
     else:
         new_rank_info = None
         total_gpus=None
@@ -151,47 +154,65 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
     #Getting region and offset region for each rank (CPU or GPU)
     regions = region_split(rank,gargs,cargs,block_size,MOSS)
-
-    #Initializing local array and filling with arr0
-    # print(rank,regions[0])
-    local_shape = get_slices_shape(regions[0])
-    local_array = np.zeros(local_shape,dtype=dType)
-    local_array[:,:,:,:] = shared_arr[regions[0]]
-
-    #Specifying which source mod to use
+    local_array = local_array_create(shared_arr,regions[0],dType)
+    # Specifying which source mod to use
     if gpu_rank:
-        #Creating cuda device and Context
+        # Creating cuda device and Context
         cuda.init()
         cuda_device = cuda.Device(new_rank_info[-1])
         cuda_context = cuda_device.make_context()
-        #Creating grid size
-        grid_size = (int(local_shape[2]/block_size[0]),int(local_shape[3]/block_size[1]))   #Grid size
+        #Creating local GPU array with split
+        grid_size = (int(local_array.shape[2]/block_size[0]),int(local_array.shape[3]/block_size[1]))   #Grid size
         #Creating constants
-        NV = local_shape[1]
+        NV = local_array.shape[1]
         SGIDS = block_size[0]*block_size[1]
         VARS =  SGIDS*grid_size[0]*grid_size[1]
         TIMES = VARS*NV
         DX = dx
         DY = dy
         DT = targs[2]
-        const_dict = ({"NV":NV,"DX":DX,"DT":DX,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
-                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS})
+        const_dict = ({"NV":NV,"DX":DX,"DT":DT,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
+                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
-        # constant_copy(source_mod,const_dict,add_consts)
-    else:
+        constant_copy(source_mod,const_dict,add_consts)
+    elif regions[0]:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
+        grid_size = None
 
+    #Setting local array boolean
+    if local_array is None:
+        LAB = False
+    else:
+        LAB = True
 
-    # print(rank,local_array.shape)
-    #First step is the up pyramid
-    # UpPyramid(source_mod,local_array, ops, gpu_rank,block_size)
-    # GST+=1  #Increment global swept step
-    # comm.Barrier()
+    #UpPyramid Step
+    if LAB:
+        UpPyramid(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[0],shared_arr) #THis modifies shared array
+        GST+=1  #Increment global swept step
+    comm.Barrier()
+
+    #Communicate edges
+    if LAB:
+        edge_comm(shared_arr,SPLITX,SPLITY)
+    comm.Barrier()
+
+    #Octahedron steps
+    while(GST<MGST):
+        print(GST%2)
+        local_array = shared_arr[regions[GST%2]]
+        GST+=1
 
     #CUDA clean up - One of the last steps
     if gpu_rank:
         cuda_context.pop()
+        # pass
+
+
+def shared_write(arr,shared_arr):
+    """Use this funciton to write back into the shared array."""
+    pass
+
 
 def rank_split(arr0,rank_size):
     """Use this function to equally split data among the ranks"""
@@ -211,7 +232,7 @@ if __name__ == "__main__":
     block_size = (8,8,1)
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
-    affinity = 0.9
+    affinity = 0
     #Time testing arguments
     t0 = 0
     t_b = 1

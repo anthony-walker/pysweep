@@ -34,7 +34,7 @@ def swept():
     #Time testing arguments
     t0 = 0
     t_b = 1
-    dt = 0.01
+    dt = 0.1
     targs = (t0,t_b,dt)
 
     #Space testing arguments

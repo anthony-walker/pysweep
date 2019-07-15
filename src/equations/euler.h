@@ -165,14 +165,17 @@ Use this function to obtain the flux for each system variable
 __device__
 void  efluxy(float* flux,float *left_state, float *right_state, int dir)
 {
+  //Initializing variables
   float rhoL = left_state[0];
   float rhoR = right_state[0];
   float uL = left_state[1]/rhoL;
   float uR = right_state[1]/rhoR;
   float vL = left_state[2]/rhoL;
   float vR = right_state[2]/rhoR;
+  //Determining pressures
   float pL = pressure(left_state);
   float pR = pressure(right_state);
+  //Updating fluxes
   flux[0] += dir*(left_state[1]+right_state[1]);
   flux[1] += dir*(left_state[2]*uL+right_state[2]*uR);
   flux[2] += dir*(left_state[2]*vL+pL+right_state[2]*vR+pR);
@@ -199,12 +202,13 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 2;  //spectral radius idx
-    //Pressure ratio
+
+    // Pressure ratio
     Pr[0] = pressureRatio(wwpoint,wpoint,cpoint);
     Pr[1] = pressureRatio(wpoint,cpoint,epoint);
     Pr[2] = pressureRatio(cpoint,epoint,eepoint);
 
-    //West
+    // West
     flimiter(temp_left,wpoint,cpoint,Pr[0]);
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
     efluxy(dfdy,temp_left,temp_right,ONE);

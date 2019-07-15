@@ -10,6 +10,22 @@ import importlib
 #Multiprocessing
 import multiprocessing as mp
 
+def local_array_create(shared_arr,region,dType):
+    """Use this function to generate the local arrays from regions."""
+    if region:
+        local_shape = get_slices_shape(region)
+        local_array = np.zeros(local_shape,dtype=dType)
+        local_array[:,:,:,:] = shared_arr[region]
+    else:
+        local_array = None
+
+    return local_array
+
+def edge_comm(shared_arr,SPLITX,SPLITY):
+    """Use this function to communicate edges in the shared array."""
+    shared_arr[:,:,-SPLITX:,:] = shared_arr[:,:,:SPLITX,:]
+    shared_arr[:,:,:,-SPLITY:] = shared_arr[:,:,:,:SPLITY]
+
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
     module_name = cpu_source.split("/")[-1]
@@ -111,19 +127,25 @@ def region_split(rank,gargs,cargs,block_size,MOSS):
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
-            for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
-                region1.append(stv+stx1+(slice(prev*block_size[1],i*block_size[1],1),))
-                region2.append(stv+stx2+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
-                prev = i
-            if len(region1)<total_cpus:
+            if stx1[0].stop>0:
+                for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
+                    region1.append(stv+stx1+(slice(prev*block_size[1],i*block_size[1],1),))
+                    region2.append(stv+stx2+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
+                    prev = i
+            else:
+                for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
+                    region1.append(tuple())
+                    region2.append(tuple())
+                    prev = i
+            if len(region1)<total_cpus: #Appending empty tuples if there are to many processes
                 for i in range(abs(len(region1)-total_cpus)):
-                    region1.append(stuple+(slice(0,0,1),))
-                    region2.append(stuple2+(slice(0,0,1),))
+                    region1.append(tuple())
+                    region2.append(tuple())
         region1 = cpu_comm.scatter(region1)
         region2 = cpu_comm.scatter(region2)
     return region1, region2
 
-def get_gpu_ranks(rank_info):
+def get_gpu_ranks(rank_info,affinity):
     """Use this funciton to determine which ranks with have a GPU.
         given: rank_info - a list of tuples of (rank, processor, gpu_ids, gpu_rank)
         returns: new_rank_inf, total_gpus
@@ -139,8 +161,7 @@ def get_gpu_ranks(rank_info):
             ri[2].reverse()
             devices[ri[1]] = ri[2].copy()   #Device ids
             total_gpus+=len(ri[2])
-
-        if assigned_ctr[ri[1]] > 0:
+        if assigned_ctr[ri[1]] > 0 and affinity > 0:
             temp = ri[:-2]+(True,)+(devices[ri[1]].pop(),)
             assigned_ctr[ri[1]]-=1
         new_rank_info.append(temp)
@@ -187,7 +208,7 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,add_const[key])
 
-def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
+def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -195,13 +216,12 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
     ops -  the number of atomic operations
     """
     if gpu_rank:
-        #Creating GPU important dimensions
-        grid_size = (int(arr.shape[2]/block_size[0]),int(arr.shape[3]/block_size[1]))   #Grid size
-        shared_size = (arr[0,:,:block_size[0],:block_size[1]].nbytes) #Creating size of shared array
         #Getting GPU Function
         gpu_fcn = source_mod.get_function("UpPyramid")
-        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=shared_size)
+        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
         cuda.Context.synchronize()
+        # for row in arr[1,0,:,:]:
+        #     print(row)
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
@@ -210,10 +230,16 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size):
         blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
         cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,ops))
         blocks = list(map(cpu_fcn,blocks))
-        #Rebuild blocks
-    #-------------------------Ending CPU Performance Testing--------------------#
-
-
+        #Rebuild blocks into array
+        if len(blocks)>1:
+            temp = []
+            for i in range(bsy,len(blocks)+1,bsy):
+                temp.append(np.concatenate(blocks[i-bsy:i],axis=3))
+            if len(temp)>1:
+                arr = np.concatenate(temp,axis=2)
+            else:
+                arr = temp[0]
+    shared_arr[region] = arr[:,:,:,:]
 
 
 def Octahedron(arr,  ops):
@@ -233,9 +259,6 @@ def CPU_UpPyramid(args):
     bsy = block.shape[3]
     iidx = tuple(np.ndindex(plane_shape[2:]))
     #Removing elements for swept step
-
-
-    # print(len(iidx),bsx
     ts = 0
     while len(iidx)>0:
         #Adjusting indices

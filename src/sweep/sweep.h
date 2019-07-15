@@ -14,14 +14,16 @@ __device__ __constant__ const float TWO=2;
 __device__ __constant__ int SGIDS; //shift in shared data
 __device__ __constant__ int VARS; //shift in variables in data
 __device__ __constant__ int TIMES; //shift in times in data
-__device__ __constant__  int MSS; //max swept steps
+__device__ __constant__  int MPSS; //max pyramid swept steps
+__device__ __constant__  int MOSS; //max octahedron swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
 __device__ __constant__ int SGNVS;
-__device__ __constant__  float DTDX;
-__device__ __constant__  float DTDY;
-
-
+__device__ __constant__  float DX;
+__device__ __constant__  float DY;
+__device__ __constant__  float DT;
+__device__ __constant__  float SPLITX;
+__device__ __constant__  float SPLITY;
 
 //!!(@#
 
@@ -55,7 +57,9 @@ UpPyramid(float *state)
     // float fluxUpdate[4];
     // Filling shared state array with variables initial variables
     // printf("%d,%d,%d,%d,%d\n",gid,sgid,sgid+SGIDS,sgid+2*SGIDS,sgid+3*SGIDS);
-    for (int k = 0; k < MSS; k++)
+    // printf("%d, %f\n",gid,state[gid]);
+
+    for (int k = 0; k < MPSS; k++)
     {
         for (int i = 0; i < NV; i++)
         {
@@ -67,7 +71,6 @@ UpPyramid(float *state)
         ux -= OPS;
         uy -= OPS;
         lxy += OPS;
-
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
         {
