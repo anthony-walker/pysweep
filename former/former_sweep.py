@@ -113,8 +113,30 @@ def CPU_UpPyramid(args):
     # return pts #This is strictly for
     return block
 
-    
+
 def rank_split(arr0,rank_size):
     """Use this function to equally split data among the ranks"""
     major_axis = plane_shape.index(max(plane_shape))
     return np.array_split(arr0,rank_size,axis=major_axis)
+
+#--------------------------------NOT USED CURRENTLY-----------------------------
+def edges(arr,ops,shape_adj=-1):
+    """Use this function to generate boolean arrays for edge handling."""
+    mask = np.zeros(arr.shape[:shape_adj], dtype=bool)
+    mask[(arr.ndim+shape_adj)*(slice(ops, -ops),)] = True
+    return mask
+
+def dummy_fcn(arr):
+    """This is a testing function for arch_speed_comp."""
+    iidx = np.ndindex(np.shape(arr))
+    for i,idx in enumerate(iidx):
+        arr[idx] *= i
+        # print(i,value)
+    return arr
+def create_map():
+    """Use this function to create local maps for process communication."""
+    smap = set() #Each rank has its own map
+
+def extended_shape(orig_shape,block_size):
+    """Use this function to develop extended array shapes."""
+    return (orig_shape[0],orig_shape[1]+int(block_size[0]/2),orig_shape[2])
