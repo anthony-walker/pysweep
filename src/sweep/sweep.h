@@ -133,3 +133,51 @@ Octahedron(float *state)
     }
 
 }
+
+__global__ void
+__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
+DownPyramid(float *state)
+{
+    //Creating flattened shared array ptr (x,y,v) length
+    extern __shared__ float shared_state[];    //Shared state specified externally
+    //Creating swept boundaries
+    int lxy = 0; //Lower swept bound
+    int ux = blockDim.x; //upper x
+    int uy = blockDim.y;//blockDim.y; //upper y
+    //Creating indexing
+    int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
+
+    int sgid = gid%(SGIDS); //Shared global index
+    int tlx = sgid/blockDim.x;  //Location x
+    int tly = sgid%blockDim.y;  //Location y
+    // float fluxUpdate[4];
+    // Filling shared state array with variables initial variables
+    // printf("%d,%d,%d,%d,%d\n",gid,sgid,sgid+SGIDS,sgid+2*SGIDS,sgid+3*SGIDS);
+    // printf("%d, %f\n",gid,state[gid]);
+
+    for (int k = 0; k < MOSS; k++)
+    {
+        for (int i = 0; i < NV; i++)
+        {
+            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
+        }
+        __syncthreads(); //Sync threads here to ensure all initial values are copied
+
+        //Update swept bounds
+        ux -= OPS;
+        uy -= OPS;
+        lxy += OPS;
+        // Solving step function
+        if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
+        {
+            step(shared_state,sgid);
+        }
+
+        // Place values back in original matrix
+        for (int j = 0; j < NV; j++)
+        {
+            state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+        }
+    }
+
+}

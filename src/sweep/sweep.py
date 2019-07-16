@@ -186,39 +186,35 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     else:
         LAB = True
 
-    #Transfer Initial edges
-    if LAB and rank == master_rank:
-        edge_comm(shared_arr,SPLITX,SPLITY)
-    comm.Barrier()
-
+    idx_sets = create_iidx_sets(block_size,ops)
     #UpPyramid Step
     if LAB:
-        UpPyramid(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[0],shared_arr) #THis modifies shared array
-        GST+=1  #Increment global swept step
+        UpPyramid(source_mod,local_array, gpu_rank,block_size,grid_size,regions[0],shared_arr,idx_sets) #THis modifies shared array
     comm.Barrier()
-
     #Communicate edges
     if LAB and rank == master_rank:
-        edge_comm(shared_arr,SPLITX,SPLITY)
+        edge_comm(shared_arr,SPLITX,SPLITY,GST%2)
     comm.Barrier()
+    GST+=1  #Increment global swept step
     #Octahedron steps
-    # while(GST<MGST):
-    if LAB:
-        #Reading local array
-        local_array = shared_arr[regions[GST%2]]
-        # print("-------------------------")
-        # for row in local_array[1,0,:,:]:
-        #     print(row)
-        # print("-------------------------")
-        #Octahedron Step
-        Octahedron(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[GST%2],shared_arr)
-        #Writing to shared
-        shared_arr[regions[GST%2]] = local_array[:,:,:,:]
+    while(GST<MGST):
+        if LAB:
+            cregion = regions[GST%2]
+            #Reading local array
+            local_array = shared_arr[cregion]
+            #Octahedron Step
+            Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
         comm.Barrier()  #Write barrier
         if rank == master_rank:
-            edge_comm(shared_arr,SPLITX,SPLITY)
-    comm.Barrier() #Edge transfer barrier
-        # GST+=1
+            edge_comm(shared_arr,SPLITX,SPLITY,GST%2)
+        comm.Barrier() #Edge transfer barrier
+        GST+=1
+        #Add JSON WRITE HERE and SHIFT
+
+    #Down Pyramid Step
+    DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets)
+
+    #Add Final Write Step Here
 
     #CUDA clean up - One of the last steps
     if gpu_rank:

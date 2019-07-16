@@ -140,3 +140,24 @@ def create_map():
 def extended_shape(orig_shape,block_size):
     """Use this function to develop extended array shapes."""
     return (orig_shape[0],orig_shape[1]+int(block_size[0]/2),orig_shape[2])
+def CPU_UpPyramid(args):
+    """Use this function to solve a block on the CPU."""
+    block,source_mod,ops = args
+    b_shape_x = block.shape[2]
+    b_shape_y = block.shape[3]
+    iidx = tuple(np.ndindex(block.shape[2:]))
+    #Removing elements for swept step
+    ts = 0
+    while len(iidx)>0:
+        #Adjusting indices
+        tl = tuple()
+        iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
+        b_shape_y-=2*ops
+        for i in range(1,b_shape_y+1,1):
+            tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
+        b_shape_x-=2*ops
+        iidx = tl
+        #Calculating Step
+        block = source_mod.step(block,iidx,ts)
+        ts+=1
+    return block

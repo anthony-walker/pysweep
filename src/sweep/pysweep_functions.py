@@ -10,6 +10,26 @@ import importlib
 #Multiprocessing
 import multiprocessing as mp
 
+def create_iidx_sets(block_size,ops):
+    """Use this function to create index sets"""
+    b_shape_x = block_size[0]
+    b_shape_y = block_size[1]
+    idx_sets = tuple()
+    iidx = tuple(np.ndindex(block_size[:2]))
+    idx_sets += (set(iidx),)
+    while len(iidx)>0:
+        #Adjusting indices
+        tl = tuple()
+        iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
+        b_shape_y-=2*ops
+        for i in range(1,b_shape_y+1,1):
+            tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
+        b_shape_x-=2*ops
+        iidx = tl
+        if len(iidx)>0:
+            idx_sets += (set(iidx),)
+    return idx_sets
+
 def local_array_create(shared_arr,region,dType):
     """Use this function to generate the local arrays from regions."""
     if region:
@@ -21,10 +41,14 @@ def local_array_create(shared_arr,region,dType):
 
     return local_array
 
-def edge_comm(shared_arr,SPLITX,SPLITY):
+def edge_comm(shared_arr,SPLITX,SPLITY,dir):
     """Use this function to communicate edges in the shared array."""
-    shared_arr[:,:,-SPLITX:,:] = shared_arr[:,:,:SPLITX,:]
-    shared_arr[:,:,:,-SPLITY:] = shared_arr[:,:,:,:SPLITY]
+    if not dir:
+        shared_arr[:,:,-SPLITX:,:] = shared_arr[:,:,:SPLITX,:]
+        shared_arr[:,:,:,-SPLITY:] = shared_arr[:,:,:,:SPLITY]
+    else:
+        shared_arr[:,:,:SPLITX,:]=shared_arr[:,:,-SPLITX:,:]
+        shared_arr[:,:,:,:SPLITY]=shared_arr[:,:,:,-SPLITY:]
 
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
@@ -225,7 +249,7 @@ def rebuild_blocks(blocks,bsx,bsy):
     else:
         return blocks[0]
 
-def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr):
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -234,6 +258,7 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr
     """
     if gpu_rank:
         #Getting GPU Function
+        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("UpPyramid")
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
         cuda.Context.synchronize()
@@ -241,13 +266,13 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
         blocks = create_blocks(arr,bsx,bsy)
-        cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,ops))
+        cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(blocks,bsx,bsy)
     #Writing to shared array
     shared_arr[region] = arr[:,:,:,:]
 
-def Octahedron(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr):
+def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -255,86 +280,71 @@ def Octahedron(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_ar
     ops -  the number of atomic operations
     """
     if gpu_rank:
-        pass
+        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
+        gpu_fcn = source_mod.get_function("Octahedron")
+        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
+        cuda.Context.synchronize()
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
-
         blocks = create_blocks(arr,bsx,bsy)
-        cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,ops))
-        cpu_fcn(blocks[0])
-        # blocks = list(map(cpu_fcn,blocks))
-        # arr = rebuild_blocks(blocks,bsx,bsy)
+        cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,idx_sets))
+        blocks = list(map(cpu_fcn,blocks))
+        arr = rebuild_blocks(blocks,bsx,bsy)
     shared_arr[region] = arr[:,:,:,:]
 
-
-def DownPyramid(arr, ops):
+def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
     """This is the ending inverted pyramid."""
-    pass
-#--------------------------------CPU Specific Swept Functions------------------
+    if gpu_rank:
+        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
+        gpu_fcn = source_mod.get_function("DownPyramid")
+        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
+        cuda.Context.synchronize()
+    else:   #CPUs do this
+        bsx = int(arr.shape[2]/block_size[0])
+        bsy =  int(arr.shape[3]/block_size[1])
+        blocks = create_blocks(arr,bsx,bsy)
+        cpu_fcn = sweep_lambda((CPU_DownPyramid,source_mod,idx_sets))
+        blocks = list(map(cpu_fcn,blocks))
+        arr = rebuild_blocks(blocks,bsx,bsy)
+    shared_arr[region] = arr[:,:,:,:]
 
+#--------------------------------CPU Specific Swept Functions------------------
 def CPU_UpPyramid(args):
-    """Use this function to solve a block on the CPU."""
-    block,source_mod,ops = args
-    b_shape_x = block.shape[2]
-    b_shape_y = block.shape[3]
-    iidx = tuple(np.ndindex(block.shape[2:]))
+    """Use this function to build the Up Pyramid."""
+    block,source_mod,idx_sets = args
     #Removing elements for swept step
     ts = 0
-    while len(iidx)>0:
-        #Adjusting indices
-        tl = tuple()
-        iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
-        b_shape_y-=2*ops
-        for i in range(1,b_shape_y+1,1):
-            tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
-        b_shape_x-=2*ops
-        iidx = tl
+    for swept_set in idx_sets[1:]:
         #Calculating Step
-        block = source_mod.step(block,iidx,ts)
+        block = source_mod.step(block,swept_set,ts)
         ts+=1
     return block
 
 def CPU_Octahedron(args):
-    """Use this function to solve a block on the CPU."""
-    block,source_mod,ops = args
-    b_shape_x = block.shape[2]
-    b_shape_y = block.shape[3]
-    mbx = int(b_shape_x/2)
-    mby = int(b_shape_y/2)
-    iidx = tuple()
-    curr_tuple = tuple()
-
-    #DownPyramid of Octahedron
-    ts = 1
-    while mbx-ts*ops > 0 and mby-ts*ops > 0:
-
-        print(mbx-ts*ops,mbx+ts*ops+1)
-
+    """Use this function to build the Octahedron."""
+    block,source_mod,idx_sets = args
+    #Removing elements for swept step
+    ts = 0
+    #Down Pyramid Step
+    for swept_set in idx_sets[::-1][:-1]:
+        #Calculating Step
+        block = source_mod.step(block,swept_set,ts)
         ts+=1
-    # #Adjusting indices
-    # tl = tuple()
-    # iidx = iidx[half_-ops*ts:half_b_shape_x*-ops*ts]
-    # b_shape_y-=2*ops
-    # for i in range(1,b_shape_y+1,1):
-    #     tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
-    # b_shape_x-=2*ops
-    # iidx = tl
-    # # Calculating Step
-    # block = source_mod.step(block,iidx,ts)
-    # ts+=1
-    #UpPyramid of Octahedron
-    # ts = 0
-    # while len(iidx)<0:
-    #     #Adjusting indices
-    #     tl = tuple()
-    #     iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
-    #     b_shape_y-=2*ops
-    #     for i in range(1,b_shape_y+1,1):
-    #         tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
-    #     b_shape_x-=2*ops
-    #     iidx = tl
-    #     #Calculating Step
-    #     block = source_mod.step(block,iidx,ts)
-    #     ts+=1
+    #Up Pyramid Step
+    for swept_set in idx_sets[2:]:  #Skips first two elements because down pyramid
+        #Calculating Step
+        block = source_mod.step(block,swept_set,ts)
+        ts+=1
+    return block
+
+def CPU_DownPyramid(args):
+    """Use this function to build the Down Pyramid."""
+    block,source_mod,idx_sets = args
+    #Removing elements for swept step
+    ts = 0
+    for swept_set in idx_sets[::-1][:-1]:
+        #Calculating Step
+        block = source_mod.step(block,swept_set,ts)
+        ts+=1
     # return block

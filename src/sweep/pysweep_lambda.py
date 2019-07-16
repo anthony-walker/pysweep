@@ -4,5 +4,5 @@ class sweep_lambda(object):
         self.args = args
 
     def __call__(self,block):
-        sweep_fcn,source_mod,ops = self.args
-        return sweep_fcn((block,source_mod,ops))
+        sweep_fcn,source_mod,idx_sets = self.args
+        return sweep_fcn((block,source_mod,idx_sets))
