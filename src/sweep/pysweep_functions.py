@@ -347,4 +347,4 @@ def CPU_DownPyramid(args):
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
         ts+=1
-    # return block
+    return block

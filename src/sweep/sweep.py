@@ -59,7 +59,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
 
-
     #Getting GPU info
     gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
 
@@ -212,8 +211,9 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Add JSON WRITE HERE and SHIFT
 
     #Down Pyramid Step
-    DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets)
-
+    if LAB:
+        DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
+        # pass
     #Add Final Write Step Here
 
     #CUDA clean up - One of the last steps
