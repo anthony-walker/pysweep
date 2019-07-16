@@ -204,6 +204,27 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,add_const[key])
 
+def create_blocks(arr,bsx,bsy):
+    """Use this function to create blocks from the arr."""
+    hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
+    blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
+    return blocks
+
+def rebuild_blocks(blocks,bsx,bsy):
+    """Use this funciton to rebuild the blocks."""
+    #Rebuild blocks into array
+    if len(blocks)>1:
+        temp = []
+        for i in range(bsy,len(blocks)+1,bsy):
+            temp.append(np.concatenate(blocks[i-bsy:i],axis=3))
+        if len(temp)>1:
+            arr = np.concatenate(temp,axis=2)
+        else:
+            arr = temp[0]
+        return arr
+    else:
+        return blocks[0]
+
 def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
@@ -216,29 +237,15 @@ def UpPyramid(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr
         gpu_fcn = source_mod.get_function("UpPyramid")
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
         cuda.Context.synchronize()
-        # for row in arr[1,0,:,:]:
-        #     print(row)
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
-        cpu_blocks = bsx*bsy
-        hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
-        blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
+        blocks = create_blocks(arr,bsx,bsy)
         cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,ops))
         blocks = list(map(cpu_fcn,blocks))
-        #Rebuild blocks into array
-        if len(blocks)>1:
-            temp = []
-            for i in range(bsy,len(blocks)+1,bsy):
-                temp.append(np.concatenate(blocks[i-bsy:i],axis=3))
-            if len(temp)>1:
-                arr = np.concatenate(temp,axis=2)
-            else:
-                arr = temp[0]
+        arr = rebuild_blocks(blocks,bsx,bsy)
     #Writing to shared array
     shared_arr[region] = arr[:,:,:,:]
-
-
 
 def Octahedron(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_arr):
     """
@@ -252,20 +259,12 @@ def Octahedron(source_mod,arr,ops,gpu_rank,block_size,grid_size,region,shared_ar
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
-        cpu_blocks = bsx*bsy
-        hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
-        blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
+
+        blocks = create_blocks(arr,bsx,bsy)
         cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,ops))
-        blocks = list(map(cpu_fcn,blocks))
-        #Rebuild blocks into array
-        if len(blocks)>1:
-            temp = []
-            for i in range(bsy,len(blocks)+1,bsy):
-                temp.append(np.concatenate(blocks[i-bsy:i],axis=3))
-            if len(temp)>1:
-                arr = np.concatenate(temp,axis=2)
-            else:
-                arr = temp[0]
+        cpu_fcn(blocks[0])
+        # blocks = list(map(cpu_fcn,blocks))
+        # arr = rebuild_blocks(blocks,bsx,bsy)
     shared_arr[region] = arr[:,:,:,:]
 
 
@@ -277,20 +276,19 @@ def DownPyramid(arr, ops):
 def CPU_UpPyramid(args):
     """Use this function to solve a block on the CPU."""
     block,source_mod,ops = args
-    plane_shape = block.shape
-    bsx = block.shape[2]
-    bsy = block.shape[3]
-    iidx = tuple(np.ndindex(plane_shape[2:]))
+    b_shape_x = block.shape[2]
+    b_shape_y = block.shape[3]
+    iidx = tuple(np.ndindex(block.shape[2:]))
     #Removing elements for swept step
     ts = 0
     while len(iidx)>0:
         #Adjusting indices
         tl = tuple()
-        iidx = iidx[ops*bsx:-ops*bsx]
-        bsy-=2*ops
-        for i in range(1,bsy+1,1):
-            tl+=iidx[i*bsx-bsx+ops:i*bsx-ops]
-        bsx-=2*ops
+        iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
+        b_shape_y-=2*ops
+        for i in range(1,b_shape_y+1,1):
+            tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
+        b_shape_x-=2*ops
         iidx = tl
         #Calculating Step
         block = source_mod.step(block,iidx,ts)
@@ -300,22 +298,43 @@ def CPU_UpPyramid(args):
 def CPU_Octahedron(args):
     """Use this function to solve a block on the CPU."""
     block,source_mod,ops = args
-    plane_shape = block.shape
-    bsx = block.shape[2]
-    bsy = block.shape[3]
-    iidx = tuple(np.ndindex(plane_shape[2:]))
-    #Removing elements for swept step
-    ts = 0
-    while len(iidx)>0:
-        #Adjusting indices
-        tl = tuple()
-        iidx = iidx[ops*bsx:-ops*bsx]
-        bsy-=2*ops
-        for i in range(1,bsy+1,1):
-            tl+=iidx[i*bsx-bsx+ops:i*bsx-ops]
-        bsx-=2*ops
-        iidx = tl
-        #Calculating Step
-        block = source_mod.step(block,iidx,ts)
+    b_shape_x = block.shape[2]
+    b_shape_y = block.shape[3]
+    mbx = int(b_shape_x/2)
+    mby = int(b_shape_y/2)
+    iidx = tuple()
+    curr_tuple = tuple()
+
+    #DownPyramid of Octahedron
+    ts = 1
+    while mbx-ts*ops > 0 and mby-ts*ops > 0:
+
+        print(mbx-ts*ops,mbx+ts*ops+1)
+
         ts+=1
-    return block
+    # #Adjusting indices
+    # tl = tuple()
+    # iidx = iidx[half_-ops*ts:half_b_shape_x*-ops*ts]
+    # b_shape_y-=2*ops
+    # for i in range(1,b_shape_y+1,1):
+    #     tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
+    # b_shape_x-=2*ops
+    # iidx = tl
+    # # Calculating Step
+    # block = source_mod.step(block,iidx,ts)
+    # ts+=1
+    #UpPyramid of Octahedron
+    # ts = 0
+    # while len(iidx)<0:
+    #     #Adjusting indices
+    #     tl = tuple()
+    #     iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
+    #     b_shape_y-=2*ops
+    #     for i in range(1,b_shape_y+1,1):
+    #         tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
+    #     b_shape_x-=2*ops
+    #     iidx = tl
+    #     #Calculating Step
+    #     block = source_mod.step(block,iidx,ts)
+    #     ts+=1
+    # return block

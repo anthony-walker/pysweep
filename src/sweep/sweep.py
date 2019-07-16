@@ -74,8 +74,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
 
     #Max Swept Steps from block_size and other constants
-    MPSS = int(min(block_size[:-1])/(2*ops)) #Max Pyramid Swept Step
-    MOSS = int(min(block_size[:-1])/(ops))   #Max Octahedron Swept Step
+    MPSS = int(min(block_size[:-1])/(2*ops+1)) #Max Pyramid Swept Step
+    MOSS = int(2*min(block_size[:-1])/(2*ops+1))   #Max Octahedron Swept Step
 
     #Splits for shared array
     SPLITX = int(block_size[0]/2)    #Split computation shift
@@ -201,21 +201,24 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     if LAB and rank == master_rank:
         edge_comm(shared_arr,SPLITX,SPLITY)
     comm.Barrier()
-
     #Octahedron steps
-    while(GST<MGST):
-        if LAB:
-            #Reading local array
-            local_array = shared_arr[regions[GST%2]]
-            #Octahedron Step
-            Octahedron(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[0],shared_arr)
-            #Writing to shared
-            shared_arr[regions[GST%2]] = local_array[:,:,:,:]
-            comm.Barrier()  #Write barrier
-            if rank == master_rank:
-                edge_comm(shared_arr,SPLITX,SPLITY)
-        comm.Barrier() #Edge transfer barrier
-        GST+=1
+    # while(GST<MGST):
+    if LAB:
+        #Reading local array
+        local_array = shared_arr[regions[GST%2]]
+        # print("-------------------------")
+        # for row in local_array[1,0,:,:]:
+        #     print(row)
+        # print("-------------------------")
+        #Octahedron Step
+        Octahedron(source_mod,local_array, ops, gpu_rank,block_size,grid_size,regions[GST%2],shared_arr)
+        #Writing to shared
+        shared_arr[regions[GST%2]] = local_array[:,:,:,:]
+        comm.Barrier()  #Write barrier
+        if rank == master_rank:
+            edge_comm(shared_arr,SPLITX,SPLITY)
+    comm.Barrier() #Edge transfer barrier
+        # GST+=1
 
     #CUDA clean up - One of the last steps
     if gpu_rank:
