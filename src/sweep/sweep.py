@@ -7,6 +7,9 @@
 import os
 import sys
 
+#Writing imports
+import h5py
+
 #DataStructure and Math imports
 import math
 import numpy as np
