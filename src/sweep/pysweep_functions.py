@@ -306,7 +306,7 @@ def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,i
     """This is the ending inverted pyramid."""
     if gpu_rank:
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-        gpu_fcn = source_mod.get_function("DownPyramid")
+        gpu_fcn = source_mod.get_function("UpPyramid")
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
