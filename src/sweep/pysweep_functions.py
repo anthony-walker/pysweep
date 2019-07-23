@@ -10,6 +10,39 @@ import importlib
 #Multiprocessing
 import multiprocessing as mp
 
+
+
+
+def write_and_shift(shared_arr,region1,hdf_file,MPSS):
+    """Use this function to write to the hdf file and shift the shared array
+        data after writing."""
+    #Add hdf write here
+    #Shift
+    shared_arr[:MPSS,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
+    #Do edge comm after this function
+
+def create_iidx_sets(block_size,ops):
+    """Use this function to create index sets"""
+    b_shape_x = block_size[0]
+    b_shape_y = block_size[1]
+    idx_sets = tuple()
+    iidx = tuple(np.ndindex(block_size[:2]))
+    idx_sets += (set(iidx),)
+    while len(iidx)>0:
+        #Adjusting indices
+
+
+def create_iidx_sets(block_size,ops):
+    """Use this function to create index sets"""
+    b_shape_x = block_size[0]
+    b_shape_y = block_size[1]
+    idx_sets = tuple()
+    iidx = tuple(np.ndindex(block_size[:2]))
+    idx_sets += (set(iidx),)
+    while len(iidx)>0:
+        #Adjusting indices
+
+
 def create_iidx_sets(block_size,ops):
     """Use this function to create index sets"""
     b_shape_x = block_size[0]
