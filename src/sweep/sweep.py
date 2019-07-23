@@ -216,7 +216,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Down Pyramid Step
     if LAB:
         DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-        # pass
+
     #Add Final Write Step Here
 
     #CUDA clean up - One of the last steps
