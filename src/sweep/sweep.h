@@ -165,7 +165,7 @@ DownPyramid(float *state)
     extern __shared__ float shared_state[];    //Shared state specified externally
     //Creating swept boundaries
     int lx = blockDim.x/2; //Lower swept bound
-    int ly = blockDim.y/2 //Lower swept bound y
+    int ly = blockDim.y/2; //Lower swept bound y
     int ux = blockDim.x/2; //upper x
     int uy = blockDim.y/2;//blockDim.y; //upper y
     //Creating indexing
