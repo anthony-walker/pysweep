@@ -155,7 +155,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
     #Getting region and offset region for each rank (CPU or GPU)
     regions = region_split(rank,gargs,cargs,block_size,MOSS)
-
+    #Add overlap to local arrays - HERE - Update Calculations
     local_array = local_array_create(shared_arr,regions[0],dType)
     # Specifying which source mod to use
     if gpu_rank:
