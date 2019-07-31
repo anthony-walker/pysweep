@@ -86,7 +86,7 @@ def get_slices_shape(slices):
         stuple+=(s.stop-s.start,)
     return stuple
 
-def affinity_split(affinity,block_size,arr_shape,total_gpus):
+def affinity_split(affinity,block_size,arr_shape,total_gpus,printer=None):
     """Use this function to split the given data based on rank information and the affinity.
     affinity -  a value between zero and one. (GPU work/CPU work)/Total Work
     block_size -  gpu block size
@@ -110,7 +110,7 @@ def affinity_split(affinity,block_size,arr_shape,total_gpus):
     cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
     return gpu_slices, cpu_slices
 
-def region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
+def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer=None):
     """Use this function to obtain the regions to for reading and writing
         from the shared array. region 1 is standard region 2 is offset by split.
         Note: The rows are divided into regions. So, each rank gets a row or set of rows
@@ -134,17 +134,16 @@ def region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
         blocks_per_gpu = int(gpu_blocks/total_gpus)
         #creating gpu indicies
         if gpu_master_rank == rank:
-            shift_slice=(slice(SPLITX+gpu_slices[1].start,gpu_slices[1].stop+SPLITX+2*ops,1),)
-            x_slice = slice(gpu_slices[1].start,gpu_slices[1].stop+2*ops,1)
+            x_slice = (slice(gpu_slices[1].start+ops,gpu_slices[1].stop+ops,1),)
+            shift_slice=(slice(gpu_slices[1].start+SPLITX,gpu_slices[1].stop+SPLITX,1),)
             #Creating regions
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
-            region3 = list()    #a list of slices one for each region
-            region4 = list()    #a list of slices one for each region
+
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
-                region1.append(stv+(x_slice,)+(slice(prev*block_size[1],i*block_size[1],1),))
-                region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
+                region1.append(stv+x_slice+(slice(prev*(block_size[1])+ops,i*(block_size[1])+ops,1),))
+                region2.append(stv+shift_slice+(slice(prev*(block_size[1])+SPLITY,i*block_size[1]+SPLITY,1),))
                 prev = i
         region1 = gpu_comm.scatter(region1)
         region2 = gpu_comm.scatter(region2)
@@ -156,6 +155,7 @@ def region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
         #creating cpu indicies
         if cpu_master_rank == rank:
             #Creating slice prefixes
+            x_slice = (slice(cpu_slices[1].start+ops,cpu_slices[1].stop+ops,1),)
             shift_slice=(slice(cpu_slices[1].start+SPLITX,cpu_slices[1].stop+SPLITX,1),)
             #Creating regions
             prev = 0
@@ -163,7 +163,7 @@ def region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
             region2 = list()    #a list of slices one for each region
             if cpu_slices[0].stop>0:
                 for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
-                    region1.append(stv+(cpu_slices[1],)+(slice(prev*block_size[1],i*block_size[1],1),))
+                    region1.append(stv+x_slice+(slice(prev*block_size[1]+ops,i*block_size[1]+ops,1),))
                     region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
                     prev = i
             else:
@@ -178,6 +178,27 @@ def region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
         region1 = cpu_comm.scatter(region1)
         region2 = cpu_comm.scatter(region2)
     return region1, region2
+
+def create_read_regions(regions,ops,printer=None):
+    """Use this function to obtain the regions to for reading and writing
+        from the shared array. region 1 is standard region 2 is offset by split.
+        Note: The rows are divided into regions. So, each rank gets a row or set of rows
+        so to speak. This is because affinity split is based on columns.
+    """
+
+    if regions[0] is not None:
+        id1 = 0
+        id2 = 1
+        region1 = (regions[id1][0],regions[id1][1])
+        region1 += slice(regions[id1][2].start-ops,regions[id1][2].stop+ops,1),
+        region1 += slice(regions[id1][3].start-ops,regions[id1][3].stop+ops,1),
+        region2 = (regions[id2][0],regions[1][1])
+        region2 += slice(regions[id2][2].start-ops,regions[id2][2].stop+ops,1),
+        region2 += slice(regions[id2][3].start-ops,regions[id2][3].stop+ops,1),
+    else:
+        region1 = None
+        region2 = None
+    return region1,region2
 
 def get_gpu_ranks(rank_info,affinity):
     """Use this funciton to determine which ranks with have a GPU.

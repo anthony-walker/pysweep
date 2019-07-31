@@ -108,6 +108,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
             total_gpus = num_ranks if num_ranks<total_gpus else total_gpus
         total_cpus = num_ranks-total_gpus
         affinity = affinity if total_cpus != 0 else 1   #sets affinity to 1 if there are no cpus avaliable
+        #Adjust for number of cpus/gpus
+        # affinity*=(total_gpus/total_cpus)
+        # affinity = affinity if affinity <= 1 else 1 #If the number becomes greater than 1 due to adjusting for number of cpus/gpus set to 1
+        # printer(affinity)
         # total_cpus = total_cpus if total_cpus%2==0 else total_cpus-total_cpus%2 #Making total cpus divisible by 2
         gpu_ranks = list()
         cpu_ranks = list()
@@ -117,7 +121,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
             else:
                 cpu_ranks.append(ri[0])
         #Getting slices for data
-        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
+        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus,printer)
     else:
         new_rank_info = None
         total_gpus=None
@@ -154,12 +158,12 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Grouping architecture arguments
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
-    printer(gpu_slices,p_ranks=True)
+    printer((gpu_rank,rank,SPLITX,SPLITY))
     #Getting region and offset region for each rank (CPU or GPU)
-    regions = region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY)
-    printer(regions,p_ranks=True)
-    #Add overlap to local arrays - HERE - Update Calculations
+    regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer)
+    regions = create_read_regions(regions,ops)+regions
     local_array = local_array_create(shared_arr,regions[0],dType)
+    printer(local_array.shape)
     # Specifying which source mod to use
     if gpu_rank:
         # Creating cuda device and Context
@@ -191,17 +195,23 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     else:
         LAB = True
 
-    idx_sets = create_iidx_sets(block_size,ops)
-    #UpPyramid Step
-    if LAB:
-        UpPyramid(source_mod,local_array, gpu_rank,block_size,grid_size,regions[0],shared_arr,idx_sets) #THis modifies shared array
-    comm.Barrier()
-    #Communicate edges
-    if LAB and rank == master_rank:
-        edge_comm(shared_arr,SPLITX,SPLITY,GST%2)
-    comm.Barrier()
-    GST+=1  #Increment global swept step
-    #Octahedron steps
+    """NEXT NEED TO UPDATE INDEX SETS WITH THE OPS SHIFT.
+    IT MAY WORK ALREADY AS THE OUTER POINTS WERE REMOVED. SO,
+    WITH A LARGER LOCAL ARRAY THE SAME SHOULD OCCUR.
+
+    """
+
+    # idx_sets = create_iidx_sets(block_size,ops)
+    # #UpPyramid Step
+    # if LAB:
+    #     UpPyramid(source_mod,local_array, gpu_rank,block_size,grid_size,regions[0],shared_arr,idx_sets) #THis modifies shared array
+    # comm.Barrier()
+    # #Communicate edges
+    # if LAB and rank == master_rank:
+    #     edge_comm(shared_arr,SPLITX,SPLITY,GST%2)
+    # comm.Barrier()
+    # GST+=1  #Increment global swept step
+    # Octahedron steps
     # while(GST<MGST):
     #     if LAB:
     #         cregion = regions[GST%2]
@@ -220,7 +230,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     # if LAB:
     #     DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
     #
-    # #Add Final Write Step Here
+    #Add Final Write Step Here
 
     #CUDA clean up - One of the last steps
     if gpu_rank:
