@@ -110,16 +110,19 @@ def affinity_split(affinity,block_size,arr_shape,total_gpus):
     cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
     return gpu_slices, cpu_slices
 
-def region_split(rank,gargs,cargs,block_size,MOSS):
+def region_split(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
     """Use this function to obtain the regions to for reading and writing
         from the shared array. region 1 is standard region 2 is offset by split.
         Note: The rows are divided into regions. So, each rank gets a row or set of rows
         so to speak. This is because affinity split is based on columns.
     """
+    #Read Regions
     region1 = None   #region1
     region2 = None   #region2
-    SPLITX = int(block_size[0]/2)
-    SPLITY = int(block_size[1]/2)
+    #Write Regions
+    region3 = None  #region3
+    region4 = None  #region4
+
     #Unpack arguments
     gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank = gargs
     cpu_comm,cpu_master_rank,total_cpus,cpu_slices = cargs
@@ -131,13 +134,16 @@ def region_split(rank,gargs,cargs,block_size,MOSS):
         blocks_per_gpu = int(gpu_blocks/total_gpus)
         #creating gpu indicies
         if gpu_master_rank == rank:
-            shift_slice=(slice(SPLITX+gpu_slices[1].start,gpu_slices[1].stop+SPLITX,1),)
+            shift_slice=(slice(SPLITX+gpu_slices[1].start,gpu_slices[1].stop+SPLITX+2*ops,1),)
+            x_slice = slice(gpu_slices[1].start,gpu_slices[1].stop+2*ops,1)
             #Creating regions
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
+            region3 = list()    #a list of slices one for each region
+            region4 = list()    #a list of slices one for each region
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
-                region1.append(stv+(gpu_slices[1],)+(slice(prev*block_size[1],i*block_size[1],1),))
+                region1.append(stv+(x_slice,)+(slice(prev*block_size[1],i*block_size[1],1),))
                 region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
                 prev = i
         region1 = gpu_comm.scatter(region1)
