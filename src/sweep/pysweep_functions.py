@@ -20,11 +20,11 @@ def write_and_shift(shared_arr,region1,hdf_set,MPSS):
 
 def create_iidx_sets(block_size,ops):
     """Use this function to create index sets"""
-    b_shape_x = block_size[0]
-    b_shape_y = block_size[1]
+    b_shape_x = block_size[0]+2*ops
+    b_shape_y = block_size[1]+2*ops
     idx_sets = tuple()
-    iidx = tuple(np.ndindex(block_size[:2]))
-    idx_sets += (set(iidx),)
+    iidx = tuple(np.ndindex((b_shape_x,b_shape_y)))
+    # idx_sets += (set(iidx),)
     while len(iidx)>0:
         #Adjusting indices
         tl = tuple()
@@ -185,7 +185,6 @@ def create_read_regions(regions,ops,printer=None):
         Note: The rows are divided into regions. So, each rank gets a row or set of rows
         so to speak. This is because affinity split is based on columns.
     """
-
     if regions[0] is not None:
         id1 = 0
         id2 = 1
@@ -284,7 +283,7 @@ def rebuild_blocks(blocks,bsx,bsy):
     else:
         return blocks[0]
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets,ops,printer=None):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -295,8 +294,9 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx
         #Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("UpPyramid")
-        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0],:block_size[1]].nbytes)
+        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].nbytes)
         cuda.Context.synchronize()
+        printer(arr[1,0,:,:])
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
@@ -305,7 +305,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(blocks,bsx,bsy)
     #Writing to shared array
-    shared_arr[region] = arr[:,:,:,:]
+    shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
     """
@@ -326,7 +326,7 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,id
         cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(blocks,bsx,bsy)
-    shared_arr[region] = arr[:,:,:,:]
+    shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
     """This is the ending inverted pyramid."""
@@ -350,7 +350,7 @@ def CPU_UpPyramid(args):
     block,source_mod,idx_sets = args
     #Removing elements for swept step
     ts = 0
-    for swept_set in idx_sets[1:]:
+    for swept_set in idx_sets:
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
         ts+=1

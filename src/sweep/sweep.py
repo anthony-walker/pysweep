@@ -76,9 +76,9 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
     printer = pysweep_printer(rank,master_rank) #This is a printer to print only master rank data
     #Max Swept Steps from block_size and other constants
-    MPSS = int(min(block_size[:-1])/(2*ops+1)) #Max Pyramid Swept Step
+    MPSS = int(min(block_size[:-1])/(2*ops+1))+1 #Max Pyramid Swept Step
     MOSS = int(2*min(block_size[:-1])/(2*ops+1))   #Max Octahedron Swept Step
-
+    printer(MPSS)
     #Splits for shared array
     SPLITX = int(block_size[0]/2)+ops    #Split computation shift - add ops
     SPLITY = int(block_size[1]/2)+ops    #Split computation shift
@@ -93,6 +93,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Create shared process array for data transfer
     shared_shape = (MOSS,arr0.shape[0],arr0.shape[1]+SPLITX,arr0.shape[2]+SPLITY)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
+    """PRINTER"""
     printer(shared_shape)
     #Setting initial conditions
     if rank == master_rank:
@@ -158,12 +159,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Grouping architecture arguments
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
+    """PRINTER"""
     printer((gpu_rank,rank,SPLITX,SPLITY))
     #Getting region and offset region for each rank (CPU or GPU)
     regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer)
     regions = create_read_regions(regions,ops)+regions
+    #Regions: (read region, shifted read, write, shifted write)
     local_array = local_array_create(shared_arr,regions[0],dType)
-    printer(local_array.shape)
     # Specifying which source mod to use
     if gpu_rank:
         # Creating cuda device and Context
@@ -174,7 +176,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         grid_size = (int(local_array.shape[2]/block_size[0]),int(local_array.shape[3]/block_size[1]))   #Grid size
         #Creating constants
         NV = local_array.shape[1]
-        SGIDS = block_size[0]*block_size[1]
+        SGIDS = block_size[0]*block_size[1]+2*ops
         VARS =  SGIDS*grid_size[0]*grid_size[1]
         TIMES = VARS*NV
         DX = dx
@@ -195,17 +197,14 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     else:
         LAB = True
 
-    """NEXT NEED TO UPDATE INDEX SETS WITH THE OPS SHIFT.
-    IT MAY WORK ALREADY AS THE OUTER POINTS WERE REMOVED. SO,
-    WITH A LARGER LOCAL ARRAY THE SAME SHOULD OCCUR.
+    #Creating swept indexes
+    idx_sets = create_iidx_sets(block_size,ops)
 
-    """
-
-    # idx_sets = create_iidx_sets(block_size,ops)
-    # #UpPyramid Step
-    # if LAB:
-    #     UpPyramid(source_mod,local_array, gpu_rank,block_size,grid_size,regions[0],shared_arr,idx_sets) #THis modifies shared array
-    # comm.Barrier()
+    #UpPyramid Step
+    if LAB:
+        UpPyramid(source_mod,local_array, gpu_rank,block_size,grid_size,regions[2],shared_arr,idx_sets,ops,printer) #THis modifies shared array
+    comm.Barrier()
+    # printer(shared_arr[1,0,:,:])
     # #Communicate edges
     # if LAB and rank == master_rank:
     #     edge_comm(shared_arr,SPLITX,SPLITY,GST%2)

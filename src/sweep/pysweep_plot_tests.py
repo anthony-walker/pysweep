@@ -8,6 +8,11 @@ from mpl_toolkits.mplot3d.axes3d import Axes3D, get_test_data
 import imageio
 import os
 
+
+def plot_point_set():
+    """Use this function to plot a set of points"""
+    pass
+
 def plot_swept_step(pts,name="./paper/figures/pyramid.gif",gf = "./paper/figures/pyramid.png"):
     """Use this function to plot the evaluated points of a swept step."""
     fig = plt.figure(1)
