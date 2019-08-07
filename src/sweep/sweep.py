@@ -61,11 +61,17 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     block_size - gpu block size (check your architecture requirements)
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
+    #Local Constants
+    ZERO = 0
+    QUARTER = 0.25
+    HALF = 0.5
+    ONE = 1
+    TWO = 2
+
 
     #Getting GPU info
     gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
-
-    #-------------MPI Set up----------------------------#
+        #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     master_rank = 0 #master rank
@@ -80,8 +86,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     MOSS = int(2*min(block_size[:-1])/(2*ops+1))   #Max Octahedron Swept Step
     printer(MPSS)
     #Splits for shared array
-    SPLITX = int(block_size[0]/2)+ops    #Split computation shift - add ops
-    SPLITY = int(block_size[1]/2)+ops    #Split computation shift
+    SPLITX = int(block_size[0]/2)+2*ops    #Split computation shift - add ops
+    SPLITY = int(block_size[1]/2)+2*ops    #Split computation shift
 
     #----------------Data Input setup -------------------------#
     time_steps = int((targs[1]-targs[0])/targs[2])+1  #Number of time steps +1 becuase initial time step
