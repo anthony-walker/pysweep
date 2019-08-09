@@ -84,10 +84,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-ONE])/(TWO*ops+ONE))+ONE #Max Pyramid Swept Step
     MOSS = int(TWO*min(block_size[:-ONE])/(TWO*ops+ONE))   #Max Octahedron Swept Step
-    printer(MPSS)
+    # printer(MPSS)
     #Splits for shared array
-    SPLITX = int(block_size[ZERO]/TWO)+TWO*ops    #Split computation shift - add ops
-    SPLITY = int(block_size[ONE]/TWO)+TWO*ops    #Split computation shift
+    SPLITX = int(block_size[ZERO]/TWO)   #Split computation shift - add ops
+    SPLITY = int(block_size[ONE]/TWO)   #Split computation shift
 
     #----------------Data Input setup -------------------------#
     time_steps = int((targs[ONE]-targs[ZERO])/targs[TWO])+ONE  #Number of time steps +ONE becuase initial time step
@@ -97,13 +97,15 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     MGST =   TWO if time_steps<MOSS else int(np.ceil(time_steps/MOSS))
 
     #Create shared process array for data transfer
-    shared_shape = (MOSS,arr0.shape[ZERO],arr0.shape[ONE]+SPLITX,arr0.shape[TWO]+SPLITY)
+    shared_shape = (MOSS,arr0.shape[ZERO],arr0.shape[ONE]+SPLITX+TWO*ops ,arr0.shape[TWO]+SPLITY+TWO*ops )
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
     """PRINTER"""
-    printer(shared_shape)
+    # printer(shared_shape)
     #Setting initial conditions
     if rank == master_rank:
         shared_arr[ZERO,:,ops:arr0.shape[ONE]+ops,ops:arr0.shape[TWO]+ops] = arr0[:,:,:]
+        #Update edges
+        edge_comm(shared_arr,SPLITX,SPLITY,ops,ZERO)
     comm.Barrier()  #Ensure that all initial data has been written to the shared array and sync ranks
 
     #Determine which ranks are GPU ranks and create shared array data
@@ -165,8 +167,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Grouping architecture arguments
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
-    """PRINTER"""
-    printer((gpu_rank,rank,SPLITX,SPLITY))
+
     #Getting region and offset region for each rank (CPU or GPU)
     regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer)
     regions = create_read_regions(regions,ops)+regions
@@ -202,9 +203,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         LAB = False
     else:
         LAB = True
-
+    # printer(local_array[0,0,:,:])
     #Creating swept indexes
     idx_sets = create_iidx_sets(block_size,ops)
+
 
     #UpPyramid Step
     if LAB:

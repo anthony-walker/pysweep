@@ -10,7 +10,6 @@ import importlib
 #Multiprocessing
 import multiprocessing as mp
 
-
 def write_and_shift(shared_arr,region1,hdf_set,MPSS):
     """Use this function to write to the hdf file and shift the shared array
         data after writing."""
@@ -49,14 +48,18 @@ def local_array_create(shared_arr,region,dType):
 
     return local_array
 
-def edge_comm(shared_arr,SPLITX,SPLITY,dir):
+def edge_comm(shared_arr,SPLITX,SPLITY,ops,dir):
     """Use this function to communicate edges in the shared array."""
+    #Updates shifted section of shared array
     if not dir:
-        shared_arr[:,:,-SPLITX:,:] = shared_arr[:,:,:SPLITX,:]
-        shared_arr[:,:,:,-SPLITY:] = shared_arr[:,:,:,:SPLITY]
+        shared_arr[:,:,-SPLITX-ops:,:] = shared_arr[:,:,ops:SPLITX+2*ops,:]
+        shared_arr[:,:,:,-SPLITY-ops:] = shared_arr[:,:,:,ops:SPLITY+2*ops]
     else:
-        shared_arr[:,:,:SPLITX,:]=shared_arr[:,:,-SPLITX:,:]
-        shared_arr[:,:,:,:SPLITY]=shared_arr[:,:,:,-SPLITY:]
+        shared_arr[:,:,ops:SPLITX+2*ops,:]=shared_arr[:,:,-SPLITX-ops:,:]
+        shared_arr[:,:,:,ops:SPLITY+2*ops]=shared_arr[:,:,:,-SPLITY-ops:]
+    #Updates ops points at front
+    shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
+    shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
 
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
@@ -135,7 +138,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
         #creating gpu indicies
         if gpu_master_rank == rank:
             x_slice = (slice(gpu_slices[1].start+ops,gpu_slices[1].stop+ops,1),)
-            shift_slice=(slice(gpu_slices[1].start+SPLITX,gpu_slices[1].stop+SPLITX,1),)
+            shift_slice=(slice(gpu_slices[1].start+SPLITX+ops,gpu_slices[1].stop+SPLITX+ops,1),)
             #Creating regions
             prev = 0
             region1 = list()    #a list of slices one for each region
@@ -143,7 +146,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
 
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
                 region1.append(stv+x_slice+(slice(prev*(block_size[1])+ops,i*(block_size[1])+ops,1),))
-                region2.append(stv+shift_slice+(slice(prev*(block_size[1])+SPLITY,i*block_size[1]+SPLITY,1),))
+                region2.append(stv+shift_slice+(slice(prev*(block_size[1])+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
                 prev = i
         region1 = gpu_comm.scatter(region1)
         region2 = gpu_comm.scatter(region2)
@@ -156,7 +159,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
         if cpu_master_rank == rank:
             #Creating slice prefixes
             x_slice = (slice(cpu_slices[1].start+ops,cpu_slices[1].stop+ops,1),)
-            shift_slice=(slice(cpu_slices[1].start+SPLITX,cpu_slices[1].stop+SPLITX,1),)
+            shift_slice=(slice(cpu_slices[1].start+SPLITX+ops,cpu_slices[1].stop+SPLITX+ops,1),)
             #Creating regions
             prev = 0
             region1 = list()    #a list of slices one for each region
@@ -164,7 +167,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
             if cpu_slices[0].stop>0:
                 for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
                     region1.append(stv+x_slice+(slice(prev*block_size[1]+ops,i*block_size[1]+ops,1),))
-                    region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY,i*block_size[1]+SPLITY,1),))
+                    region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
                     prev = i
             else:
                 for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
@@ -292,10 +295,15 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx
     """
     if gpu_rank:
         #Getting GPU Function
+        printer(arr.shape)
+        printer("--------------------------------------------")
+        printer(arr[0,0,:,:])
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("UpPyramid")
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].nbytes)
         cuda.Context.synchronize()
+        printer("--------------------------------------------")
+        arr = nan_to_zero(arr)
         printer(arr[1,0,:,:])
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
@@ -383,3 +391,10 @@ def CPU_DownPyramid(args):
         block = source_mod.step(block,swept_set,ts)
         ts+=1
     return block
+
+def nan_to_zero(arr,zero=0.):
+    """Use this function to turn nans to zero."""
+    for i in np.ndindex(arr.shape):
+        if np.isnan(arr[i]):
+            arr[i]=zero
+    return arr

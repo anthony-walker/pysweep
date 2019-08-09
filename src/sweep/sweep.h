@@ -49,11 +49,14 @@ UpPyramid(float *state)
     int ux = blockDim.x; //upper x
     int uy = blockDim.y;//blockDim.y; //upper y
     //Creating indexing
+    // int tidxx = threadIdx.x + OPS;
+    // int tidxy = threadIdx.y + OPS;
+    // int bid = blockIdx.x + blockIdx.y * gridDim.x;
+    // int gid = bid * (blockDim.x * blockDim.y)+(tidxy * blockDim.x) + tidxx;
     int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
     int sgid = gid%(SGIDS); //Shared global index
     //Adjusting thread ids for interior points
-    int tidxx = threadIdx.x + OPS;
-    int tidxy = threadIdx.y + OPS;
+    // printf("%d,%d,%d,%d\n",tidxx,tidxy,gid,sgid);
 
     for (int k = 0; k < MPSS; k++)
     {
@@ -67,7 +70,7 @@ UpPyramid(float *state)
         ux -= OPS;
         uy -= OPS;
         lxy += OPS;
-        // printf("%d,%d,%d\n",threadIdx.x,threadIdx.x,lxy);
+
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
         {
