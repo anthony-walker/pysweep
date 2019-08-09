@@ -1,5 +1,6 @@
 #Dont Track These
 former/
+*.pyc
 *__pycache__/
 vcluster
 testfile.py
