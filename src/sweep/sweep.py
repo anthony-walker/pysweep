@@ -70,7 +70,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
 
     #Getting GPU info
-    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
+    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10000) #getting devices by load
         #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
@@ -185,7 +185,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
         #Creating constants
         NV = local_array.shape[ONE]
-        SGIDS = block_size[ZERO]*block_size[ONE]+TWO*ops
+        SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
         VARS =  SGIDS*grid_size[ZERO]*grid_size[ONE]
         TIMES = VARS*NV
         DX = dx

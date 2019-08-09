@@ -30,7 +30,7 @@ def swept():
     block_size = (8,8,1)
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
-    affinity = 0.5
+    affinity = 1
     #Time testing arguments
     t0 = 0
     t_b = 1
