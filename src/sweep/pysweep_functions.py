@@ -45,7 +45,6 @@ def local_array_create(shared_arr,region,dType):
         local_array[:,:,:,:] = shared_arr[region]
     else:
         local_array = None
-
     return local_array
 
 def edge_comm(shared_arr,SPLITX,SPLITY,ops,dir):
@@ -143,7 +142,6 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
-
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
                 region1.append(stv+x_slice+(slice(prev*(block_size[1])+ops,i*(block_size[1])+ops,1),))
                 region2.append(stv+shift_slice+(slice(prev*(block_size[1])+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
@@ -164,20 +162,14 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
-            if cpu_slices[0].stop>0:
+            if cpu_slices[0].stop>0 and cpu_slices[1].start != cpu_slices[1].stop:
                 for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
                     region1.append(stv+x_slice+(slice(prev*block_size[1]+ops,i*block_size[1]+ops,1),))
                     region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
                     prev = i
-            else:
-                for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
-                    region1.append(tuple())
-                    region2.append(tuple())
-                    prev = i
-            if len(region1)<total_cpus: #Appending empty tuples if there are to many processes
-                for i in range(abs(len(region1)-total_cpus)):
-                    region1.append(tuple())
-                    region2.append(tuple())
+            for i in range(abs(len(region1)-total_cpus)):
+                region1.append(None)
+                region2.append(None)
         region1 = cpu_comm.scatter(region1)
         region2 = cpu_comm.scatter(region2)
     return region1, region2
@@ -265,28 +257,34 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,add_const[key])
 
-def create_blocks(arr,bsx,bsy):
-    """Use this function to create blocks from the arr."""
-    hcs = lambda x,s,a: np.array_split(x,s,axis=a)   #Lambda function for creating blocks for cpu testing
-    blocks =  [item for subarr in hcs(arr,bsx,2) for item in hcs(subarr,bsy,3)]    #applying lambda function
-    return blocks
+def create_blocks_list(arr,block_size,ops,printer=None):
+    """Use this function to create a list of blocks from the array."""
+    if arr is not None:
+        bsx = int((arr.shape[2]-2*ops)/block_size[0])
+        bsy =  int((arr.shape[3]-2*ops)/block_size[1])
+        slices = []
+        c_slice = (slice(0,arr.shape[0],1),slice(0,arr.shape[1],1),)
+        for i in range(ops+block_size[0],arr.shape[2],block_size[0]):
+            for j in range(ops+block_size[1],arr.shape[3],block_size[1]):
+                t_slice = c_slice+(slice(i-block_size[0]-ops,i+ops,1),slice(j-block_size[1]-ops,j+ops,1))
+                slices.append(t_slice)
+        return slices
+    else:
+        return None
 
-def rebuild_blocks(blocks,bsx,bsy):
+def rebuild_blocks(arr,blocks,local_regions,ops):
     """Use this funciton to rebuild the blocks."""
     #Rebuild blocks into array
     if len(blocks)>1:
-        temp = []
-        for i in range(bsy,len(blocks)+1,bsy):
-            temp.append(np.concatenate(blocks[i-bsy:i],axis=3))
-        if len(temp)>1:
-            arr = np.concatenate(temp,axis=2)
-        else:
-            arr = temp[0]
+        for ct,lr in enumerate(local_regions):
+            lr2 = slice(lr[2].start+ops,lr[2].stop-ops,1)
+            lr3 = slice(lr[3].start+ops,lr[3].stop-ops,1)
+            arr[:,:,lr2,lr3] = blocks[ct][:,:,ops:-ops,ops:-ops]
         return arr
     else:
         return blocks[0]
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets,ops,printer=None):
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -296,22 +294,25 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx
     if gpu_rank:
         #Getting GPU Function
         printer(arr.shape)
-        printer("--------------------------------------------")
-        printer(arr[0,0,:,:])
+        printer(grid_size)
+        # printer("--------------------------------------------")
+        # printer(arr[0,0,:,:])
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("UpPyramid")
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].nbytes)
         cuda.Context.synchronize()
-        printer("--------------------------------------------")
-        arr = nan_to_zero(arr)
-        printer(arr[1,0,:,:])
+        # printer("--------------------------------------------")
+        # arr = nan_to_zero(arr)
+        # printer(arr[1,0,:,:])
     else:   #CPUs do this
-        bsx = int(arr.shape[2]/block_size[0])
-        bsy =  int(arr.shape[3]/block_size[1])
-        blocks = create_blocks(arr,bsx,bsy)
+        blocks = []
+        for local_region in local_cpu_regions:
+            block = np.zeros(arr[local_region].shape)
+            block += arr[local_region]
+            blocks.append(block)
         cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
-        arr = rebuild_blocks(blocks,bsx,bsy)
+        arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
     #Writing to shared array
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
@@ -330,7 +331,7 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,id
     else:   #CPUs do this
         bsx = int(arr.shape[2]/block_size[0])
         bsy =  int(arr.shape[3]/block_size[1])
-        blocks = create_blocks(arr,bsx,bsy)
+        blocks = [arr[local_region] for local_region in local_cpu_regions]
         cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(blocks,bsx,bsy)
@@ -349,7 +350,7 @@ def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,i
         blocks = create_blocks(arr,bsx,bsy)
         cpu_fcn = sweep_lambda((CPU_DownPyramid,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
-        arr = rebuild_blocks(blocks,bsx,bsy)
+        # arr = rebuild_blocks(blocks,bsx,bsy)
     shared_arr[region] = arr[:,:,:,:]
 
 #--------------------------------CPU Specific Swept Functions------------------

@@ -22,7 +22,7 @@ def swept():
     dims = (4,int(16),int(16))
     arr0 = np.zeros(dims)
     arr0[0,:,:] = 2
-    arr0[1,:,:] = 3
+    arr0[1,:,:] = 1
     arr0[2,:,:] = 1
     arr0[3,:,:] = 9
 

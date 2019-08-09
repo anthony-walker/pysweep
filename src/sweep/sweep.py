@@ -111,11 +111,14 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Determine which ranks are GPU ranks and create shared array data
     if rank == master_rank:
         new_rank_info, total_gpus = get_gpu_ranks(rank_info,affinity)
+        #Adjusting if affinity is 0
         if affinity==ZERO:
             total_gpus = ZERO
         else:
             total_gpus = num_ranks if num_ranks<total_gpus else total_gpus
+        #Getting total cpus
         total_cpus = num_ranks-total_gpus
+        #Adjusting affinity if no cpus avaliable
         affinity = affinity if total_cpus != ZERO else ONE   #sets affinity to ONE if there are no cpus avaliable
         #Adjust for number of cpus/gpus
         # affinity*=(total_gpus/total_cpus)
@@ -167,7 +170,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Grouping architecture arguments
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
-
     #Getting region and offset region for each rank (CPU or GPU)
     regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer)
     regions = create_read_regions(regions,ops)+regions
@@ -194,8 +196,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
         constant_copy(source_mod,const_dict,add_consts)
-    elif regions[ZERO]:
+        local_cpu_regions = None
+    else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
+        local_cpu_regions = create_blocks_list(local_array,block_size,ops,printer)
         grid_size = None
 
     #Setting local array boolean
@@ -206,13 +210,18 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     # printer(local_array[0,0,:,:])
     #Creating swept indexes
     idx_sets = create_iidx_sets(block_size,ops)
-
-
+    # if rank == master_rank:
+    #     for i in idx_sets[0]:
+    #         shared_arr[0,0,i[0],i[1]] = 0
+    #     for i in idx_sets[1]:
+    #         shared_arr[0,0,i[0],i[1]] = 5
+    #     printer(shared_arr[0,0,local_cpu_regions[0][2],local_cpu_regions[0][3]])
+    # print(local_cpu_regions)
     #UpPyramid Step
     if LAB:
-        UpPyramid(source_mod,local_array, gpu_rank,block_size,grid_size,regions[TWO],shared_arr,idx_sets,ops,printer) #THis modifies shared array
+        UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
     comm.Barrier()
-    # printer(shared_arr[ONE,ZERO,:,:])
+    # printer(shared_arr[ONE,ONE,:,:])
     # #Communicate edges
     # if LAB and rank == master_rank:
     #     edge_comm(shared_arr,SPLITX,SPLITY,GST%TWO)

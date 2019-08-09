@@ -32,6 +32,7 @@ __device__ int getGlobalIdx_2D_2D()
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = blockId * (blockDim.x * blockDim.y)+ (threadIdx.y * blockDim.x) + threadIdx.x;
+    printf("%d\n",threadId );
     return threadId;
 }
 
@@ -49,40 +50,40 @@ UpPyramid(float *state)
     int ux = blockDim.x; //upper x
     int uy = blockDim.y;//blockDim.y; //upper y
     //Creating indexing
-    // int tidxx = threadIdx.x + OPS;
-    // int tidxy = threadIdx.y + OPS;
-    // int bid = blockIdx.x + blockIdx.y * gridDim.x;
-    // int gid = bid * (blockDim.x * blockDim.y)+(tidxy * blockDim.x) + tidxx;
-    int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
+
+    int tid0 = OPS*blockDim.y+(2*(OPS+1)-1)*OPS;
+    int tym = threadIdx.y*(blockDim.y+2*OPS);
+    int gid = getGlobalIdx_2D_2D();//+OPS*blockDim.y+TWO*OPS;  //Getting 2D global index
+    // printf("%d\n", tid0+threadIdx.x+tym);
     int sgid = gid%(SGIDS); //Shared global index
     //Adjusting thread ids for interior points
     // printf("%d,%d,%d,%d\n",tidxx,tidxy,gid,sgid);
 
-    for (int k = 0; k < MPSS; k++)
-    {
-        for (int i = 0; i < NV; i++)
-        {
-            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
-        }
-        __syncthreads(); //Sync threads here to ensure all initial values are copied
-
-        //Update swept bounds
-        ux -= OPS;
-        uy -= OPS;
-        lxy += OPS;
-
-        // Solving step function
-        if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
-        {
-            step(shared_state,sgid);
-        }
-
-        // Place values back in original matrix
-        for (int j = 0; j < NV; j++)
-        {
-            state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
-        }
-    }
+    // for (int k = 0; k < MPSS; k++)
+    // {
+    //     for (int i = 0; i < NV; i++)
+    //     {
+    //         shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
+    //     }
+    //     __syncthreads(); //Sync threads here to ensure all initial values are copied
+    //
+    //     //Update swept bounds
+    //     ux -= OPS;
+    //     uy -= OPS;
+    //     lxy += OPS;
+    //
+    //     // Solving step function
+    //     if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
+    //     {
+    //         step(shared_state,sgid);
+    //     }
+    //
+    //     // Place values back in original matrix
+    //     for (int j = 0; j < NV; j++)
+    //     {
+    //         state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+    //     }
+    // }
 
 }
 
