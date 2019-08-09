@@ -2,6 +2,10 @@
 
 This is a package containing the functions to implement the swept space time decomposition rule.
 
+# Constraints
+- Square grid
+- Blocksize should be (2^n,2^m) and constrained by your GPU
+
 
 # Approach
 
