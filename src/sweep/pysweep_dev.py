@@ -82,10 +82,3 @@ def getDeviceAttrs(devNum=0,print_device = False):
         for x in dev_attrs:
             print(x,": ",dev_attrs[x])
     return dev_attrs
-
-def nan_to_zero(arr,zero=0.):
-    """Use this function to turn nans to zero."""
-    for i in np.ndindex(arr.shape):
-        if np.isnan(arr[i]):
-            arr[i]=zero
-    return arr

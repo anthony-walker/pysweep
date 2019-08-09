@@ -1,0 +1,7 @@
+#Dont Track
+former/
+__pycache__/
+src/__pycache__/
+src/analytical/__pycache__/
+src/equations/__pycache__/
+src/sweep/__pycache__/
