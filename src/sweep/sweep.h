@@ -19,6 +19,8 @@ __device__ __constant__  int MOSS; //max octahedron swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
 __device__ __constant__ int SGNVS;
+__device__ __constant__ int ARRX; // Array size x
+__device__ __constant__ int ARRY; //Array size y
 __device__ __constant__  float DX;
 __device__ __constant__  float DY;
 __device__ __constant__  float DT;
@@ -35,11 +37,9 @@ __device__ int getGlobalIdx_2D_2D()
 }
 
 
-__device__ int gft(int tidxx, int tidxy)
+__device__ int get_sgid(int tidx, int tidy)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = blockId * (blockDim.x+2*OPS * blockDim.y+2*OPS)+(tidxy * blockDim.x) + tidxx;
-    return threadId;
+    return tidy + (blockDim.y+2*OPS)*tidx;
 }
 
 /*
@@ -49,17 +49,8 @@ __device__
 void edge_comm(float * shared_state, float * state)
 {
 
-    int tidxx = threadIdx.x+OPS;
-    int tidxy = threadIdx.y+OPS;
-    int shift = blockDim.y+2*OPS;
-    int cgid = gft(tidxx,tidxy);
-    printf("%d\n", shift);
-    if (tidxx < OPS && tidxy < blockDim.y+OPS)
-    {
-        
-    }
-
 }
+
 
 /*
     Use this function to get the global id
@@ -67,9 +58,19 @@ void edge_comm(float * shared_state, float * state)
 __device__ int get_gid()
 {
     int bid = blockIdx.x + blockIdx.y * gridDim.x;
-    int tid0 = OPS*blockDim.y+(2*(OPS+1)-1)*OPS;
-    int tym = threadIdx.y*(blockDim.y+2*OPS);
-    return tid0+threadIdx.x+tym+bid*((2*OPS+blockDim.x)*(2*OPS+blockDim.y));
+    int M = gridDim.y*blockDim.y+2*OPS;
+    return M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
+}
+
+__device__ void test_gid(int tdx,int tdy)
+{
+    if (tdx == threadIdx.x && tdy == threadIdx.y)
+    {
+        int bid = blockIdx.x + blockIdx.y * gridDim.x;
+        int M = gridDim.y*blockDim.y+2*OPS;
+        int gid = M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
+        printf("%d\n", gid);
+    }
 }
 
 /*
@@ -87,38 +88,47 @@ UpPyramid(float *state)
     int ux = blockDim.x; //upper x
     int uy = blockDim.y;//blockDim.y; //upper y
 
+    //Other quantities for indexing
+    int bdx = blockDim.x+2*OPS;
+    int bdy = blockDim.y+2*OPS;
+    int tidx = threadIdx.x+OPS;
+    int tidy = threadIdx.y+OPS;
+    int sgid = get_sgid(tidx,tidy);
+    int gid = get_gid();
+
+    // printf("%f\n", state[4799]);
     //Creating indexing - Adjusted for interior points
-    int gid =  get_gid();
-    int sgid = gid%(SGIDS); //Shared global index
-
-    edge_comm(shared_state, state);
-
-
-    for (int k = 0; k < MPSS; k++)
-    {
-        for (int i = 0; i < NV; i++)
-        {
-            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
-        }
-        __syncthreads(); //Sync threads here to ensure all initial values are copied
-
-        // //Update swept bounds
-        // ux -= OPS;
-        // uy -= OPS;
-        // lxy += OPS;
-        //
-        // // Solving step function
-        // if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
-        // {
-        //     step(shared_state,sgid);
-        // }
-
-        // Place values back in original matrix
-        for (int j = 0; j < NV; j++)
-        {
-            state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
-        }
-    }
+    // int gid =  get_gid();
+    // int sgid = gid%(SGIDS); //Shared global index
+    //
+    // edge_comm(shared_state, state);
+    //
+    //
+    // for (int k = 0; k < MPSS; k++)
+    // {
+    //     for (int i = 0; i < NV; i++)
+    //     {
+    //         shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
+    //     }
+    //     __syncthreads(); //Sync threads here to ensure all initial values are copied
+    //
+    //     // //Update swept bounds
+    //     // ux -= OPS;
+    //     // uy -= OPS;
+    //     // lxy += OPS;
+    //     //
+    //     // // Solving step function
+    //     // if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
+    //     // {
+    //     //     step(shared_state,sgid);
+    //     // }
+    //
+    //     // Place values back in original matrix
+    //     for (int j = 0; j < NV; j++)
+    //     {
+    //         state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+    //     }
+    // }
 
 }
 
