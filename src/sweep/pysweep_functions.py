@@ -299,9 +299,9 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
         # printer("--------------------------------------------")
         ct = 0.0
         for pt in np.ndindex(arr.shape):
-            arr[pt] = ct
+            arr[pt] = 0
             ct += 1.0
-        
+
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
 
         gpu_fcn = source_mod.get_function("UpPyramid")
@@ -309,7 +309,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
         cuda.Context.synchronize()
         # printer("--------------------------------------------")
         # arr = nan_to_zero(arr)
-        # printer(arr[1,0,:,:])
+        printer(arr[1,0,:,:])
     else:   #CPUs do this
         blocks = []
         for local_region in local_cpu_regions:

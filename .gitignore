@@ -2,6 +2,7 @@
 former/
 *.pyc
 *__pycache__/
+*.m
 vcluster
 testfile.py
 sources/

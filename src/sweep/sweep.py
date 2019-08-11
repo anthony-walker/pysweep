@@ -185,16 +185,16 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
         #Creating constants
         NV = local_array.shape[ONE]
-        ARRX = local_array.shape[TWO]
-        ARRY = local_array.shape[3]
+        # ARRX = local_array.shape[TWO]
+        # ARRY = local_array.shape[3]
         SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
-        VARS =  SGIDS*grid_size[ZERO]*grid_size[ONE]
+        VARS =  local_array.shape[TWO]*local_array.shape[3]
         TIMES = VARS*NV
         DX = dx
         DY = dy
         DT = targs[TWO]
         const_dict = ({"NV":NV,"DX":DX,"DT":DT,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
-                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops,"ARRX":ARRX,"ARRY":ARRY})
+                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
         constant_copy(source_mod,const_dict,add_consts)
@@ -242,7 +242,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #         edge_comm(shared_arr,SPLITX,SPLITY,GST%TWO)
     #     comm.Barrier() #Edge transfer barrier
     #     GST+=ONE
-    #     #Add JSON WRITE HERE and SHIFT
+    #     #Add WRITE HERE and SHIFT
     #
     # #Down Pyramid Step
     # if LAB:

@@ -19,13 +19,11 @@ __device__ __constant__  int MOSS; //max octahedron swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
 __device__ __constant__ int SGNVS;
-__device__ __constant__ int ARRX; // Array size x
-__device__ __constant__ int ARRY; //Array size y
 __device__ __constant__  float DX;
 __device__ __constant__  float DY;
 __device__ __constant__  float DT;
-__device__ __constant__  float SPLITX;
-__device__ __constant__  float SPLITY;
+__device__ __constant__  float SPLITX; //half an octahedron x
+__device__ __constant__  float SPLITY; //half an octahedron y
 
 //!!(@#
 
@@ -43,16 +41,6 @@ __device__ int get_sgid(int tidx, int tidy)
 }
 
 /*
-    Use this function to communicate the initial swept edges.
-*/
-__device__
-void edge_comm(float * shared_state, float * state)
-{
-
-}
-
-
-/*
     Use this function to get the global id
 */
 __device__ int get_gid()
@@ -62,6 +50,9 @@ __device__ int get_gid()
     return M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
 }
 
+/*
+    Use this function for testing points by thread indices
+*/
 __device__ void test_gid(int tdx,int tdy)
 {
     if (tdx == threadIdx.x && tdy == threadIdx.y)
@@ -71,6 +62,62 @@ __device__ void test_gid(int tdx,int tdy)
         int gid = M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
         printf("%d\n", gid);
     }
+}
+
+
+
+/*
+    Use this function to communicate the initial swept edges.
+*/
+__device__
+void plane_shared_comm(float * shared_state, float * state, int time)
+{
+    int M = (gridDim.y*blockDim.y+2*OPS); //Major y axis length
+    int tgid = getGlobalIdx_2D_2D()%(blockDim.x*blockDim.y);
+    int gid = tgid+blockIdx.y*blockDim.y+blockDim.x*blockIdx.x*M;
+    int bid = blockIdx.x + blockIdx.y * gridDim.x;
+    if (tgid < blockDim.y+TWO*OPS)
+    {
+        int i;
+        //Front edge comm
+        for (i = 0; i < OPS; i++)
+        {
+            int ntgid = tgid+i*(blockDim.y+TWO*OPS);
+            int ngid = gid+i*M;
+            for (int j = 0; j < NV; i++)
+            {
+                shared_state[ntgid+j*SGIDS] = state[ngid+j*VARS+time*TIMES]; //Current time step
+            }
+        }
+
+        //Back edge comm
+        for (i = blockDim.x+OPS; i < blockDim.x+TWO*OPS; i++)
+        {
+            int ntgid = tgid+i*(blockDim.y+TWO*OPS);
+            int ngid = gid+i*M;
+            shared_state[ntgid] =  state[ngid]+1;
+        }
+
+        if (tgid<OPS || blockDim.x+OPS<=tgid)
+        {
+            for (i = 0; i < blockDim.x+TWO*OPS; i++) {
+                int ntgid = tgid+i*(blockDim.y+TWO*OPS);
+                int ngid = gid+i*M;
+                shared_state[ntgid] =  state[ngid]+1;
+            }
+        }
+        // if (bid == 3)
+        // {
+        //     for (i = 0; i < blockDim.x+TWO*OPS; i++)
+        //     {
+        //         int ntgid = tgid+i*(blockDim.y+TWO*OPS);
+        //         int ngid = gid+i*M;
+        //         printf("%d\n",ngid );
+        //     }
+        //     // printf("%s\n","," );
+        // }
+    }
+    __syncthreads();
 }
 
 /*
@@ -83,27 +130,25 @@ UpPyramid(float *state)
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
 
-    //Creating swept boundaries
-    int lxy = 0; //Lower swept bound
-    int ux = blockDim.x; //upper x
-    int uy = blockDim.y;//blockDim.y; //upper y
+
 
     //Other quantities for indexing
-    int bdx = blockDim.x+2*OPS;
-    int bdy = blockDim.y+2*OPS;
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
-    int sgid = get_sgid(tidx,tidy);
-    int gid = get_gid();
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    int gid = get_gid(); //global index
 
-    // printf("%f\n", state[4799]);
-    //Creating indexing - Adjusted for interior points
-    // int gid =  get_gid();
-    // int sgid = gid%(SGIDS); //Shared global index
-    //
-    // edge_comm(shared_state, state);
-    //
-    //
+    //Creating swept boundaries
+    int lx = OPS; //Lower x swept bound
+    int ly = OPS; // Lower y swept bound
+    int ux = blockDim.x+OPS; //upper x
+    int uy = blockDim.y+OPS; //upper y
+
+    // printf("%d,%d,%d\n",TIMES,VARS, SGIDS );
+
+    // plane_shared_comm(shared_state, state, 0);
+
+
     // for (int k = 0; k < MPSS; k++)
     // {
     //     for (int i = 0; i < NV; i++)
@@ -112,16 +157,20 @@ UpPyramid(float *state)
     //     }
     //     __syncthreads(); //Sync threads here to ensure all initial values are copied
     //
+    //
+    //
+    //     // // Solving step function
+    //     // if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
+    //     // {
+    //     //     // step(shared_state,sgid);
+    //     //     shared_state[sgid] = 2*shared_state[sgid];
+    //     // }
+    //     //
     //     // //Update swept bounds
     //     // ux -= OPS;
     //     // uy -= OPS;
-    //     // lxy += OPS;
-    //     //
-    //     // // Solving step function
-    //     // if (threadIdx.x<ux && threadIdx.x>=lxy && threadIdx.y<uy && threadIdx.y>=lxy)
-    //     // {
-    //     //     step(shared_state,sgid);
-    //     // }
+    //     // lx += OPS;
+    //     // ly += OPS;
     //
     //     // Place values back in original matrix
     //     for (int j = 0; j < NV; j++)
