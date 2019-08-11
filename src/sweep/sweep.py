@@ -68,9 +68,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     ONE = 1
     TWO = 2
 
-
     #Getting GPU info
-    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[1],limit=10000) #getting devices by load
+    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
         #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
@@ -209,46 +208,41 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         LAB = False
     else:
         LAB = True
-    # printer(local_array[0,0,:,:])
+
     #Creating swept indexes
     idx_sets = create_iidx_sets(block_size,ops)
-    # if rank == master_rank:
-    #     for i in idx_sets[0]:
-    #         shared_arr[0,0,i[0],i[1]] = 0
-    #     for i in idx_sets[1]:
-    #         shared_arr[0,0,i[0],i[1]] = 5
-    #     printer(shared_arr[0,0,local_cpu_regions[0][2],local_cpu_regions[0][3]])
-    # print(local_cpu_regions)
+
     #UpPyramid Step
     if LAB:
         UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
     comm.Barrier()
-    # printer(shared_arr[ONE,ONE,:,:])
-    # #Communicate edges
-    # if LAB and rank == master_rank:
-    #     edge_comm(shared_arr,SPLITX,SPLITY,GST%TWO)
-    # comm.Barrier()
-    # GST+=ONE  #Increment global swept step
+
+    #Communicate edges
+    if LAB and rank == master_rank:
+        edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
+    comm.Barrier()
+    GST+=ONE  #Increment global swept step
     # Octahedron steps
-    # while(GST<MGST):
-    #     if LAB:
-    #         cregion = regions[GST%TWO]
-    #         #Reading local array
-    #         local_array = shared_arr[cregion]
-    #         #Octahedron Step
-    #         Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-    #     comm.Barrier()  #Write barrier
-    #     if rank == master_rank:
-    #         edge_comm(shared_arr,SPLITX,SPLITY,GST%TWO)
-    #     comm.Barrier() #Edge transfer barrier
-    #     GST+=ONE
-    #     #Add WRITE HERE and SHIFT
-    #
+    while(GST<MGST):
+        if LAB:
+            cregion = regions[GST%TWO]
+            #Reading local array
+            local_array = shared_arr[cregion]
+            #Octahedron Step
+        #     Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
+        # comm.Barrier()  #Write barrier
+        # if rank == master_rank:
+        #     edge_comm(shared_arr,SPLITX,SPLITY,GST%TWO)
+        # comm.Barrier() #Edge transfer barrier
+        GST+=ONE
+        # Add WRITE HERE and SHIFT
+
     # #Down Pyramid Step
     # if LAB:
     #     DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-    #
-    #Add Final Write Step Here
+
+    #Final Write Step
+
 
     #CUDA clean up - One of the last steps
     if gpu_rank:

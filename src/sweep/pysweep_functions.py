@@ -293,23 +293,11 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
     """
     if gpu_rank:
         #Getting GPU Function
-        printer(arr.shape)
-        printer(grid_size)
-        printer(np.prod(arr.shape))
-        # printer("--------------------------------------------")
-        ct = 0.0
-        for pt in np.ndindex(arr.shape):
-            arr[pt] = 0
-            ct += 1.0
-
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-
         gpu_fcn = source_mod.get_function("UpPyramid")
-        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].nbytes)
+        ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
+        gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
-        # printer("--------------------------------------------")
-        # arr = nan_to_zero(arr)
-        printer(arr[1,0,:,:])
     else:   #CPUs do this
         blocks = []
         for local_region in local_cpu_regions:
@@ -320,6 +308,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
     #Writing to shared array
+    # arr = nan_to_zero(arr,zero=1.0)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):
