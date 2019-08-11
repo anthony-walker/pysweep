@@ -13,8 +13,9 @@ import multiprocessing as mp
 def write_and_shift(shared_arr,region1,hdf_set,MPSS):
     """Use this function to write to the hdf file and shift the shared array
         data after writing."""
-    hdf_set[MPSS:,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
-    shared_arr[:MPSS,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
+
+    # hdf_set[MPSS:,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
+    # shared_arr[:MPSS,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
     #Do edge comm after this function
 
 def create_iidx_sets(block_size,ops):

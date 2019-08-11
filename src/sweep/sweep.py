@@ -50,7 +50,7 @@ warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
 #----------------------End Global Variables------------------------#
 
-def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType = np.dtype('float32'),add_consts=dict()):
+def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict()):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -83,7 +83,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-ONE])/(TWO*ops+ONE))+ONE #Max Pyramid Swept Step
     MOSS = int(TWO*min(block_size[:-ONE])/(TWO*ops+ONE))   #Max Octahedron Swept Step
-    # printer(MPSS)
+
     #Splits for shared array
     SPLITX = int(block_size[ZERO]/TWO)   #Split computation shift - add ops
     SPLITY = int(block_size[ONE]/TWO)   #Split computation shift
@@ -94,12 +94,11 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Global swept step
     GST = ZERO #This is a variable to track which swept step the simulation is on
     MGST =   TWO if time_steps<MOSS else int(np.ceil(time_steps/MOSS))
-
+    nts = int(MGST*MOSS)
     #Create shared process array for data transfer
     shared_shape = (MOSS,arr0.shape[ZERO],arr0.shape[ONE]+SPLITX+TWO*ops ,arr0.shape[TWO]+SPLITY+TWO*ops )
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
-    """PRINTER"""
-    # printer(shared_shape)
+
     #Setting initial conditions
     if rank == master_rank:
         shared_arr[ZERO,:,ops:arr0.shape[ONE]+ops,ops:arr0.shape[TWO]+ops] = arr0[:,:,:]
@@ -212,6 +211,12 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Creating swept indexes
     idx_sets = create_iidx_sets(block_size,ops)
 
+    #Creating HDF5 file
+    if LAB:
+        filename+=".hdf5"
+        hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+        hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+
     #UpPyramid Step
     if LAB:
         UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
@@ -225,24 +230,29 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     # Octahedron steps
     while(GST<MGST):
         if LAB:
+            printer(GST%TWO)
             cregion = regions[GST%TWO]
             #Reading local array
-            local_array = shared_arr[cregion]
+            local_array[:,:,:,:] = shared_arr[cregion]
             #Octahedron Step
         #     Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-        # comm.Barrier()  #Write barrier
-        # if rank == master_rank:
-        #     edge_comm(shared_arr,SPLITX,SPLITY,GST%TWO)
-        # comm.Barrier() #Edge transfer barrier
+        comm.Barrier()  #Write barrier
+        if rank == master_rank:
+            edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
+        comm.Barrier() #Edge transfer barrier
         GST+=ONE
-        # Add WRITE HERE and SHIFT
+
 
     # #Down Pyramid Step
     # if LAB:
     #     DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-
-    #Final Write Step
-
+    printer(MPSS)
+    comm.Barrier()
+    if LAB:
+        #Final Write Step
+        write_and_shift(shared_arr,regions[GST%TWO+TWO],hdf5_data_set,MPSS)
+        #Closeing HDF5 file
+        hdf5_file.close()
 
     #CUDA clean up - One of the last steps
     if gpu_rank:

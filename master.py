@@ -41,7 +41,7 @@ def swept():
     dy = 0.1
     ops = 2
 
-    sweep(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity)
+    sweep(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity,filename="./results/solution")
 
 
 if __name__ == "__main__":
