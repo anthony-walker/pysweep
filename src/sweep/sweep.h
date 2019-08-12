@@ -165,9 +165,9 @@ UpPyramid(float *state)
     int ly = OPS; // Lower y swept bound
     int ux = blockDim.x+OPS; //upper x
     int uy = blockDim.y+OPS; //upper y
-    int curr_time = 0;
+
     //Communicating edge values to shared array
-    edge_comm(shared_state, state,curr_time);
+    edge_comm(shared_state, state,ZERO);
 
     for (int k = 0; k < MPSS; k++)
     {
@@ -177,13 +177,10 @@ UpPyramid(float *state)
         }
         __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-
-
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
             step(shared_state,sgid);
-            // shared_state[sgid] = 2*shared_state[sgid];
         }
 
         //Update swept bounds
@@ -207,14 +204,22 @@ Octahedron(float *state)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
+    shared_state_zero(shared_state);
+
+    //Other quantities for indexing
+    int tidx = threadIdx.x+OPS;
+    int tidy = threadIdx.y+OPS;
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    int gid = get_gid(); //global index
+
     //Creating swept boundaries
-    int lx = blockDim.x/2; //Lower swept bound
-    int ly = blockDim.y/2; //Lower swept bound y
-    int ux = blockDim.x/2; //upper x
-    int uy = blockDim.y/2;//blockDim.y; //upper y
-    //Creating indexing
-    int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
-    int sgid = gid%(SGIDS); //Shared global index
+    int lx =(blockDim.x+OPS)/TWO+1; //upper x
+    int ly = (blockDim.y+OPS)/TWO+1; //upper y
+    int ux =(blockDim.x+OPS)/TWO; //upper x
+    int uy = (blockDim.y+OPS)/TWO; //upper y
+
+    //Communicating edge values to shared array
+    edge_comm(shared_state, state, MPSS);
 
     //Down Pyramid step of the octahedron
     for (int k = 0; k < MPSS; k++)
@@ -232,7 +237,7 @@ Octahedron(float *state)
         ly -= OPS;
 
         // Solving step function
-        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
+        if (tidx<=ux && tidx>=lx && tidy<=uy && tidy>=ly)
         {
             step(shared_state,sgid);
         }
@@ -244,14 +249,15 @@ Octahedron(float *state)
         }
     }
 
-    //Reassign lx and ly for UpPyramid
-    lx = 0;
-    ly = 0;
-    ux = blockDim.x;
-    uy = blockDim.y;
+    //UpPyramid part of Octahedron
+    //Creating swept boundaries
+    lx = OPS; //Lower x swept bound
+    ly = OPS; // Lower y swept bound
+    ux = blockDim.x+OPS; //upper x
+    uy = blockDim.y+OPS; //upper y
 
-    //UpPyramid Step of Octahedron
-    for (int k = MPSS; k < MPSS+MPSS; k++)
+
+    for (int k = 1; k < MPSS; k++)
     {
         for (int i = 0; i < NV; i++)
         {
@@ -259,16 +265,17 @@ Octahedron(float *state)
         }
         __syncthreads(); //Sync threads here to ensure all initial values are copied
 
+        // Solving step function
+        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
+        {
+            step(shared_state,sgid);
+        }
+
         //Update swept bounds
         ux -= OPS;
         uy -= OPS;
         lx += OPS;
         ly += OPS;
-        // Solving step function
-        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
-        {
-            step(shared_state,sgid);
-        }
 
         // Place values back in original matrix
         for (int j = 0; j < NV; j++)
@@ -283,41 +290,50 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 DownPyramid(float *state)
 {
-    //Creating flattened shared array ptr (x,y,v) length
-    extern __shared__ float shared_state[];    //Shared state specified externally
-    //Creating swept boundaries
-    int lx = blockDim.x/2; //Lower swept bound
-    int ly = blockDim.y/2; //Lower swept bound y
-    int ux = blockDim.x/2; //upper x
-    int uy = blockDim.y/2;//blockDim.y; //upper y
-    //Creating indexing
-    int gid = getGlobalIdx_2D_2D();  //Getting 2D global index
-    int sgid = gid%(SGIDS); //Shared global index
+  //Creating flattened shared array ptr (x,y,v) length
+  extern __shared__ float shared_state[];    //Shared state specified externally
+  shared_state_zero(shared_state);
 
-    for (int k = 0; k < MPSS; k++)
-    {
-        for (int i = 0; i < NV; i++)
-        {
-            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
-        }
-        __syncthreads(); //Sync threads here to ensure all initial values are copied
+  //Other quantities for indexing
+  int tidx = threadIdx.x+OPS;
+  int tidy = threadIdx.y+OPS;
+  int sgid = get_sgid(tidx,tidy); //Shared global index
+  int gid = get_gid(); //global index
 
-        //Update swept bounds
-        ux += OPS;
-        uy += OPS;
-        lx -= OPS;
-        ly -= OPS;
-        // Solving step function
-        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
-        {
-            step(shared_state,sgid);
-        }
+  //Creating swept boundaries
+  int lx =(blockDim.x+OPS)/TWO+1; //upper x
+  int ly = (blockDim.y+OPS)/TWO+1; //upper y
+  int ux =(blockDim.x+OPS)/TWO; //upper x
+  int uy = (blockDim.y+OPS)/TWO; //upper y
 
-        // Place values back in original matrix
-        for (int j = 0; j < NV; j++)
-        {
-            state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
-        }
-    }
+  //Communicating edge values to shared array
+  edge_comm(shared_state, state, MPSS);
 
+  //Down Pyramid step
+  for (int k = 0; k < MPSS; k++)
+  {
+      for (int i = 0; i < NV; i++)
+      {
+          shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
+      }
+      __syncthreads(); //Sync threads here to ensure all initial values are copied
+
+      //Update swept bounds
+      ux += OPS;
+      uy += OPS;
+      lx -= OPS;
+      ly -= OPS;
+
+      // Solving step function
+      if (tidx<=ux && tidx>=lx && tidy<=uy && tidy>=ly)
+      {
+          step(shared_state,sgid);
+      }
+
+      // Place values back in original matrix
+      for (int j = 0; j < NV; j++)
+      {
+          state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+      }
+  }
 }

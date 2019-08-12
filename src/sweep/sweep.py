@@ -96,7 +96,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     MGST =   TWO if time_steps<MOSS else int(np.ceil(time_steps/MOSS))
     nts = int(MGST*MOSS)
     #Create shared process array for data transfer
-    shared_shape = (MOSS,arr0.shape[ZERO],arr0.shape[ONE]+SPLITX+TWO*ops ,arr0.shape[TWO]+SPLITY+TWO*ops )
+    shared_shape = (MOSS+ONE,arr0.shape[ZERO],arr0.shape[ONE]+SPLITX+TWO*ops ,arr0.shape[TWO]+SPLITY+TWO*ops )
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
 
     #Setting initial conditions
@@ -216,43 +216,46 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         filename+=".hdf5"
         hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
         hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-
+    # print(rank,regions[0])
+    # print(rank,regions[1])
+    # print(rank,regions[2])
+    # print(rank,regions[3])
     #UpPyramid Step
-    # if LAB:
-    #     UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
-    # comm.Barrier()
-    # printer(shared_arr[1,0,:,:])
-    #Communicate edges
-    # if LAB and rank == master_rank:
-    #     edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
-    # comm.Barrier()
-    # GST+=ONE  #Increment global swept step
-    # # Octahedron steps
-    # while(GST<MGST):
-    #     if LAB:
-    #         printer(GST%TWO)
-    #         cregion = regions[GST%TWO]
-    #         #Reading local array
-    #         local_array[:,:,:,:] = shared_arr[cregion]
-    #         #Octahedron Step
-    #     #     Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-    #     comm.Barrier()  #Write barrier
-    #     if rank == master_rank:
-    #         edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
-    #     comm.Barrier() #Edge transfer barrier
-    #     GST+=ONE
-
-
-    # #Down Pyramid Step
-    # if LAB:
-    #     DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-    printer(MPSS)
-    comm.Barrier()
     if LAB:
-        #Final Write Step
-        write_and_shift(shared_arr,regions[GST%TWO+TWO],hdf5_data_set,MPSS)
-        #Closeing HDF5 file
+        UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
+    comm.Barrier()
+    # Communicate edges
+    if LAB and rank == master_rank:
+        edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
+    comm.Barrier()
+    # printer(idx_sets[-2])
+    # Octahedron steps
+    while(GST<=MGST):
+        if LAB:
+            cregion = regions[(GST+1)%TWO]
+            #Reading local array
+            local_array[:,:,:,:] = shared_arr[cregion]
+            #Octahedron Step
+            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer)
+        comm.Barrier()  #Write barrier
+        if rank == master_rank:
+            edge_comm(shared_arr,SPLITX,SPLITY,ops,(GST+1)%TWO)
+        comm.Barrier() #Edge transfer barrier
+        #Write and shift step
+        if LAB:
+            write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
+        comm.Barrier()
+        GST+=ONE
+
+    #Down Pyramid Step
+    if LAB:
+        DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
+    comm.Barrier()
+    #Final Write Step
+    if LAB:
+        write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
         hdf5_file.close()
+    comm.Barrier()
 
     #CUDA clean up - One of the last steps
     if gpu_rank:
