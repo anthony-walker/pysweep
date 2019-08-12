@@ -35,6 +35,8 @@ import ctypes
 import GPUtil
 #Decomp functions
 from .decomp_functions import *
+#Testing
+import time as timer
 
 def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict()):
     """Use this function to perform standard decomposition
@@ -47,6 +49,7 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     block_size - gpu block size (check your architecture requirements)
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
+    start = timer.time()
     #Local Constants
     ZERO = 0
     QUARTER = 0.25
@@ -175,6 +178,13 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     if LAB:
         filename+=".hdf5"
         hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+        hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
+        hdf_bs[:] = block_size[:]
+        hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
+        hdf_as[:] = (time_steps,)+arr0.shape
+        hdf_aff = hdf5_file.create_dataset("affinity",(1,))
+        hdf_aff[0] = affinity
+        hdf_time = hdf5_file.create_dataset("time",(1,))
         hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
         hdfr1 = slice(regions[1][2].start-ops,regions[1][2].stop-ops)
         hdfr2 = slice(regions[1][3].start-ops,regions[1][3].stop-ops)
@@ -193,11 +203,19 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         #Writing Data after it has been shifted
         if LAB:
             hdf5_data_set[i,:,hdfr1,hdfr2] = shared_arr[0,regions[1][1],regions[1][2],regions[1][3]]
-    #Final Write Step
-    if LAB:
-        hdf5_file.close()
     comm.Barrier()
-
     #CUDA clean up - One of the last steps
     if gpu_rank:
         cuda_context.pop()
+    comm.Barrier()
+
+    #Timer
+    stop = timer.time()
+    exec_time = abs(stop-start)
+    exec_time = comm.gather(exec_time)
+    if rank == master_rank:
+        avg_time = sum(exec_time)/num_ranks
+        hdf_time[0] = avg_time
+    comm.Barrier()
+    if LAB:
+        hdf5_file.close()

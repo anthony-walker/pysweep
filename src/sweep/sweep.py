@@ -38,12 +38,13 @@ from .pysweep_printer import pysweep_printer
 import importlib.util
 #Testing and Debugging
 import warnings
+import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 #--------------------Global Variables------------------------------#
 
 #----------------------End Global Variables------------------------#
 
-def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict()):
+def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict(),exid=[]):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -54,6 +55,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     block_size - gpu block size (check your architecture requirements)
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
+    start = timer.time()
     #Local Constants
     ZERO = 0
     QUARTER = 0.25
@@ -62,7 +64,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     TWO = 2
 
     #Getting GPU info
-    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
+    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=10000) #getting devices by load
         #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
@@ -73,9 +75,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #None is in place for device ID
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
 
+
+    #Creating swept indexes
+    idx_sets = create_iidx_sets(block_size,ops)
+
     #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-ONE])/(TWO*ops+ONE))+ONE #Max Pyramid Swept Step
-    MOSS = int(TWO*min(block_size[:-ONE])/(TWO*ops+ONE))   #Max Octahedron Swept Step
+    MOSS = int(TWO*len(idx_sets))-1   #Max Octahedron Swept Step
 
     #Splits for shared array
     SPLITX = int(block_size[ZERO]/TWO)   #Split computation shift - add ops
@@ -88,6 +94,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     GST = ZERO #This is a variable to track which swept step the simulation is on
     MGST =   TWO if time_steps<MOSS else int(np.ceil(time_steps/MOSS))
     nts = int(MGST*MOSS)
+
     #Create shared process array for data transfer
     shared_shape = (MOSS+ONE,arr0.shape[ZERO],arr0.shape[ONE]+SPLITX+TWO*ops ,arr0.shape[TWO]+SPLITY+TWO*ops )
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
@@ -165,8 +172,15 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     regions = create_read_regions(regions,ops)+regions
     #Regions: (read region, shifted read, write, shifted write)
     local_array = local_array_create(shared_arr,regions[ZERO],dType)
+
+    #Setting local array boolean
+    if local_array is None:
+        LAB = False
+    else:
+        LAB = True
+
     # Specifying which source mod to use
-    if gpu_rank:
+    if gpu_rank and LAB:
         # Creating cuda device and Context
         cuda.init()
         cuda_device = cuda.Device(new_rank_info[-ONE])
@@ -189,37 +203,31 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         source_mod = build_gpu_source(gpu_source)
         constant_copy(source_mod,const_dict,add_consts)
         local_cpu_regions = None
-    else:
+    elif LAB:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
         local_cpu_regions = create_blocks_list(local_array,block_size,ops)
         grid_size = None
 
-    #Setting local array boolean
-    if local_array is None:
-        LAB = False
-    else:
-        LAB = True
-
-    #Creating swept indexes
-    idx_sets = create_iidx_sets(block_size,ops)
-
-    #Creating HDF5 file
+    #Creating HDF5 file and UpPyramid
     if LAB:
         filename+=".hdf5"
         hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+        hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
+        hdf_bs[:] = block_size[:]
+        hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
+        hdf_as[:] = (nts,)+arr0.shape
+        hdf_aff = hdf5_file.create_dataset("affinity",(1,))
+        hdf_aff[0] = affinity
+        hdf_time = hdf5_file.create_dataset("time",(1,))
         hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-    # print(rank,regions[0])
-    # print(rank,regions[1])
-    # print(rank,regions[2])
-    # print(rank,regions[3])
-    #UpPyramid Step
-    if LAB:
         UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
     comm.Barrier()
+
     # Communicate edges
     if LAB and rank == master_rank:
         edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
     comm.Barrier()
+
     # Octahedron steps
     while(GST<=MGST):
         if LAB:
@@ -229,7 +237,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
             #Octahedron Step
             Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
         comm.Barrier()  #Write barrier
-        if rank == master_rank:
+
+        if rank == master_rank and LAB:
             edge_comm(shared_arr,SPLITX,SPLITY,ops,(GST+1)%TWO)
         comm.Barrier() #Edge transfer barrier
         #Write and shift step
@@ -238,19 +247,25 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         comm.Barrier()
         GST+=ONE
 
-    #Down Pyramid Step
+    #Down Pyramid Step and final write
     if LAB:
         DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
-    comm.Barrier()
-    #Final Write Step
-    if LAB:
         write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
-        hdf5_file.close()
     comm.Barrier()
 
     #CUDA clean up - One of the last steps
-    if gpu_rank:
+    if gpu_rank and LAB:
         cuda_context.pop()
+    comm.Barrier()
+    stop = timer.time()
+    exec_time = abs(stop-start)
+    exec_time = comm.gather(exec_time)
+    if rank == master_rank:
+        avg_time = sum(exec_time)/num_ranks
+        hdf_time[0] = avg_time
+    comm.Barrier()
+    if LAB:
+        hdf5_file.close()
 
 if __name__ == "__main__":
     # print("Starting execution.")

@@ -17,32 +17,28 @@ import multiprocessing as mp
 def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
-    r1 = slice(region1[1].start-ops,region1[1].stop-ops,1)
     r2 = slice(region1[2].start-ops,region1[2].stop-ops,1)
     r3 = slice(region1[3].start-ops,region1[3].stop-ops,1)
-    # print(MPSS*(GST),MPSS*(GST+1))
-    hdf_set[MPSS*(GST-1):MPSS*(GST),r1,r2,r3] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
-    shared_arr[:MPSS,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
+    hdf_set[MPSS*(GST-1):MPSS*(GST),region1[1],r2,r3] = shared_arr[:MPSS,region1[1],region1[2],region1[3]]
+    shared_arr[:MPSS+1,region1[1],region1[2],region1[3]] = shared_arr[MPSS+1:,region1[1],region1[2],region1[3]]
     #Do edge comm after this function
 
 def create_iidx_sets(block_size,ops):
-    """Use this function to create index sets"""
-    b_shape_x = block_size[0]+2*ops
-    b_shape_y = block_size[1]+2*ops
+    """Use this function to create index sets."""
+    bsx = block_size[0]+2*ops
+    bsy = block_size[1]+2*ops
+    ly = ops
+    uy = bsy-ops
+    min_bs = int(min(bsx,bsy)/(2*ops))
+    iidx = tuple(np.ndindex((bsx,bsy)))
     idx_sets = tuple()
-    iidx = tuple(np.ndindex((b_shape_x,b_shape_y)))
-    # idx_sets += (set(iidx),)
-    while len(iidx)>0:
-        #Adjusting indices
-        tl = tuple()
-        iidx = iidx[ops*b_shape_x:-ops*b_shape_x]
-        b_shape_y-=2*ops
-        for i in range(1,b_shape_y+1,1):
-            tl+=iidx[i*b_shape_x-b_shape_x+ops:i*b_shape_x-ops]
-        b_shape_x-=2*ops
-        iidx = tl
+    for i in range(min_bs):
+        iidx = iidx[ops*(bsy-i*2*ops):-ops*(bsy-i*2*ops)]
+        iidx = [(x,y) for x,y in iidx if y >= ly and y < uy]
         if len(iidx)>0:
-            idx_sets += (set(iidx),)
+            idx_sets+=(iidx,)
+        ly+=ops
+        uy-=ops
     return idx_sets
 
 def local_array_create(shared_arr,region,dType):
@@ -141,6 +137,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
         #Getting gpu blocks
         gpu_blocks = int((gpu_slices[2].stop-gpu_slices[2].start)/block_size[1])
         blocks_per_gpu = int(gpu_blocks/total_gpus)
+        blocks_per_gpu = 1 if blocks_per_gpu >= 0 and blocks_per_gpu < 1 else blocks_per_gpu
         #creating gpu indicies
         if gpu_master_rank == rank:
             x_slice = (slice(gpu_slices[1].start+ops,gpu_slices[1].stop+ops,1),)
@@ -149,10 +146,14 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
             prev = 0
             region1 = list()    #a list of slices one for each region
             region2 = list()    #a list of slices one for each region
+
             for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
                 region1.append(stv+x_slice+(slice(prev*(block_size[1])+ops,i*(block_size[1])+ops,1),))
                 region2.append(stv+shift_slice+(slice(prev*(block_size[1])+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
                 prev = i
+            for i in range(abs(len(region1)-total_gpus)):
+                region1.append(None)
+                region2.append(None)
         region1 = gpu_comm.scatter(region1)
         region2 = gpu_comm.scatter(region2)
     #CPU ranks go in here
