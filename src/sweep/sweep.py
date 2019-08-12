@@ -76,7 +76,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
 
     #PRINTER
-    printer = pysweep_printer(rank,master_rank)
+    # printer = pysweep_printer(rank,master_rank)
 
     #Creating swept indexes
     idx_sets = create_iidx_sets(block_size,ops)
@@ -245,7 +245,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
             local_array[:,:,:,:] = shared_arr[cregion]  #Array of first step seems to be correct
             # printer(local_array[time_id,var_id,:,:])
             #Octahedron Step
-            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer)
+            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
 
         comm.Barrier()  #Write barrier
 
@@ -279,7 +279,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #This if for testing only
     if rank == master_rank:
         return avg_time
-        
+
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (4,int(32),int(32))

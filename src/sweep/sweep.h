@@ -275,7 +275,7 @@ Octahedron(float *state)
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-    for (int k = MPSS; k < TWO*MPSS; k++)
+    for (int k = MPSS; k < TWO*MPSS-ONE; k++)
     {
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
@@ -292,13 +292,11 @@ Octahedron(float *state)
             }
             __syncthreads(); //Sync threads here to ensure all initial values are copied
         }
-
         //Update swept bounds
         ux -= OPS;
         uy -= OPS;
         lx += OPS;
         ly += OPS;
-
     }
 }
 

@@ -5,6 +5,8 @@ from src.analytical import *
 from src.equations import *
 from src.decomp import *
 import multiprocessing as mp
+from notipy.notipy import NotiPy
+
 #Calling analytical solution
 def analytical():
     """Use this funciton to solve the analytical euler vortex."""
@@ -20,8 +22,8 @@ def create_block_sizes():
         bss.append(cbs)
     return bss
 
-if __name__ == "__main__":
 
+def test(args):
     comm = MPI.COMM_WORLD
     master_rank = 0 #master rank
     rank = comm.Get_rank()  #current rank
@@ -37,14 +39,16 @@ if __name__ == "__main__":
     Y = cvics.L
     #Dimensions and steps
     npx = 512
-    npy = 16
+    npy = 512
     dx = X/npx
     dy = Y/npy
+
     #Time testing arguments
     t0 = 0
-    t_b = 1
-    dt = 0.1
+    t_b = 0.3
+    dt = 0.01
     targs = (t0,t_b,dt)
+
     # Creating initial vortex from analytical code
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
     initial_vortex = np.swapaxes(initial_vortex,0,2)
@@ -62,19 +66,29 @@ if __name__ == "__main__":
     block_sizes = create_block_sizes()
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
-    #Swept results
-    for i,bs in enumerate(block_sizes[:1]):
-        for j,aff in enumerate(affinities[:2]):
-            fname = swept_name+"_"+str(i)+"_"+str(j)
-            ct = sweep(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
-            if rank == master_rank:
-                f.write("Swept: "+str((ct,bs,aff))+"\n")
-            comm.Barrier()
+    # #Swept results
+    # for i,bs in enumerate(block_sizes):
+    #     for j,aff in enumerate(affinities):
+    #         fname = swept_name+"_"+str(i)+"_"+str(j)
+    #         ct = sweep(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
+    #         if rank == master_rank:
+    #             f.write("Swept: "+str((ct,bs,aff))+"\n")
+    #         comm.Barrier()
 
     for i,bs in enumerate(block_sizes[:1]):
-        for j,aff in enumerate(affinities[:2]):
+        for j,aff in enumerate(affinities):
             fname = decomp_name+"_"+str(i)+"_"+str(j)
             ct = decomp(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
             if rank == master_rank:
                 f.write("Decom: "+str((ct,bs,aff))+"\n")
             comm.Barrier()
+
+
+
+if __name__ == "__main__":
+    args = tuple()
+    sm = "Hi,\nYour function run is complete.\n"
+    notifier = NotiPy(test,args,sm,"asw42695@gmail.com",timeout=None)
+    notifier.run()
+    #For testing individual sweep
+    # ct = sweep(initial_vortex,targs,dx,dy,ops,block_sizes[0],kernel,cpu_source,affinity=affinities[0],filename="./results/temp")

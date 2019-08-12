@@ -8,3 +8,5 @@ testfile.py
 sources/
 figures/
 results/
+post_sweep/
+notipy/
