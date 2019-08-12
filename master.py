@@ -72,4 +72,7 @@ def swept():
 
 
 if __name__ == "__main__":
+    print("Executing standard")
     standard()
+    print("Executing Swept")
+    swept()

@@ -3,6 +3,7 @@
 import numpy as np
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
+from .decomp_lambda import decomp_lambda
 #MPI imports
 from mpi4py import MPI
 import importlib
@@ -23,18 +24,15 @@ def local_array_create(shared_arr,region,dType):
         local_array = None
     return local_array
 
-def edge_comm(shared_arr,SPLITX,SPLITY,ops,dir):
+def edge_comm(shared_arr,ops):
     """Use this function to communicate edges in the shared array."""
+    #Shifting data down
+    shared_arr[0,:,:,:] = shared_arr[1,:,:,:]
     #Updates shifted section of shared array
-    if not dir:
-        shared_arr[:,:,-SPLITX-ops:,:] = shared_arr[:,:,ops:SPLITX+2*ops,:]
-        shared_arr[:,:,:,-SPLITY-ops:] = shared_arr[:,:,:,ops:SPLITY+2*ops]
-    else:
-        shared_arr[:,:,ops:SPLITX+2*ops,:]=shared_arr[:,:,-SPLITX-ops:,:]
-        shared_arr[:,:,:,ops:SPLITY+2*ops]=shared_arr[:,:,:,-SPLITY-ops:]
-    #Updates ops points at front
-    shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
-    shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
+    shared_arr[:,:,-ops:,:] = shared_arr[:,:,ops:2*ops,:]
+    shared_arr[:,:,:ops,:] = shared_arr[:,:,ops:2*ops,:]
+    shared_arr[:,:,:,-ops:] = shared_arr[:,:,:,ops:2*ops]
+    shared_arr[:,:,:,:ops] = shared_arr[:,:,:,ops:2*ops]
 
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
@@ -101,7 +99,7 @@ def create_write_region(rank,gargs,cargs,block_size,ops):
     #Unpack arguments
     gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank = gargs
     cpu_comm,cpu_master_rank,total_cpus,cpu_slices = cargs
-    stv = (slice(0,1,1),gpu_slices[0])
+    stv = (slice(0,2,1),gpu_slices[0])
     #GPU ranks go in here
     if gpu_rank:
         #Getting gpu blocks
@@ -242,7 +240,7 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
     else:
         return blocks[0]
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops):
+def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -252,7 +250,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
     if gpu_rank:
         #Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-        gpu_fcn = source_mod.get_function("UpPyramid")
+        gpu_fcn = source_mod.get_function("Decomp")
         ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
@@ -262,7 +260,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
             block = np.zeros(arr[local_region].shape)
             block += arr[local_region]
             blocks.append(block)
-        cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets))
+        cpu_fcn = decomp_lambda((CPU_Decomp,source_mod,ops))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
     #Writing to shared array
@@ -270,15 +268,15 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 #--------------------------------CPU Specific Swept Functions------------------
-def CPU_UpPyramid(args):
+def CPU_Decomp(args):
     """Use this function to build the Up Pyramid."""
-    block,source_mod,idx_sets = args
+    block,source_mod,ops = args
     #Removing elements for swept step
+    iidx = tuple(np.ndindex((block.shape[2],block.shape[3])))
+    iidx = iidx[block.shape[3]*ops:-block.shape[3]*ops]
+    iidx = [(x,y) for x,y in iidx if y >= ops and y < block.shape[3]-ops]
     ts = 0
-    for swept_set in idx_sets:
-        #Calculating Step
-        block = source_mod.step(block,swept_set,ts)
-        ts+=1
+    block = source_mod.step(block,iidx,ts)
     return block
 
 def nan_to_zero(arr,zero=0.):

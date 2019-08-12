@@ -72,7 +72,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     gpu_rank = False    #Says whether or not the rank is a GPU rank
     #None is in place for device ID
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
-    printer = pysweep_printer(rank,master_rank) #This is a printer to print only master rank data
+
     #Max Swept Steps from block_size and other constants
     MPSS = int(min(block_size[:-ONE])/(TWO*ops+ONE))+ONE #Max Pyramid Swept Step
     MOSS = int(TWO*min(block_size[:-ONE])/(TWO*ops+ONE))   #Max Octahedron Swept Step
@@ -114,7 +114,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Adjust for number of cpus/gpus
         # affinity*=(total_gpus/total_cpus)
         # affinity = affinity if affinity <= ONE else ONE #If the number becomes greater than ONE due to adjusting for number of cpus/gpus set to ONE
-        # printer(affinity)
         # total_cpus = total_cpus if total_cpus%TWO==ZERO else total_cpus-total_cpus%TWO #Making total cpus divisible by TWO
         gpu_ranks = list()
         cpu_ranks = list()
@@ -124,7 +123,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
             else:
                 cpu_ranks.append(ri[ZERO])
         #Getting slices for data
-        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus,printer)
+        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
     else:
         new_rank_info = None
         total_gpus=None
@@ -162,7 +161,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
     #Getting region and offset region for each rank (CPU or GPU)
-    regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer)
+    regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY)
     regions = create_read_regions(regions,ops)+regions
     #Regions: (read region, shifted read, write, shifted write)
     local_array = local_array_create(shared_arr,regions[ZERO],dType)
@@ -192,7 +191,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         local_cpu_regions = None
     else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
-        local_cpu_regions = create_blocks_list(local_array,block_size,ops,printer)
+        local_cpu_regions = create_blocks_list(local_array,block_size,ops)
         grid_size = None
 
     #Setting local array boolean
@@ -215,13 +214,12 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     # print(rank,regions[3])
     #UpPyramid Step
     if LAB:
-        UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
+        UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
     comm.Barrier()
     # Communicate edges
     if LAB and rank == master_rank:
         edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
     comm.Barrier()
-    # printer(idx_sets[-2])
     # Octahedron steps
     while(GST<=MGST):
         if LAB:
@@ -229,7 +227,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
             #Reading local array
             local_array[:,:,:,:] = shared_arr[cregion]
             #Octahedron Step
-            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer)
+            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
         comm.Barrier()  #Write barrier
         if rank == master_rank:
             edge_comm(shared_arr,SPLITX,SPLITY,ops,(GST+1)%TWO)

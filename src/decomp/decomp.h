@@ -13,11 +13,8 @@ __device__ __constant__ const float TWO=2;
 __device__ __constant__ int SGIDS; //shift in shared data
 __device__ __constant__ int VARS; //shift in variables in data
 __device__ __constant__ int TIMES; //shift in times in data
-__device__ __constant__  int MPSS; //max pyramid swept steps
-__device__ __constant__  int MOSS; //max octahedron swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
-__device__ __constant__ int SGNVS;
 __device__ __constant__  float DX;
 __device__ __constant__  float DY;
 __device__ __constant__  float DT;
@@ -145,7 +142,7 @@ void shared_state_zero(float * shared_state)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-UpPyramid(float *state)
+Decomp(float *state)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -157,40 +154,21 @@ UpPyramid(float *state)
     int sgid = get_sgid(tidx,tidy); //Shared global index
     int gid = get_gid(); //global index
 
-    //Creating swept boundaries
-    int lx = OPS; //Lower x swept bound
-    int ly = OPS; // Lower y swept bound
-    int ux = blockDim.x+OPS; //upper x
-    int uy = blockDim.y+OPS; //upper y
-
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO);
 
-    for (int k = 0; k < MPSS; k++)
-    {
-        for (int i = 0; i < NV; i++)
-        {
-            shared_state[sgid+i*SGIDS] = state[gid+i*VARS+k*TIMES]; //Current time step
-        }
-        __syncthreads(); //Sync threads here to ensure all initial values are copied
+      for (int i = 0; i < NV; i++)
+      {
+          shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Current time step
+      }
+      __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-        // Solving step function
-        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
-        {
-            step(shared_state,sgid);
-        }
+      // Solving step function
+      step(shared_state,sgid);
 
-        //Update swept bounds
-        ux -= OPS;
-        uy -= OPS;
-        lx += OPS;
-        ly += OPS;
-
-        // Place values back in original matrix
-        for (int j = 0; j < NV; j++)
-        {
-            state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
-        }
-    }
-
+      // Place values back in original matrix
+      for (int j = 0; j < NV; j++)
+      {
+          state[gid+j*VARS+TIMES]=shared_state[sgid+j*SGIDS];
+      }
 }

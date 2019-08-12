@@ -175,10 +175,28 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     if LAB:
         filename+=".hdf5"
         hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
-        hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+        hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+        hdfr1 = slice(regions[1][2].start-ops,regions[1][2].stop-ops)
+        hdfr2 = slice(regions[1][3].start-ops,regions[1][3].stop-ops)
+        hdf5_data_set[0,:,hdfr1,hdfr2] = shared_arr[0,regions[1][1],regions[1][2],regions[1][3]]
+    comm.Barrier()
 
-    #Add Solution Procedure HERE
 
+    #Solution
+    for i in range(1,time_steps):
+        if LAB:
+            decomposition(source_mod,local_array, gpu_rank, block_size, grid_size,regions[ONE],local_cpu_regions,shared_arr,ops)
+        comm.Barrier()
+        if rank == master_rank:
+            edge_comm(shared_arr,ops)
+        comm.Barrier()
+        #Writing Data after it has been shifted
+        if LAB:
+            hdf5_data_set[i,:,hdfr1,hdfr2] = shared_arr[0,regions[1][1],regions[1][2],regions[1][3]]
+    #Final Write Step
+    if LAB:
+        hdf5_file.close()
+    comm.Barrier()
 
     #CUDA clean up - One of the last steps
     if gpu_rank:
