@@ -21,10 +21,10 @@ def swept():
     """Use this function to execute the swept rule."""
     dims = (4,int(16),int(16))
     arr0 = np.zeros(dims)
-    arr0[0,:,:] = 2
-    arr0[1,:,:] = 1
-    arr0[2,:,:] = 1
-    arr0[3,:,:] = 9
+    arr0[0,:,:] = 1
+    arr0[1,:,:] = 2
+    arr0[2,:,:] = 3
+    arr0[3,:,:] = 4
 
     #GPU Arguments
     block_size = (8,8,1)

@@ -42,6 +42,8 @@ def local_array_create(shared_arr,region,dType):
     """Use this function to generate the local arrays from regions."""
     if region:
         local_shape = get_slices_shape(region)
+        print(local_shape)
+        print(region)
         local_array = np.zeros(local_shape,dtype=dType)
         local_array[:,:,:,:] = shared_arr[region]
     else:
@@ -129,7 +131,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
     #Unpack arguments
     gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank = gargs
     cpu_comm,cpu_master_rank,total_cpus,cpu_slices = cargs
-    stv = (slice(0,MOSS,1),gpu_slices[0])
+    stv = (slice(0,MOSS+1,1),gpu_slices[0])
     #GPU ranks go in here
     if gpu_rank:
         #Getting gpu blocks
@@ -309,7 +311,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
     #Writing to shared array
-    # arr = nan_to_zero(arr,zero=1.0)
+    # arr = nan_to_zero(arr,zero=5)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets):

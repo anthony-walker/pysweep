@@ -218,29 +218,29 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
 
     #UpPyramid Step
-    if LAB:
-        UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
-    comm.Barrier()
-
+    # if LAB:
+    #     UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer) #THis modifies shared array
+    # comm.Barrier()
+    # printer(shared_arr[1,0,:,:])
     #Communicate edges
-    if LAB and rank == master_rank:
-        edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
-    comm.Barrier()
-    GST+=ONE  #Increment global swept step
-    # Octahedron steps
-    while(GST<MGST):
-        if LAB:
-            printer(GST%TWO)
-            cregion = regions[GST%TWO]
-            #Reading local array
-            local_array[:,:,:,:] = shared_arr[cregion]
-            #Octahedron Step
-        #     Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
-        comm.Barrier()  #Write barrier
-        if rank == master_rank:
-            edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
-        comm.Barrier() #Edge transfer barrier
-        GST+=ONE
+    # if LAB and rank == master_rank:
+    #     edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
+    # comm.Barrier()
+    # GST+=ONE  #Increment global swept step
+    # # Octahedron steps
+    # while(GST<MGST):
+    #     if LAB:
+    #         printer(GST%TWO)
+    #         cregion = regions[GST%TWO]
+    #         #Reading local array
+    #         local_array[:,:,:,:] = shared_arr[cregion]
+    #         #Octahedron Step
+    #     #     Octahedron(source_mod,local_array, gpu_rank,block_size,grid_size,cregion,shared_arr,idx_sets)
+    #     comm.Barrier()  #Write barrier
+    #     if rank == master_rank:
+    #         edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
+    #     comm.Barrier() #Edge transfer barrier
+    #     GST+=ONE
 
 
     # #Down Pyramid Step
