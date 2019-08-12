@@ -7,6 +7,10 @@ from pycuda.compiler import SourceModule
 #MPI imports
 from mpi4py import MPI
 import importlib
+#System imports
+import os.path as op
+import inspect
+
 #Multiprocessing
 import multiprocessing as mp
 
@@ -16,7 +20,7 @@ def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
     r1 = slice(region1[1].start-ops,region1[1].stop-ops,1)
     r2 = slice(region1[2].start-ops,region1[2].stop-ops,1)
     r3 = slice(region1[3].start-ops,region1[3].stop-ops,1)
-    print(MPSS*(GST),MPSS*(GST+1))
+    # print(MPSS*(GST),MPSS*(GST+1))
     hdf_set[MPSS*(GST-1):MPSS*(GST),r1,r2,r3] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
     shared_arr[:MPSS,region1[1],region1[2],region1[3]] = shared_arr[MPSS:,region1[1],region1[2],region1[3]]
     #Do edge comm after this function
@@ -75,11 +79,13 @@ def build_cpu_source(cpu_source):
 
 def build_gpu_source(kernel_source):
     """Use this function to build the given and swept source module together.
-    -NEED TO UPDATE THIS TO GET PATH OF SWEPT SOURCE IN LIEU OF HARDWIRED
     """
     #GPU Swept Calculations
     #----------------Reading In Source Code-------------------------------#
-    source_code = source_code_read("/home/walkanth/pysweep/src/sweep/sweep.h")
+    file = inspect.getfile(build_cpu_source)
+    fname = file.split("/")[-1]
+    fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+"sweep.h"
+    source_code = source_code_read(fpath)
     split_source_code = source_code.split("//!!(@#\n")
     source_code = split_source_code[0]+"\n"+source_code_read(kernel_source)+"\n"+split_source_code[1]
     source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
