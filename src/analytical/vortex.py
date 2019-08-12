@@ -107,6 +107,7 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, dirpath = "./v
             np.savetxt(str_array[fc]+str(tsc),temp_prop_state,fmt="%.10f",delimiter=",",header="time_step: "+str(times[tsc]))
             fc+=1
         tsc+=1
+    return state
 
 class vics(object):
     """This class contains functions for vortex initial conditions
@@ -121,7 +122,7 @@ class vics(object):
     """
     def __init__(self):
         """Creates empty vics object."""
-        pass
+        self.initialized = False
 
     #----------------------------vics Initializer functions
 

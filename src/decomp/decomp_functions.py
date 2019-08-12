@@ -142,7 +142,7 @@ def create_read_region(regions,ops):
         Note: The rows are divided into regions. So, each rank gets a row or set of rows
         so to speak. This is because affinity split is based on columns.
     """
-    if regions[0] is not None:
+    if regions is not None:
         region1 = (regions[0],regions[1])
         region1 += slice(regions[2].start-ops,regions[2].stop+ops,1),
         region1 += slice(regions[3].start-ops,regions[3].stop+ops,1),

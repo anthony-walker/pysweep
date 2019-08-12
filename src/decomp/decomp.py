@@ -175,22 +175,22 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         LAB = True
 
     #Creating HDF5 file
+    filename+=".hdf5"
+    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+    hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
+    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
+    hdf_aff = hdf5_file.create_dataset("affinity",(1,))
+    hdf_time = hdf5_file.create_dataset("time",(1,))
+    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+
     if LAB:
-        filename+=".hdf5"
-        hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
-        hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
         hdf_bs[:] = block_size[:]
-        hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
         hdf_as[:] = (time_steps,)+arr0.shape
-        hdf_aff = hdf5_file.create_dataset("affinity",(1,))
         hdf_aff[0] = affinity
-        hdf_time = hdf5_file.create_dataset("time",(1,))
-        hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
         hdfr1 = slice(regions[1][2].start-ops,regions[1][2].stop-ops)
         hdfr2 = slice(regions[1][3].start-ops,regions[1][3].stop-ops)
         hdf5_data_set[0,:,hdfr1,hdfr2] = shared_arr[0,regions[1][1],regions[1][2],regions[1][3]]
     comm.Barrier()
-
 
     #Solution
     for i in range(1,time_steps):
@@ -208,7 +208,6 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     if gpu_rank:
         cuda_context.pop()
     comm.Barrier()
-
     #Timer
     stop = timer.time()
     exec_time = abs(stop-start)
@@ -217,5 +216,8 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         avg_time = sum(exec_time)/num_ranks
         hdf_time[0] = avg_time
     comm.Barrier()
-    if LAB:
-        hdf5_file.close()
+    #Closing file
+    hdf5_file.close()
+    #For testing only
+    if rank == master_rank:
+        return avg_time

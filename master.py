@@ -4,70 +4,77 @@ from src.sweep import *
 from src.analytical import *
 from src.equations import *
 from src.decomp import *
-
-#Properties
-gamma = 1.4
-times = np.linspace(1,5,10)
-
-#Analytical properties
-avics = vics()  #Creating vortex ics object
-avics.Shu(gamma) #Initializing with Shu parameters
-
+import multiprocessing as mp
 #Calling analytical solution
 def analytical():
     """Use this funciton to solve the analytical euler vortex."""
-    create_vortex_data(cvics,X,Y,npx,npy,times=(0,0.1))
+    # create_vortex_data(cvics,X,Y,npx,npy,times=(0,0.1))
+    pass
 
-def create_test_args():
+def create_block_sizes():
     """Use this function to create arguements for the two codes."""
-    for i in range(6,34,2):
-        # print(i)
-        pass
-
-def create_sets(block_size,ops):
-    """Use this function to create index sets."""
-    bsx = block_size[0]+2*ops
-    bsy = block_size[1]+2*ops
-    ly = ops
-    uy = bsy-ops
-    min_bs = int(min(bsx,bsy)/(2*ops))
-    iidx = tuple(np.ndindex((bsx,bsy)))
-    idx_sets = tuple()
-    for i in range(min_bs):
-        iidx = iidx[ops*(bsy-i*2*ops):-ops*(bsy-i*2*ops)]
-        iidx = [(x,y) for x,y in iidx if y >= ly and y < uy]
-        if len(iidx)>0:
-            idx_sets+=(iidx,)
-        ly+=ops
-        uy-=ops
-    return idx_sets
-
+    #Block_sizes
+    bss = list()
+    for i in range(3,6,1):
+        cbs = (int(2**i),int(2**i),1)
+        bss.append(cbs)
+    return bss
 
 if __name__ == "__main__":
-    dims = (4,int(16),int(16))
-    arr0 = np.zeros(dims)
-    arr0[0,:,:] = 1
-    arr0[1,:,:] = 2
-    arr0[2,:,:] = 3
-    arr0[3,:,:] = 4
 
-    #GPU Arguments
-    block_size = (8,8,1)
-    kernel = "/home/walkanth/pysweep/src/equations/euler.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
-    affinity = 0.5    #Time testing arguments
+    comm = MPI.COMM_WORLD
+    master_rank = 0 #master rank
+    rank = comm.Get_rank()  #current rank
+
+    #Properties
+    gamma = 1.4
+
+    #Analytical properties
+    cvics = vics()
+    cvics.Shu(gamma)
+    initial_args = cvics.get_args()
+    X = cvics.L
+    Y = cvics.L
+    #Dimensions and steps
+    npx = 512
+    npy = 16
+    dx = X/npx
+    dy = Y/npy
+    #Time testing arguments
     t0 = 0
     t_b = 1
     dt = 0.1
     targs = (t0,t_b,dt)
+    # Creating initial vortex from analytical code
+    initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
+    initial_vortex = np.swapaxes(initial_vortex,0,2)
+    initial_vortex = np.swapaxes(initial_vortex,1,3)[0]
 
-    #Space testing arguments
-    dx = 0.1
-    dy = 0.1
-    ops = 2
-    # idx = create_sets(block_size,ops)
-    # print(idx[1])
-    # print(len(idx[1]))
-    # print(len(idx))
-    sweep(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity,filename="./results/swept")
-    # decomp(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity,filename="./results/decomp")
+    #GPU Arguments
+    kernel = "/home/walkanth/pysweep/src/equations/euler.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    ops = 2 #number of atomic operations
+    #File args
+    swept_name = "./results/swept"
+    decomp_name = "./results/decomp"
+    #Changing arguments
+    affinities = np.linspace(1/2,1,mp.cpu_count()/2)
+    block_sizes = create_block_sizes()
+    if rank == master_rank:
+        f =  open("./results/time_data.txt",'w')
+    #Swept results
+    for i,bs in enumerate(block_sizes[:1]):
+        for j,aff in enumerate(affinities[:2]):
+            fname = swept_name+"_"+str(i)+"_"+str(j)
+            ct = sweep(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
+            if rank == master_rank:
+                f.write("Swept: "+str((ct,bs,aff))+"\n")
+            comm.Barrier()
+
+    for i,bs in enumerate(block_sizes[:1]):
+        for j,aff in enumerate(affinities[:2]):
+            fname = decomp_name+"_"+str(i)+"_"+str(j)
+            ct = decomp(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
+            if rank == master_rank:
+                f.write("Decom: "+str((ct,bs,aff))+"\n")
+            comm.Barrier()

@@ -75,6 +75,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #None is in place for device ID
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
 
+    #PRINTER
+    printer = pysweep_printer(rank,master_rank)
 
     #Creating swept indexes
     idx_sets = create_iidx_sets(block_size,ops)
@@ -208,34 +210,43 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         local_cpu_regions = create_blocks_list(local_array,block_size,ops)
         grid_size = None
 
-    #Creating HDF5 file and UpPyramid
+    # Creating HDF5 file
+    filename+=".hdf5"
+    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+    hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
+    hdf_bs[:] = block_size[:]
+    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
+    hdf_as[:] = (nts,)+arr0.shape
+    hdf_aff = hdf5_file.create_dataset("affinity",(1,))
+    hdf_aff[0] = affinity
+    hdf_time = hdf5_file.create_dataset("time",(1,))
+    hdf5_data_set = hdf5_file.create_dataset("data",(nts,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+
+    #UpPyramid
     if LAB:
-        filename+=".hdf5"
-        hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
-        hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
-        hdf_bs[:] = block_size[:]
-        hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
-        hdf_as[:] = (nts,)+arr0.shape
-        hdf_aff = hdf5_file.create_dataset("affinity",(1,))
-        hdf_aff[0] = affinity
-        hdf_time = hdf5_file.create_dataset("time",(1,))
-        hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
         UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
     comm.Barrier()
+
+    # time_id = 2
+    # var_id = 0
 
     # Communicate edges
     if LAB and rank == master_rank:
         edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
     comm.Barrier()
+    # if rank == master_rank:
+    #     print(shared_arr[time_id,var_id,:,:])
 
     # Octahedron steps
     while(GST<=MGST):
         if LAB:
-            cregion = regions[(GST+1)%TWO]
+            cregion = regions[(GST+1)%TWO] #This is the correct read region
             #Reading local array
-            local_array[:,:,:,:] = shared_arr[cregion]
+            local_array[:,:,:,:] = shared_arr[cregion]  #Array of first step seems to be correct
+            # printer(local_array[time_id,var_id,:,:])
             #Octahedron Step
-            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
+            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops,printer)
+
         comm.Barrier()  #Write barrier
 
         if rank == master_rank and LAB:
@@ -252,7 +263,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
         write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
     comm.Barrier()
-
     #CUDA clean up - One of the last steps
     if gpu_rank and LAB:
         cuda_context.pop()
@@ -264,9 +274,12 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         avg_time = sum(exec_time)/num_ranks
         hdf_time[0] = avg_time
     comm.Barrier()
-    if LAB:
-        hdf5_file.close()
-
+    #Close file
+    hdf5_file.close()
+    #This if for testing only
+    if rank == master_rank:
+        return avg_time
+        
 if __name__ == "__main__":
     # print("Starting execution.")
     dims = (4,int(32),int(32))
