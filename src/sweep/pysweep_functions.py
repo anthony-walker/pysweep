@@ -98,7 +98,7 @@ def get_slices_shape(slices):
         stuple+=(s.stop-s.start,)
     return stuple
 
-def affinity_split(affinity,block_size,arr_shape,total_gpus,printer=None):
+def affinity_split(affinity,block_size,arr_shape,total_gpus):
     """Use this function to split the given data based on rank information and the affinity.
     affinity -  a value between zero and one. (GPU work/CPU work)/Total Work
     block_size -  gpu block size
@@ -122,7 +122,7 @@ def affinity_split(affinity,block_size,arr_shape,total_gpus,printer=None):
     cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
     return gpu_slices, cpu_slices
 
-def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,printer=None):
+def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
     """Use this function to obtain the regions to for reading and writing
         from the shared array. region 1 is standard region 2 is offset by split.
         Note: The rows are divided into regions. So, each rank gets a row or set of rows
@@ -131,9 +131,6 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
     #Read Regions
     region1 = None   #region1
     region2 = None   #region2
-    #Write Regions
-    region3 = None  #region3
-    region4 = None  #region4
 
     #Unpack arguments
     gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank = gargs
@@ -184,7 +181,7 @@ def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY,prin
         region2 = cpu_comm.scatter(region2)
     return region1, region2
 
-def create_read_regions(regions,ops,printer=None):
+def create_read_regions(regions,ops):
     """Use this function to obtain the regions to for reading and writing
         from the shared array. region 1 is standard region 2 is offset by split.
         Note: The rows are divided into regions. So, each rank gets a row or set of rows
@@ -267,7 +264,7 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,add_const[key])
 
-def create_blocks_list(arr,block_size,ops,printer=None):
+def create_blocks_list(arr,block_size,ops):
     """Use this function to create a list of blocks from the array."""
     if arr is not None:
         bsx = int((arr.shape[2]-2*ops)/block_size[0])
@@ -294,7 +291,7 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
     else:
         return blocks[0]
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -321,7 +318,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regi
     # arr = nan_to_zero(arr,zero=5)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
-def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):
+def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -346,7 +343,7 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_reg
         arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
-def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):
+def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops):
     """This is the ending inverted pyramid."""
     if gpu_rank:
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous

@@ -37,13 +37,7 @@ from .pysweep_functions import *
 from .pysweep_printer import pysweep_printer
 import importlib.util
 #Testing and Debugging
-# import platform
-# import time
-# sys.path.insert(0, '/home/walkanth/pysweep/src/equations')
-# import euler
 import warnings
-# from euler import *
-# from pysweep_plot_tests import *
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 #--------------------Global Variables------------------------------#
 

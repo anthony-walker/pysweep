@@ -65,10 +65,10 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     gpu_rank = False    #Says whether or not the rank is a GPU rank
     #None is in place for device ID
     rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
-    printer = pysweep_printer(rank,master_rank) #This is a printer to print only master rank data
 
     #----------------Data Input setup -------------------------#
     time_steps = int((targs[ONE]-targs[ZERO])/targs[TWO])+ONE  #Number of time steps +ONE becuase initial time step
+    itemsize = int(dType.itemsize)
     shared_shape = (time_steps,arr0.shape[ZERO],arr0.shape[ONE]+TWO*ops ,arr0.shape[TWO]+TWO*ops )
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
 
@@ -86,7 +86,6 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         #Adjust for number of cpus/gpus
         # affinity*=(total_gpus/total_cpus)
         # affinity = affinity if affinity <= ONE else ONE #If the number becomes greater than ONE due to adjusting for number of cpus/gpus set to ONE
-        # printer(affinity)
         # total_cpus = total_cpus if total_cpus%TWO==ZERO else total_cpus-total_cpus%TWO #Making total cpus divisible by TWO
         gpu_ranks = list()
         cpu_ranks = list()
@@ -96,7 +95,7 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
             else:
                 cpu_ranks.append(ri[ZERO])
         #Getting slices for data
-        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus,printer)
+        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
     else:
         new_rank_info = None
         total_gpus=None
@@ -134,6 +133,11 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
 
+    #Create regions and local array here
+    regions = create_write_region(rank,gargs,cargs,block_size,ops)
+    regions = (create_read_region(regions,ops),regions)
+    local_array = local_array_create(shared_arr,regions[ZERO],dType)
+
     # Specifying which source mod to use
     if gpu_rank:
         # Creating cuda device and Context
@@ -144,8 +148,6 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
         #Creating constants
         NV = local_array.shape[ONE]
-        # ARRX = local_array.shape[TWO]
-        # ARRY = local_array.shape[3]
         SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
         VARS =  local_array.shape[TWO]*local_array.shape[3]
         TIMES = VARS*NV
@@ -153,14 +155,14 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         DY = dy
         DT = targs[TWO]
         const_dict = ({"NV":NV,"DX":DX,"DT":DT,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
-                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
+                    ,"TIMES":TIMES,"OPS":ops})
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
         constant_copy(source_mod,const_dict,add_consts)
         local_cpu_regions = None
     else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
-        local_cpu_regions = create_blocks_list(local_array,block_size,ops,printer)
+        local_cpu_regions = create_blocks_list(local_array,block_size,ops)
         grid_size = None
 
     #Setting local array boolean
@@ -174,3 +176,10 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         filename+=".hdf5"
         hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
         hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+
+    #Add Solution Procedure HERE
+
+
+    #CUDA clean up - One of the last steps
+    if gpu_rank:
+        cuda_context.pop()
