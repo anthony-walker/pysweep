@@ -3,7 +3,7 @@
 from src.sweep import *
 from src.analytical import *
 from src.equations import *
-
+from src.decomp import *
 #Properties
 gamma = 1.4
 times = np.linspace(1,5,10)
@@ -16,6 +16,33 @@ avics.Shu(gamma) #Initializing with Shu parameters
 def analytical():
     """Use this funciton to solve the analytical euler vortex."""
     create_vortex_data(cvics,X,Y,npx,npy,times=(0,0.1))
+
+
+def standard():
+    """Use this function to execute the swept rule."""
+    dims = (4,int(16),int(16))
+    arr0 = np.zeros(dims)
+    arr0[0,:,:] = 1
+    arr0[1,:,:] = 2
+    arr0[2,:,:] = 3
+    arr0[3,:,:] = 4
+
+    #GPU Arguments
+    block_size = (8,8,1)
+    kernel = "/home/walkanth/pysweep/src/equations/euler.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    affinity = 0.5    #Time testing arguments
+    t0 = 0
+    t_b = 1
+    dt = 0.1
+    targs = (t0,t_b,dt)
+
+    #Space testing arguments
+    dx = 0.1
+    dy = 0.1
+    ops = 2
+
+    decomp(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity,filename="./results/solution")
 
 def swept():
     """Use this function to execute the swept rule."""
@@ -45,4 +72,4 @@ def swept():
 
 
 if __name__ == "__main__":
-    swept()
+    standard()

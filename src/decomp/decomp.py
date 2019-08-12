@@ -33,7 +33,8 @@ import ctypes
 
 #GPU Utility Imports
 import GPUtil
-
+#Decomp functions
+from .decomp_functions import *
 
 def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict()):
     """Use this function to perform standard decomposition
@@ -132,3 +133,44 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     #Grouping architecture arguments
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
+
+    # Specifying which source mod to use
+    if gpu_rank:
+        # Creating cuda device and Context
+        cuda.init()
+        cuda_device = cuda.Device(new_rank_info[-ONE])
+        cuda_context = cuda_device.make_context()
+        #Creating local GPU array with split
+        grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
+        #Creating constants
+        NV = local_array.shape[ONE]
+        # ARRX = local_array.shape[TWO]
+        # ARRY = local_array.shape[3]
+        SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
+        VARS =  local_array.shape[TWO]*local_array.shape[3]
+        TIMES = VARS*NV
+        DX = dx
+        DY = dy
+        DT = targs[TWO]
+        const_dict = ({"NV":NV,"DX":DX,"DT":DT,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
+                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
+        #Building CUDA source code
+        source_mod = build_gpu_source(gpu_source)
+        constant_copy(source_mod,const_dict,add_consts)
+        local_cpu_regions = None
+    else:
+        source_mod = build_cpu_source(cpu_source) #Building Python source code
+        local_cpu_regions = create_blocks_list(local_array,block_size,ops,printer)
+        grid_size = None
+
+    #Setting local array boolean
+    if local_array is None:
+        LAB = False
+    else:
+        LAB = True
+
+    #Creating HDF5 file
+    if LAB:
+        filename+=".hdf5"
+        hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+        hdf5_data_set = hdf5_file.create_dataset("data",(nts,local_array.shape[ONE],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
