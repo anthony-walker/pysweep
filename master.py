@@ -7,6 +7,12 @@ from src.decomp import *
 import multiprocessing as mp
 from notipy.notipy import NotiPy
 
+#MPI Info
+comm = MPI.COMM_WORLD
+master_rank = 0 #master rank
+rank = comm.Get_rank()  #current rank
+
+
 #Calling analytical solution
 def analytical():
     """Use this funciton to solve the analytical euler vortex."""
@@ -24,10 +30,6 @@ def create_block_sizes():
 
 
 def test(args):
-    comm = MPI.COMM_WORLD
-    master_rank = 0 #master rank
-    rank = comm.Get_rank()  #current rank
-
     #Properties
     gamma = 1.4
 
@@ -38,15 +40,15 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 512
-    npy = 512
+    npx = 64
+    npy = 64
     dx = X/npx
     dy = Y/npy
 
     #Time testing arguments
     t0 = 0
     t_b = 0.3
-    dt = 0.01
+    dt = 0.1
     targs = (t0,t_b,dt)
 
     # Creating initial vortex from analytical code
@@ -75,20 +77,21 @@ def test(args):
     #             f.write("Swept: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
 
-    for i,bs in enumerate(block_sizes[:1]):
-        for j,aff in enumerate(affinities):
-            fname = decomp_name+"_"+str(i)+"_"+str(j)
-            ct = decomp(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
-            if rank == master_rank:
-                f.write("Decom: "+str((ct,bs,aff))+"\n")
-            comm.Barrier()
+    # for i,bs in enumerate(block_sizes[:1]):
+    #     for j,aff in enumerate(affinities):
+    #         fname = decomp_name+"_"+str(i)+"_"+str(j)
+    #         ct = decomp(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
+    #         if rank == master_rank:
+    #             f.write("Decom: "+str((ct,bs,aff))+"\n")
+    #         comm.Barrier()
+    #For testing individual sweep
+    ct = sweep(initial_vortex,targs,dx,dy,ops,block_sizes[2],kernel,cpu_source,affinity=affinities[0],filename="./results/temp")
 
 
 
 if __name__ == "__main__":
     args = tuple()
-    sm = "Hi,\nYour function run is complete.\n"
-    notifier = NotiPy(test,args,sm,"asw42695@gmail.com",timeout=None)
-    notifier.run()
-    #For testing individual sweep
-    # ct = sweep(initial_vortex,targs,dx,dy,ops,block_sizes[0],kernel,cpu_source,affinity=affinities[0],filename="./results/temp")
+    # sm = "Hi,\nYour function run is complete.\n"
+    # notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
+    # notifier.run()
+    test(args)
