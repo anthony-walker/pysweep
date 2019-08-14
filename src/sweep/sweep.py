@@ -142,6 +142,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         gpu_slices = None
         cpu_slices = None
 
+
+    """ADD PROCESS ESTIMATION HERE AND REMOVE ALL UNNECESSARY PROCESSES
+    -Include both cases:
+        too many PROCESSES
+        not enough PROCESSES
+    """
+
     #Scattering new rank information
     new_rank_info = comm.scatter(new_rank_info)
     #Updating gpu_rank bools
@@ -169,116 +176,123 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Grouping architecture arguments
     gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
     cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
+
     #Getting region and offset region for each rank (CPU or GPU)
     regions = create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY)
     regions = create_read_regions(regions,ops)+regions
-    #Regions: (read region, shifted read, write, shifted write)
-    local_array = local_array_create(shared_arr,regions[ZERO],dType)
 
-    #Setting local array boolean
-    if local_array is None:
-        LAB = False
-    else:
-        LAB = True
+    if regions[0] is None:
+        print(rank)
 
-    # Specifying which source mod to use
-    if gpu_rank and LAB:
-        # Creating cuda device and Context
-        cuda.init()
-        cuda_device = cuda.Device(new_rank_info[-ONE])
-        cuda_context = cuda_device.make_context()
-        #Creating local GPU array with split
-        grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
-        #Creating constants
-        NV = local_array.shape[ONE]
-        # ARRX = local_array.shape[TWO]
-        # ARRY = local_array.shape[3]
-        SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
-        VARS =  local_array.shape[TWO]*local_array.shape[3]
-        TIMES = VARS*NV
-        DX = dx
-        DY = dy
-        DT = targs[TWO]
-        const_dict = ({"NV":NV,"DX":DX,"DT":DT,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
-                    ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
-        #Building CUDA source code
-        source_mod = build_gpu_source(gpu_source)
-        constant_copy(source_mod,const_dict,add_consts)
-        local_cpu_regions = None
-    elif LAB:
-        source_mod = build_cpu_source(cpu_source) #Building Python source code
-        local_cpu_regions = create_blocks_list(local_array,block_size,ops)
-        grid_size = None
 
-    # Creating HDF5 file
-    filename+=".hdf5"
-    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
-    hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
-    hdf_bs[:] = block_size[:]
-    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
-    hdf_as[:] = (nts,)+arr0.shape
-    hdf_aff = hdf5_file.create_dataset("affinity",(1,))
-    hdf_aff[0] = affinity
-    hdf_time = hdf5_file.create_dataset("time",(1,))
-    hdf5_data_set = hdf5_file.create_dataset("data",(nts,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
 
-    #UpPyramid
-    if LAB:
-        UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
-    comm.Barrier()
-
-    # time_id = 2
-    # var_id = 0
-
-    # Communicate edges
-    if LAB and rank == master_rank:
-        edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
-    comm.Barrier()
+    # #Regions: (read region, shifted read, write, shifted write)
+    # local_array = local_array_create(shared_arr,regions[ZERO],dType)
+    #
+    # #Setting local array boolean
+    # if local_array is None:
+    #     LAB = False
+    # else:
+    #     LAB = True
+    #
+    # # Specifying which source mod to use
+    # if gpu_rank and LAB:
+    #     # Creating cuda device and Context
+    #     cuda.init()
+    #     cuda_device = cuda.Device(new_rank_info[-ONE])
+    #     cuda_context = cuda_device.make_context()
+    #     #Creating local GPU array with split
+    #     grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
+    #     #Creating constants
+    #     NV = local_array.shape[ONE]
+    #     # ARRX = local_array.shape[TWO]
+    #     # ARRY = local_array.shape[3]
+    #     SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
+    #     VARS =  local_array.shape[TWO]*local_array.shape[3]
+    #     TIMES = VARS*NV
+    #     DX = dx
+    #     DY = dy
+    #     DT = targs[TWO]
+    #     const_dict = ({"NV":NV,"DX":DX,"DT":DT,"DY":DY,"SGIDS":SGIDS,"VARS":VARS
+    #                 ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
+    #     #Building CUDA source code
+    #     source_mod = build_gpu_source(gpu_source)
+    #     constant_copy(source_mod,const_dict,add_consts)
+    #     local_cpu_regions = None
+    # elif LAB:
+    #     source_mod = build_cpu_source(cpu_source) #Building Python source code
+    #     local_cpu_regions = create_blocks_list(local_array,block_size,ops)
+    #     grid_size = None
+    #
+    # # Creating HDF5 file
+    # filename+=".hdf5"
+    # hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+    # hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
+    # hdf_bs[:] = block_size[:]
+    # hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
+    # hdf_as[:] = (nts,)+arr0.shape
+    # hdf_aff = hdf5_file.create_dataset("affinity",(1,))
+    # hdf_aff[0] = affinity
+    # hdf_time = hdf5_file.create_dataset("time",(1,))
+    # hdf5_data_set = hdf5_file.create_dataset("data",(nts,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+    #
+    # #UpPyramid
+    # if LAB:
+    #     UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
+    # comm.Barrier()
+    #
+    # # time_id = 2
+    # # var_id = 0
+    #
+    # # Communicate edges
+    # if LAB and rank == master_rank:
+    #     edge_comm(shared_arr,SPLITX,SPLITY,ops,GST%TWO)
+    # comm.Barrier()
+    # # if rank == master_rank:
+    # #     print(shared_arr[time_id,var_id,:,:])
+    #
+    # # Octahedron steps
+    # while(GST<=MGST):
+    #     if LAB:
+    #         cregion = regions[(GST+1)%TWO] #This is the correct read region
+    #         #Reading local array
+    #         local_array[:,:,:,:] = shared_arr[cregion]  #Array of first step seems to be correct
+    #         # printer(local_array[time_id,var_id,:,:])
+    #         #Octahedron Step
+    #         Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
+    #
+    #     comm.Barrier()  #Write barrier
+    #
+    #     if rank == master_rank and LAB:
+    #         edge_comm(shared_arr,SPLITX,SPLITY,ops,(GST+1)%TWO)
+    #     comm.Barrier() #Edge transfer barrier
+    #     #Write and shift step
+    #     if LAB:
+    #         write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
+    #     comm.Barrier()
+    #     GST+=ONE
+    #
+    # #Down Pyramid Step and final write
+    # if LAB:
+    #     DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
+    #     write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
+    # comm.Barrier()
+    # #CUDA clean up - One of the last steps
+    # if gpu_rank and LAB:
+    #     cuda_context.pop()
+    # comm.Barrier()
+    # stop = timer.time()
+    # exec_time = abs(stop-start)
+    # exec_time = comm.gather(exec_time)
     # if rank == master_rank:
-    #     print(shared_arr[time_id,var_id,:,:])
-
-    # Octahedron steps
-    while(GST<=MGST):
-        if LAB:
-            cregion = regions[(GST+1)%TWO] #This is the correct read region
-            #Reading local array
-            local_array[:,:,:,:] = shared_arr[cregion]  #Array of first step seems to be correct
-            # printer(local_array[time_id,var_id,:,:])
-            #Octahedron Step
-            Octahedron(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
-
-        comm.Barrier()  #Write barrier
-
-        if rank == master_rank and LAB:
-            edge_comm(shared_arr,SPLITX,SPLITY,ops,(GST+1)%TWO)
-        comm.Barrier() #Edge transfer barrier
-        #Write and shift step
-        if LAB:
-            write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
-        comm.Barrier()
-        GST+=ONE
-
-    #Down Pyramid Step and final write
-    if LAB:
-        DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
-        write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
-    comm.Barrier()
-    #CUDA clean up - One of the last steps
-    if gpu_rank and LAB:
-        cuda_context.pop()
-    comm.Barrier()
-    stop = timer.time()
-    exec_time = abs(stop-start)
-    exec_time = comm.gather(exec_time)
-    if rank == master_rank:
-        avg_time = sum(exec_time)/num_ranks
-        hdf_time[0] = avg_time
-    comm.Barrier()
-    #Close file
-    hdf5_file.close()
-    #This if for testing only
-    if rank == master_rank:
-        return avg_time
+    #     avg_time = sum(exec_time)/num_ranks
+    #     hdf_time[0] = avg_time
+    # comm.Barrier()
+    # #Close file
+    # hdf5_file.close()
+    # #This if for testing only
+    # if rank == master_rank:
+    #     return avg_time
 
 if __name__ == "__main__":
     # print("Starting execution.")

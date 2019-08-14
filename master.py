@@ -40,8 +40,8 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 64
-    npy = 64
+    npx = 16
+    npy = 16
     dx = X/npx
     dy = Y/npy
 
@@ -85,7 +85,7 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    ct = sweep(initial_vortex,targs,dx,dy,ops,block_sizes[2],kernel,cpu_source,affinity=affinities[0],filename="./results/temp")
+    ct = sweep(initial_vortex,targs,dx,dy,ops,block_sizes[0],kernel,cpu_source,affinity=affinities[0],filename="./results/temp")
 
 
 
