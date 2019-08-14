@@ -14,6 +14,119 @@ import inspect
 #Multiprocessing
 import multiprocessing as mp
 
+def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):
+    """Use this function to create shared memory arrays for node communication."""
+    itemsize = int(dType.itemsize)
+    #Creating MPI Window for shared memory
+    win = MPI.Win.Allocate_shared(arr_bytes, itemsize, comm=comm)
+    shared_buf, itemsize = win.Shared_query(0)
+    arr = np.ndarray(buffer=shared_buf, dtype=dType.type, shape=arr_shape)
+    return arr
+
+def affinity_split(affinity,block_size,arr_shape):
+    """Use this function to split the given data based on rank information and the affinity.
+    affinity -  a value between zero and one. (GPU work/CPU work)/Total Work
+    block_size -  gpu block size
+    arr_shape - shape of array initial conditions array (v,x,y)
+    ***This function splits to the nearest column, so the affinity may change***
+    """
+    #Getting number of GPU blocks based on affinity
+    blocks_per_row = arr_shape[2]/block_size[1]
+    blocks_per_column = arr_shape[1]/block_size[0]
+    num_blocks = int(blocks_per_row*blocks_per_column)
+    gpu_blocks = round(affinity*num_blocks)
+    #Rounding blocks to the nearest column
+    col_mod = gpu_blocks%blocks_per_column
+    col_perc = col_mod/blocks_per_column
+    gpu_blocks += round(col_perc)*blocks_per_column-col_mod
+    #Getting number of columns and rows
+    num_columns = gpu_blocks/blocks_per_column
+    num_rows = blocks_per_row
+    #Region Indicies
+    gpu_slices = (slice(0,arr_shape[0],1),slice(0,int(block_size[0]*num_columns),1),slice(0,int(block_size[1]*num_rows),1))
+    cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
+    return gpu_slices, cpu_slices
+
+def boundary_update(shared_arr,ops):
+    """Use this function to update the boundary point ghost nodes."""
+    shared_arr[0,:,:ops,:] = shared_arr[0,:,-2*ops:-ops,:]
+    shared_arr[0,:,:,:ops] = shared_arr[0,:,:,-2*ops:-ops]
+    shared_arr[0,:,-ops:,:] = shared_arr[0,:,ops:2*ops,:]
+    shared_arr[0,:,:,-ops:] = shared_arr[0,:,:,ops:2*ops]
+
+def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices,time_steps,ops):
+    """Use this function to split regions amongst the architecture."""
+    y_blocks = arr_shape[2]/block_size[1]
+    blocks_per_rank = round(y_blocks/total_ranks)
+    rank_blocks = (blocks_per_rank*(rank),blocks_per_rank*(rank+1))
+    rank_blocks = comm.gather(rank_blocks,root=master)
+    if rank == master:
+        rem = int(y_blocks-rank_blocks[-1][1])
+        if rem > 0:
+            ct = 0
+            for i in range(rem):
+                rank_blocks[i] = (rank_blocks[i][0]+ct,rank_blocks[i][1]+1+ct)
+                ct +=1
+
+            for j in range(rem,total_ranks):
+                rank_blocks[j] = (rank_blocks[j][0]+ct,rank_blocks[j][1]+ct)
+        elif rem < 0:
+            ct = 0
+            for i in range(rem,0,1):
+                rank_blocks[i] = (rank_blocks[i][0]+ct,rank_blocks[i][1]-1+ct)
+                ct -=1
+    rank_blocks = comm.scatter(rank_blocks,root=master)
+    x_slice = slice(slices[1].start+ops,slices[1].stop+ops,1)
+    y_slice = slice(int(block_size[1]*rank_blocks[0]+ops),int(block_size[1]*rank_blocks[1]+ops),1)
+    return (slice(0,time_steps,1),slices[0],x_slice,y_slice)
+
+def create_read_region(region,ops):
+    """Use this function to obtain the regions to for reading and writing
+        from the shared array. region 1 is standard region 2 is offset by split.
+        Note: The rows are divided into regions. So, each rank gets a row or set of rows
+        so to speak. This is because affinity split is based on columns.
+    """
+    #Read Region
+    new_region = region[:2]
+    new_region += slice(region[2].start-ops,region[2].stop+ops,1),
+    new_region += slice(region[3].start-ops,region[3].stop+ops,1),
+    return new_region
+
+def get_slices_shape(slices):
+    """Use this function to convert slices into a shape tuple."""
+    stuple = tuple()
+    for s in slices:
+        stuple+=(s.stop-s.start,)
+    return stuple
+
+def create_local_array(shared_arr,region,dType):
+    """Use this function to generate the local arrays from regions."""
+    local_shape = get_slices_shape(region)
+    local_array = np.zeros(local_shape,dtype=dType)
+    local_array[:,:,:,:] = shared_arr[region]
+    return local_array
+
+def edge_shift(shared_arr,SPLITX,SPLITY,ops,dir):
+    """Use this function to communicate edges in the shared array."""
+    #Updates shifted section of shared array
+    ss = shared_arr.shape
+    x_arr = np.zeros(ss[0],ss[1],block_size[0],ss[3])
+    y_arr = np.zeros(ss[0],ss[1],ss[2],block_size[1])
+    if not dir:
+        x_arr[:,:,:,:] = shared_arr[:,:,-block_size[0]-ops:-ops,:]
+        shared_arr[:,:,-block_size[0]-ops:-ops,:] = shared_arr[:,:,ops:block_size[0]+ops,:]
+        shared_arr[:,:,ops:block_size[0]+ops,:] = x_arr[:,:,:,:]
+        #Repeat for y
+    else:
+        shared_arr[:,:,ops:block_size[0]+2*ops,:]=shared_arr[:,:,-block_size[0]-ops:,:]
+        shared_arr[:,:,:,ops:block_size[1]+2*ops]=shared_arr[:,:,:,-block_size[1]-ops:]
+    #Updates ops points at front
+    shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
+    shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
+
+
+
+
 def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
@@ -87,151 +200,16 @@ def build_gpu_source(kernel_source):
     source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
     return source_mod
 
-def get_slices_shape(slices):
-    """Use this function to convert slices into a shape tuple."""
-    stuple = tuple()
-    for s in slices:
-        stuple+=(s.stop-s.start,)
-    return stuple
+# def get_slices_shape(slices):
+#     """Use this function to convert slices into a shape tuple."""
+#     stuple = tuple()
+#     for s in slices:
+#         stuple+=(s.stop-s.start,)
+#     return stuple
+#
 
-def affinity_split(affinity,block_size,arr_shape,total_gpus):
-    """Use this function to split the given data based on rank information and the affinity.
-    affinity -  a value between zero and one. (GPU work/CPU work)/Total Work
-    block_size -  gpu block size
-    arr_shape - shape of array initial conditions array (v,x,y)
-    Assuming total number of gpus is the same as the number of cpus
-    """
-    #Getting number of GPU blocks based on affinity
-    blocks_per_row = arr_shape[2]/block_size[1]
-    blocks_per_column = arr_shape[1]/block_size[0]
-    num_blocks = int(blocks_per_row*blocks_per_column)
-    gpu_blocks = round(affinity*num_blocks)
-    #Rounding blocks to the nearest column
-    col_mod = gpu_blocks%blocks_per_column
-    col_perc = col_mod/blocks_per_column
-    gpu_blocks += round(col_perc)*blocks_per_column-col_mod
-    #Getting number of columns and rows
-    num_columns = gpu_blocks/blocks_per_column
-    num_rows = blocks_per_row
-    #Region Indicies
-    gpu_slices = (slice(0,arr_shape[0],1),slice(0,int(block_size[0]*num_columns),1),slice(0,int(block_size[1]*num_rows),1))
-    cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),int(block_size[0]*blocks_per_column),1),slice(0,int(block_size[1]*num_rows),1))
-    return gpu_slices, cpu_slices
 
-def create_write_regions(rank,gargs,cargs,block_size,ops,MOSS,SPLITX,SPLITY):
-    """Use this function to obtain the regions to for reading and writing
-        from the shared array. region 1 is standard region 2 is offset by split.
-        Note: The rows are divided into regions. So, each rank gets a row or set of rows
-        so to speak. This is because affinity split is based on columns.
-    """
-    #Read Regions
-    region1 = None   #region1
-    region2 = None   #region2
 
-    #Unpack arguments
-    gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank = gargs
-    cpu_comm,cpu_master_rank,total_cpus,cpu_slices = cargs
-    stv = (slice(0,MOSS+1,1),gpu_slices[0])
-    #GPU ranks go in here
-    if gpu_rank:
-        #Getting gpu blocks
-        gpu_blocks = int((gpu_slices[2].stop-gpu_slices[2].start)/block_size[1])
-        blocks_per_gpu = int(gpu_blocks/total_gpus)
-        blocks_per_gpu = 1 if blocks_per_gpu >= 0 and blocks_per_gpu < 1 else blocks_per_gpu
-        #creating gpu indicies
-        if gpu_master_rank == rank:
-            x_slice = (slice(gpu_slices[1].start+ops,gpu_slices[1].stop+ops,1),)
-            shift_slice=(slice(gpu_slices[1].start+SPLITX+ops,gpu_slices[1].stop+SPLITX+ops,1),)
-            #Creating regions
-            prev = 0
-            region1 = list()    #a list of slices one for each region
-            region2 = list()    #a list of slices one for each region
-
-            for i in range(blocks_per_gpu,gpu_blocks+1,blocks_per_gpu):
-                region1.append(stv+x_slice+(slice(prev*(block_size[1])+ops,i*(block_size[1])+ops,1),))
-                region2.append(stv+shift_slice+(slice(prev*(block_size[1])+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
-                prev = i
-            for i in range(abs(len(region1)-total_gpus)):
-                region1.append(None)
-                region2.append(None)
-        region1 = gpu_comm.scatter(region1)
-        region2 = gpu_comm.scatter(region2)
-    #CPU ranks go in here
-    else:
-        #Getting cpu blocks
-        cpu_blocks = int((cpu_slices[2].stop-cpu_slices[2].start)/block_size[1])
-        blocks_per_cpu = int(np.ceil(cpu_blocks/total_cpus))   #Ensures all blocks will be given to a cpu core
-        #creating cpu indicies
-        if cpu_master_rank == rank:
-            #Creating slice prefixes
-            x_slice = (slice(cpu_slices[1].start+ops,cpu_slices[1].stop+ops,1),)
-            shift_slice=(slice(cpu_slices[1].start+SPLITX+ops,cpu_slices[1].stop+SPLITX+ops,1),)
-            #Creating regions
-            prev = 0
-            region1 = list()    #a list of slices one for each region
-            region2 = list()    #a list of slices one for each region
-            if cpu_slices[0].stop>0 and cpu_slices[1].start != cpu_slices[1].stop:
-                for i in range(blocks_per_cpu,cpu_blocks+1,blocks_per_cpu):
-                    region1.append(stv+x_slice+(slice(prev*block_size[1]+ops,i*block_size[1]+ops,1),))
-                    region2.append(stv+shift_slice+(slice(prev*block_size[1]+SPLITY+ops,i*block_size[1]+SPLITY+ops,1),))
-                    prev = i
-            for i in range(abs(len(region1)-total_cpus)):
-                region1.append(None)
-                region2.append(None)
-        region1 = cpu_comm.scatter(region1)
-        region2 = cpu_comm.scatter(region2)
-    return region1, region2
-
-def create_read_regions(regions,ops):
-    """Use this function to obtain the regions to for reading and writing
-        from the shared array. region 1 is standard region 2 is offset by split.
-        Note: The rows are divided into regions. So, each rank gets a row or set of rows
-        so to speak. This is because affinity split is based on columns.
-    """
-    if regions[0] is not None:
-        id1 = 0
-        id2 = 1
-        region1 = (regions[id1][0],regions[id1][1])
-        region1 += slice(regions[id1][2].start-ops,regions[id1][2].stop+ops,1),
-        region1 += slice(regions[id1][3].start-ops,regions[id1][3].stop+ops,1),
-        region2 = (regions[id2][0],regions[1][1])
-        region2 += slice(regions[id2][2].start-ops,regions[id2][2].stop+ops,1),
-        region2 += slice(regions[id2][3].start-ops,regions[id2][3].stop+ops,1),
-    else:
-        region1 = None
-        region2 = None
-    return region1,region2
-
-def get_gpu_ranks(rank_info,affinity):
-    """Use this funciton to determine which ranks with have a GPU.
-        given: rank_info - a list of tuples of (rank, processor, gpu_ids, gpu_rank)
-        returns: new_rank_inf, total_gpus
-    """
-    total_gpus = 0
-    new_rank_info = list()
-    assigned_ctr = dict()
-    devices = dict()
-    for ri in rank_info:
-        temp = ri
-        if ri[1] not in assigned_ctr:
-            assigned_ctr[ri[1]] = len(ri[2])
-            ri[2].reverse()
-            devices[ri[1]] = ri[2].copy()   #Device ids
-            total_gpus+=len(ri[2])
-        if assigned_ctr[ri[1]] > 0 and affinity > 0:
-            temp = ri[:-2]+(True,)+(devices[ri[1]].pop(),)
-            assigned_ctr[ri[1]]-=1
-        new_rank_info.append(temp)
-    return new_rank_info, total_gpus
-
-def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):
-    """Use this function to create shared memory arrays for node communication."""
-    itemsize = int(dType.itemsize)
-    #Creating MPI Window for shared memory
-    win = MPI.Win.Allocate_shared(arr_bytes, itemsize, comm=comm)
-    shared_buf, itemsize = win.Shared_query(0)
-    arr = np.ndarray(buffer=shared_buf, dtype=dType.type, shape=arr_shape)
-    return arr
 
 def source_code_read(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
@@ -413,3 +391,13 @@ def nan_to_zero(arr,zero=0.):
         if np.isnan(arr[i]):
             arr[i]=zero
     return arr
+
+def create_shift_regions(regions,SPLITX,SPLITY):
+    """Use this function to create shifted regions."""
+    shifted_regions = tuple()
+    for region in regions:
+        temp_region = region[:2]
+        temp_region += slice(region[2].start+SPLITX,region[2].stop+SPLITY,1),
+        temp_region += slice(region[3].start+SPLITX,region[3].stop+SPLITY,1),
+        shifted_regions+=temp_region,
+    return shifted_regions
