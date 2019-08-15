@@ -5,6 +5,27 @@ from .pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 from .pysweep_decomposition import *
+
+
+def edge_shift(comm, block_size, shared_arr, wregion, SPLITX, SPLITY, ops, dir):
+    """Use this function to communicate edges in the shared array."""
+    #Updates shifted section of shared array
+    ss = shared_arr.shape
+    temp_array = np.zeros((ss[0], ss[1],block_size[0],block_size[1]))
+    #Copying points to local array
+    temp_array[:,:,:,:] = shared_arr[wregion]
+    comm.Barrier()
+    if not dir:
+        shared_arr[:,:,:,:] = temp_array[:,:,:,:]
+        # shared_arr[:,:,ops:block_size[0]+ops,:] = x_arr[:,:,:,:]
+        #Repeat for y
+    # else:
+    #     shared_arr[:,:,ops:block_size[0]+2*ops,:]=shared_arr[:,:,-block_size[0]-ops:,:]
+    #     shared_arr[:,:,:,ops:block_size[1]+2*ops]=shared_arr[:,:,:,-block_size[1]-ops:]
+    # #Updates ops points at front
+    # shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
+    # shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
+
 def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
@@ -12,6 +33,10 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,sh
     fcn - the function that solves the problem in question
     ops -  the number of atomic operations
     """
+    #Finding splits again
+    SPLITX = block_size[0]/2
+    SPLITY = block_size[1]/2
+    #Splitting between cpu and gpu
     if gpu_rank:
         # Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
@@ -33,7 +58,11 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,sh
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
         arr = nan_to_zero(arr,zero=4)
-    # Writing to shared array
+
+    # Add shift here to avoid extra step
+    if region[2].stop +SPLITX > shared_arr.shape[2] or region[3].stop +SPLITY > shared_arr.shape[3]:
+        print(region)
+        print(region[2].stop +SPLITX,region[3].stop +SPLITY)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):

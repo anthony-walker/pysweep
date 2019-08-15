@@ -162,14 +162,14 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         gri = None
         wregion = create_write_region(cpu_comm,cri,cpu_master,num_cpus,block_size,arr0.shape,cpu_slices,shared_shape[0],ops)
     rregion = create_read_region(wregion,ops)   #Create read region
-
+    sregion = create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,ops)  #Create shifted region
 
     #---------------------_REMOVING UNWANTED RANKS---------------------------#
     #Checking if rank is useful
-    if not wregion[3].start == wregion[3].stop and not wregion[2].start == wregion[2].stop:
-        include_ranks = rank
-    else:
+    if wregion[3].start == wregion[3].stop or wregion[2].start == wregion[2].stop:
         include_ranks = None
+    else:
+        include_ranks = rank
     #Gathering results
     include_ranks = comm.gather(include_ranks,root=master_rank)
     if rank == master_rank:
@@ -186,8 +186,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     comm = comm.Create_group(comm_group)
     #Sync all processes - Ensures boundaries are updated
     comm.Barrier()
-
-
     #Creating local array
     local_array = create_local_array(shared_arr,rregion,dType)
     #---------------Generating Source Modules----------------------------------#
@@ -234,17 +232,18 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #----------------------------CREATING BRIDGES--------------------------------#
     x_bridge, y_bridge = create_bridge_regions(shared_shape,rregion,SPLITX,SPLITY)
 
-    #--------------------------------Creating Index Sets-----------------------------------------
+    #--------------------------------CREATING INDEX SETS-----------------------------------------
     idx_sets = create_iidx_sets(block_size,ops)
     x_bridge_sets, y_bridge_sets = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
+    comm.Barrier() #Ensure all processes are prepared to solve
 
     #-------------------------------SWEPT RULE---------------------------------------------#
 
     #UpPyramid
-    UpPyramid(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
+    # UpPyramid(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
     comm.Barrier()
-    printer(shared_arr[2,0,:,:])
-    edge_shift(shared_arr,block_size,ops,ZERO)
+    # printer(shared_arr[2,0,:,:])
+    # edge_shift(comm,block_size,shared_arr,wregion,SPLITX,SPLITY,ops,ZERO)
 
     # # time_id = 2
     # # var_id = 0
