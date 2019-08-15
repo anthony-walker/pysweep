@@ -35,6 +35,7 @@ from .pysweep_lambda import sweep_lambda
 from .pysweep_dev import *
 from .pysweep_functions import *
 from .pysweep_printer import pysweep_printer
+from .pysweep_decomposition import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -75,10 +76,12 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Max Swept Steps from block_size and other constants
-    min_block = min(block_size[:-1])
+    mbx = block_size[0]
+    mby = block_size[1]
     MPSS = 1 #Max Pyramid Swept Step  #Start at 1 to account for ghost node calc
-    while(min_block>=(TOPS+ONE)):
-        min_block -= TOPS
+    while(mbx>=(TOPS+ONE) and mby>=(TOPS+ONE)):
+        mbx -= TOPS
+        mby -= TOPS
         MPSS += 1
     MOSS = int(TWO*(MPSS-1))+1   #Max Octahedron Swept Step
     #Splits for shared array
@@ -95,11 +98,11 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Create shared process array for data transfer
     shared_shape = (MOSS+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
-
+    printer(shared_shape)
     #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     if rank == master_rank:
         #Determining the split between gpu and cpu
-        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape)
+        gpu_slices,cpu_slices = get_affinity_slices(affinity,block_size,arr0.shape)
         #Getting gpus
         if affinity>0:
             gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
@@ -160,9 +163,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         wregion = create_write_region(cpu_comm,cri,cpu_master,num_cpus,block_size,arr0.shape,cpu_slices,shared_shape[0],ops)
     rregion = create_read_region(wregion,ops)   #Create read region
 
+
     #---------------------_REMOVING UNWANTED RANKS---------------------------#
     #Checking if rank is useful
-    if not wregion[3].start == wregion[3].stop:
+    if not wregion[3].start == wregion[3].stop and not wregion[2].start == wregion[2].stop:
         include_ranks = rank
     else:
         include_ranks = None
@@ -182,6 +186,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     comm = comm.Create_group(comm_group)
     #Sync all processes - Ensures boundaries are updated
     comm.Barrier()
+
 
     #Creating local array
     local_array = create_local_array(shared_arr,rregion,dType)
@@ -206,10 +211,10 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
         constant_copy(source_mod,const_dict,add_consts)
-        local_cpu_regions = None
+        cpu_regions = None
     else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
-        local_cpu_regions = create_blocks_list(local_array,block_size,ops)
+        cpu_regions = create_blocks_list(local_array.shape,block_size,ops)
         grid_size = None
 
     #------------------------------HDF5 File------------------------------------------#
@@ -226,13 +231,21 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     hregion = (wregion[1],slice(wregion[2].start-ops,wregion[2].stop-ops,1),slice(wregion[3].start-ops,wregion[3].stop-ops,1))
     hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = shared_arr[0,wregion[1],wregion[2],wregion[3]]
 
+    #----------------------------CREATING BRIDGES--------------------------------#
+    x_bridge, y_bridge = create_bridge_regions(shared_shape,rregion,SPLITX,SPLITY)
+
+    #--------------------------------Creating Index Sets-----------------------------------------
+    idx_sets = create_iidx_sets(block_size,ops)
+    x_bridge_sets, y_bridge_sets = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
+
     #-------------------------------SWEPT RULE---------------------------------------------#
+
+    #UpPyramid
+    UpPyramid(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
+    comm.Barrier()
+    printer(shared_arr[2,0,:,:])
     edge_shift(shared_arr,block_size,ops,ZERO)
-    # #UpPyramid
-    # if LAB:
-    #     UpPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[TWO],local_cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
-    # comm.Barrier()
-    #
+
     # # time_id = 2
     # # var_id = 0
     #
@@ -268,12 +281,14 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     # if LAB:
     #     DownPyramid(source_mod,local_array,gpu_rank,block_size,grid_size,regions[(GST+1)%TWO+TWO],local_cpu_regions,shared_arr,idx_sets,ops)
     #     write_and_shift(shared_arr,regions[TWO],hdf5_data_set,ops,MPSS,GST)
+
     comm.Barrier()
     #CUDA clean up - One of the last steps
     if gpu_rank[0]:
         cuda_context.pop()
     # Close file
     hdf5_file.close()
+
     # comm.Barrier()
     # stop = timer.time()
     # exec_time = abs(stop-start)
