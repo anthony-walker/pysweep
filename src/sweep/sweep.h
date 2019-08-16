@@ -203,6 +203,128 @@ UpPyramid(float *state)
 
 }
 
+
+/*
+    Use this function to create and return the GPU X-Bridge
+*/
+__global__ void
+__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
+BridgeX(float *state)
+{
+    //Creating flattened shared array ptr (x,y,v) length
+    extern __shared__ float shared_state[];    //Shared state specified externally
+    shared_state_zero(shared_state);
+
+    //Other quantities for indexing
+    int tidx = threadIdx.x+OPS;
+    int tidy = threadIdx.y+OPS;
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    int gid = get_gid(); //global index
+
+    //Creating swept boundaries
+    int lx = (MPSS-1)*OPS+OPS; //Lower x swept bound
+    int ly = 2*OPS; // Lower y swept bound
+    int ux = lx+2*OPS; //upper x
+    int uy = blockDim.y; //upper y
+
+    //Communicating edge values to shared array
+    edge_comm(shared_state, state,ZERO);
+    //Communicating interior points
+    for (int i = 0; i < NV; i++)
+    {
+        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+    }
+    __syncthreads(); //Sync threads here to ensure all initial values are copied
+
+    for (int k = 1; k < MPSS; k++)
+    {
+        // Solving step function
+        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
+        {
+            step(shared_state,sgid);
+            //Ensures steps are done prior to communication
+            __syncthreads();
+            for (int j = 0; j < NV; j++)
+            {
+                // Place values back in original matrix
+                state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+                //Communicate next steps initial values
+                shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES]; //Current time step
+            }
+            __syncthreads(); //Sync threads here to ensure all initial values are copied
+        }
+
+        //Update swept bounds
+        lx-=OPS;
+        ux+=OPS;
+        ly+=OPS;
+        uy-=OPS;
+
+    }
+
+}
+
+
+/*
+    Use this function to create and return the GPU UpPyramid
+*/
+__global__ void
+__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
+BridgeY(float *state)
+{
+    //Creating flattened shared array ptr (x,y,v) length
+    extern __shared__ float shared_state[];    //Shared state specified externally
+    shared_state_zero(shared_state);
+
+    //Other quantities for indexing
+    int tidx = threadIdx.x+OPS;
+    int tidy = threadIdx.y+OPS;
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    int gid = get_gid(); //global index
+
+    //Creating swept boundaries
+    int ly = (MPSS-1)*OPS+OPS; //Lower x swept bound
+    int lx = 2*OPS; // Lower y swept bound
+    int uy = lx+2*OPS; //upper x
+    int ux = blockDim.y; //upper y
+
+    //Communicating edge values to shared array
+    edge_comm(shared_state, state,ZERO);
+    //Communicating interior points
+    for (int i = 0; i < NV; i++)
+    {
+        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+    }
+    __syncthreads(); //Sync threads here to ensure all initial values are copied
+
+    for (int k = 1; k < MPSS; k++)
+    {
+        // Solving step function
+        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
+        {
+            step(shared_state,sgid);
+            //Ensures steps are done prior to communication
+            __syncthreads();
+            for (int j = 0; j < NV; j++)
+            {
+                // Place values back in original matrix
+                state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+                //Communicate next steps initial values
+                shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES]; //Current time step
+            }
+            __syncthreads(); //Sync threads here to ensure all initial values are copied
+        }
+
+        //Update swept bounds
+        ly-=OPS;
+        uy+=OPS;
+        lx+=OPS;
+        ux-=OPS;
+
+    }
+
+}
+
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 Octahedron(float *state)

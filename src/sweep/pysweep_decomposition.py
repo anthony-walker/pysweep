@@ -43,12 +43,23 @@ def get_affinity_slices(affinity,block_size,arr_shape):
     cpu_slices = (slice(0,arr_shape[0],1),slice(int(block_size[0]*num_columns),arr_shape[1],1),slice(0,arr_shape[2],1))
     return gpu_slices, cpu_slices
 
-def boundary_update(shared_arr,ops):
-    """Use this function to update the boundary point ghost nodes."""
-    shared_arr[0,:,:ops,:] = shared_arr[0,:,-2*ops:-ops,:]
-    shared_arr[0,:,:,:ops] = shared_arr[0,:,:,-2*ops:-ops]
-    shared_arr[0,:,-ops:,:] = shared_arr[0,:,ops:2*ops,:]
-    shared_arr[0,:,:,-ops:] = shared_arr[0,:,:,ops:2*ops]
+def boundary_update(shared_arr,ops,cregions,dir):
+    """
+    FIX MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+
+    Use this function to update the boundary point ghost nodes."""
+
+    if dir: #Front edge to back edge
+        for reg in cregions:
+            local_copy = np.zeros(shared_arr[reg[0],reg[1],reg[4],reg[5]].shape)
+            local_copy[:,:,:,:] = shared_arr[reg[0],reg[1],reg[4],reg[5]]
+            # shared_arr[reg[0],reg[1],reg[4],reg[5]] += (local_copy[:,:,:,:]-shared_arr[reg[0],reg[1],reg[2],reg[3]])
+    else:   #Back Edge to front
+        for reg in cregions:
+            local_copy = np.zeros(shared_arr[reg[0],reg[1],reg[4],reg[5]].shape)
+            local_copy[:,:,:,:] = shared_arr[reg[0],reg[1],reg[4],reg[5]]
+            # shared_arr[reg[0],reg[1],reg[2],reg[3]] += (local_copy[:,:,:,:]-shared_arr[reg[0],reg[1],reg[2],reg[3]])
+
 
 def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices,time_steps,ops):
     """Use this function to split regions amongst the architecture."""
@@ -75,6 +86,43 @@ def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices
     x_slice = slice(slices[1].start+ops,slices[1].stop+ops,1)
     y_slice = slice(int(block_size[1]*rank_blocks[0]+ops),int(block_size[1]*rank_blocks[1]+ops),1)
     return (slice(0,time_steps,1),slices[0],x_slice,y_slice)
+
+def create_boundary_regions(wregion,SPLITX,SPLITY,ops,ss):
+    """Use this function to create boundary write regions."""
+    boundary_regions = tuple()
+    comm_regions =tuple()
+    region_start = wregion[:2]
+    c1 = wregion[2].start==ops
+    c2 = wregion[3].start==ops
+    sx = ss[2]-ops-SPLITX
+    sy = ss[3]-ops-SPLITX
+    xm = wregion[2].stop-wregion[2].start
+    ym = wregion[3].stop-wregion[3].start
+    x_reg = slice(ops,xm+ops,1)
+    y_reg = slice(ops,ym+ops,1)
+    tops = 2*ops
+
+    if c1:
+        boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wregion[3]),)
+        comm_regions += (region_start+(slice(ops,SPLITX+tops,1),wregion[3],slice(sx,ss[2],1),wregion[3]),)
+    if c2:
+        boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wregion[2],slice(sy,ss[3],1)),)
+        comm_regions += (region_start+(wregion[2],slice(ops,SPLITY+tops,1),wregion[2],slice(sy,ss[3],1)),)
+    if c1 and c2:
+        boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
+        comm_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
+    return boundary_regions,comm_regions
+
+def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,mod=0):
+    """Use this function to create a shifted region(s)."""
+    #Conditions
+    sregion = wregion[:2]
+    sps = (SPLITX,SPLITY)
+    for i, rs in enumerate(wregion[2:]):
+        sregion+=(slice(rs.start+sps[i],rs.stop+sps[i],1),)
+    xbregion =  sregion[:3]+(wregion[3],)
+    ybregion =  sregion[:2]+(wregion[2],sregion[3])
+    return sregion,xbregion,ybregion
 
 def create_read_region(region,ops):
     """Use this function to obtain the regions to for reading and writing
@@ -158,29 +206,6 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,add_const[key])
 
-def create_bridge_regions(shared_shape,region,SPLITX,SPLITY):
-    """Use this function to create bridges."""
-    x_bridge = region[:2]
-    x_bridge += (slice(region[2].start+SPLITX,region[2].stop+SPLITX,1),region[3])
-
-    if x_bridge[2].stop > shared_shape[2]:
-        x_bridge1 = x_bridge[:2]+(slice(x_bridge[2].start,shared_shape[2],1),x_bridge[3])
-        x_bridge2 = x_bridge[:2]+(slice(0,x_bridge[2].stop-shared_shape[2],1),x_bridge[3])
-        x_bridge = (x_bridge1,x_bridge2)
-    else:
-        x_bridge = x_bridge,
-
-    y_bridge = region[:3]
-    y_bridge += (slice(region[3].start+SPLITX,region[3].stop+SPLITX,1),)
-    if y_bridge[3].stop > shared_shape[3]:
-        y_bridge1 = y_bridge[:3]+(slice(y_bridge[3].start,shared_shape[3],1),)
-        y_bridge2 = y_bridge[:3]+(slice(0,y_bridge[3].stop-shared_shape[3],1),)
-        y_bridge = (y_bridge1,y_bridge2)
-    else:
-        y_bridge = y_bridge,
-
-    return x_bridge, y_bridge
-
 def create_iidx_sets(block_size,ops):
     """Use this function to create index sets."""
     bsx = block_size[0]+2*ops
@@ -241,58 +266,6 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
             ux-=ops
     return x_bridge, y_bridge
 
-def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,mod=0):
-    """Use this function to create a shifted region(s)."""
-    #Conditions
-    asx = shared_shape[2]-mod
-    asy = shared_shape[3]-mod
-    wsx = wregion[2].stop + SPLITX
-    wsy = wregion[3].stop + SPLITY
-
-    c1 = wsx > asx
-    c2 =  wsy > asy
-    sregion = tuple()
-    if c1 and c2:
-        sr1 = wregion[:2]+(slice(wregion[2].start+SPLITX,asx,1),slice(wregion[3].start+SPLITX,asy,1),)
-        sr2 = wregion[:2]+(slice(mod,wsx+mod-asx,1),slice(mod,wsy+mod-asy,1),)
-        sregion = (sr1,sr2)
-    elif c1:
-        sr1 = wregion[:2]+(slice(wregion[2].start+SPLITX,asx,1),slice(wregion[3].start+SPLITY,wsy,1))
-        sr2 = wregion[:2]+(slice(mod,wsx+mod-asx,1),slice(wregion[3].start+SPLITY,wsy,1))
-        sregion = (sr1,sr2)
-        print(sregion)
-    elif c2:
-        sr1 = wregion[:2]+(slice(wregion[2].start+SPLITX,wsx,1),slice(wregion[3].start+SPLITX,asy,1))
-        sr2 = wregion[:2]+(slice(wregion[2].start+SPLITX,wsx,1),slice(mod,wsy+mod-asy,1))
-        sregion = (sr1,sr2)
-    else:
-        sregion = (wregion[:2]+(slice(wregion[2].start+SPLITX,wregion[2].stop+SPLITX,1),slice(wregion[3].start+SPLITY,wregion[3].stop+SPLITY,1)),)
-    return sregion
-
-def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
-    """Use this function to write to the hdf file and shift the shared array
-        # data after writing."""
-    r2 = slice(region1[2].start-ops,region1[2].stop-ops,1)
-    r3 = slice(region1[3].start-ops,region1[3].stop-ops,1)
-    hdf_set[MPSS*(GST-1):MPSS*(GST),region1[1],r2,r3] = shared_arr[:MPSS,region1[1],region1[2],region1[3]]
-    shared_arr[:MPSS+1,region1[1],region1[2],region1[3]] = shared_arr[MPSS+1:,region1[1],region1[2],region1[3]]
-    #Do edge comm after this function
-
-
-
-# def edge_comm(shared_arr,SPLITX,SPLITY,ops,dir):
-#     """Use this function to communicate edges in the shared array."""
-#     #Updates shifted section of shared array
-#     if not dir:
-#         shared_arr[:,:,-SPLITX-ops:,:] = shared_arr[:,:,ops:SPLITX+2*ops,:]
-#         shared_arr[:,:,:,-SPLITY-ops:] = shared_arr[:,:,:,ops:SPLITY+2*ops]
-#     else:
-#         shared_arr[:,:,ops:SPLITX+2*ops,:]=shared_arr[:,:,-SPLITX-ops:,:]
-#         shared_arr[:,:,:,ops:SPLITY+2*ops]=shared_arr[:,:,:,-SPLITY-ops:]
-#     #Updates ops points at front
-#     shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
-#     shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
-
 
 def create_blocks_list(arr_shape,block_size,ops):
     """Use this function to create a list of blocks from the array."""
@@ -318,3 +291,27 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
         return arr
     else:
         return blocks[0]
+
+def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
+    """Use this function to write to the hdf file and shift the shared array
+        # data after writing."""
+    r2 = slice(region1[2].start-ops,region1[2].stop-ops,1)
+    r3 = slice(region1[3].start-ops,region1[3].stop-ops,1)
+    hdf_set[MPSS*(GST-1):MPSS*(GST),region1[1],r2,r3] = shared_arr[:MPSS,region1[1],region1[2],region1[3]]
+    shared_arr[:MPSS+1,region1[1],region1[2],region1[3]] = shared_arr[MPSS+1:,region1[1],region1[2],region1[3]]
+    #Do edge comm after this function
+
+
+
+# def edge_comm(shared_arr,SPLITX,SPLITY,ops,dir):
+#     """Use this function to communicate edges in the shared array."""
+#     #Updates shifted section of shared array
+#     if not dir:
+#         shared_arr[:,:,-SPLITX-ops:,:] = shared_arr[:,:,ops:SPLITX+2*ops,:]
+#         shared_arr[:,:,:,-SPLITY-ops:] = shared_arr[:,:,:,ops:SPLITY+2*ops]
+#     else:
+#         shared_arr[:,:,ops:SPLITX+2*ops,:]=shared_arr[:,:,-SPLITX-ops:,:]
+#         shared_arr[:,:,:,ops:SPLITY+2*ops]=shared_arr[:,:,:,-SPLITY-ops:]
+#     #Updates ops points at front
+#     shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
+#     shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]

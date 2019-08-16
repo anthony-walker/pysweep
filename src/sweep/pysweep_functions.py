@@ -26,7 +26,11 @@ def edge_shift(comm, block_size, shared_arr, wregion, SPLITX, SPLITY, ops, dir):
     # shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
     # shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,shared_arr,idx_sets,ops):
+def edge_comm(SPLITX,SPLITY,ops):
+    pass
+
+
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,boundaries,cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -57,13 +61,65 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,sh
         cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
-        arr = nan_to_zero(arr,zero=4)
-
-    # Add shift here to avoid extra step
-    if region[2].stop +SPLITX > shared_arr.shape[2] or region[3].stop +SPLITY > shared_arr.shape[3]:
-        print(region)
-        print(region[2].stop +SPLITX,region[3].stop +SPLITY)
+        arr = nan_to_zero(arr,zero=3)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
+    for br in boundaries:
+        shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
+
+def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,boundaries,cpu_regions,shared_arr,idx_sets,ops,printer=None):
+    """Use this function to solve the bridge step."""
+    #Finding splits again
+    SPLITX = block_size[0]/2
+    SPLITY = block_size[1]/2
+    y0arr = np.zeros(yarr.shape)
+    y0arr[:,:,:,:] = yarr[:,:,:,:]
+    x0arr = np.zeros(xarr.shape)
+    x0arr[:,:,:,:] = xarr[:,:,:,:]
+    #Splitting between cpu and gpu
+    if gpu_rank:
+
+        # X-Bridge
+        xarr = np.ascontiguousarray(xarr) #Ensure array is contiguous
+        gpu_fcn = source_mod.get_function("BridgeX")
+        ss = np.zeros(xarr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
+        gpu_fcn(cuda.InOut(xarr),grid=grid_size, block=block_size,shared=ss.nbytes)
+        cuda.Context.synchronize()
+        xarr = nan_to_zero(xarr,zero=3)
+        # Y-Bridge
+        yarr = np.ascontiguousarray(yarr) #Ensure array is contiguous
+        gpu_fcn = source_mod.get_function("BridgeY")
+        ss = np.zeros(yarr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
+        gpu_fcn(cuda.InOut(yarr),grid=grid_size, block=block_size,shared=ss.nbytes)
+        cuda.Context.synchronize()
+        yarr = nan_to_zero(yarr,zero=3)
+
+    else:   #CPUs do this
+        blocks_x = []
+        blocks_y = []
+
+        for local_region in cpu_regions:
+            #X blocks
+            block_x = np.zeros(xarr[local_region].shape)
+            block_x += xarr[local_region]
+            blocks_x.append(block_x)
+            #Y_blocks
+            block_y = np.zeros(yarr[local_region].shape)
+            block_y += yarr[local_region]
+            blocks_y.append(block_y)
+        #Solving
+        cpu_fcn = sweep_lambda((CPU_Bridge,source_mod,idx_sets[0]))
+        blocks_x = list(map(cpu_fcn,blocks_x))
+        cpu_fcn.args = (CPU_Bridge,source_mod,idx_sets[1])
+        blocks_y = list(map(cpu_fcn,blocks_y))
+        xarr = rebuild_blocks(xarr,blocks_x,cpu_regions,ops)
+        yarr = rebuild_blocks(yarr,blocks_y,cpu_regions,ops)
+        yarr = nan_to_zero(yarr,zero=3)
+        xarr = nan_to_zero(xarr,zero=3)
+    yarr-=y0arr
+    xarr-=x0arr
+    shared_arr[xregion] += xarr[:,:,:,:]
+    shared_arr[yregion] += yarr[:,:,:,:]
+
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):
     """
@@ -118,6 +174,18 @@ def CPU_UpPyramid(args):
     block,source_mod,idx_sets = args
     #Removing elements for swept step
     ts = 0
+    for swept_set in idx_sets:
+        #Calculating Step
+
+        block = source_mod.step(block,swept_set,ts)
+        ts+=1
+    return block
+
+def CPU_Bridge(args):
+    """Use this function to build the Up Pyramid."""
+    block,source_mod,idx_sets = args
+    #Removing elements for swept step
+    ts = 1
     for swept_set in idx_sets:
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
