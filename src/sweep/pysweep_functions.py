@@ -26,9 +26,13 @@ def edge_shift(comm, block_size, shared_arr, wregion, SPLITX, SPLITY, ops, dir):
     # shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
     # shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
 
-def edge_comm(SPLITX,SPLITY,ops):
-    pass
-
+# def edge_comm_forward(rank,master,shared_arr,SPLITX,SPLITY,ops):
+#     """Use this function to transfer the front edge to the back edge."""
+#     if rank == master:
+#         shared_arr[:,:,:,-SPLITY:] = shared_arr[:,:,:,2*ops:2*ops+SPLITY]
+#         shared_arr[:,:,-SPLITX:,:] = shared_arr[:,:,2*ops:2*ops+SPLITX,:]
+#         # shared_arr[:,:,-ops-SPLITX:,:] = shared_arr[:,:,ops:2*ops+SPLITX,:]
+#
 
 def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """
@@ -129,10 +133,10 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
     xarr-=x0arr
     shared_arr[xregion] += xarr[:,:,:,:]
     shared_arr[yregion] += yarr[:,:,:,:]
-    for br in cregions[1]:
-        shared_arr[br[0],br[1],br[4],br[5]] = xarr[br[0],br[1],br[2],br[3]]
-    for br in cregions[0]:
-        shared_arr[br[0],br[1],br[4],br[5]] = yarr[br[0],br[1],br[2],br[3]]
+    # for br in cregions[1]:
+    #     shared_arr[br[0],br[1],br[4],br[5]] = xarr[br[0],br[1],br[2],br[3]]
+    # for br in cregions[0]:
+    #     shared_arr[br[0],br[1],br[4],br[5]] = yarr[br[0],br[1],br[2],br[3]]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops,printer=None):
     """
