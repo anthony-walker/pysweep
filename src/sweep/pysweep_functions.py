@@ -48,7 +48,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,boundaries,cpu
         ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
-        arr = nan_to_zero(arr,zero=3)
+        arr = nan_to_zero(arr,zero=1)
     else:   #CPUs do this
         blocks = []
         for local_region in cpu_regions:
@@ -61,7 +61,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,boundaries,cpu
         cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
-        arr = nan_to_zero(arr,zero=3)
+        arr = nan_to_zero(arr,zero=1)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
     for br in boundaries:
         shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
@@ -84,14 +84,14 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
         ss = np.zeros(xarr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(xarr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
-        xarr = nan_to_zero(xarr,zero=3)
+        xarr = nan_to_zero(xarr,zero=1)
         # Y-Bridge
         yarr = np.ascontiguousarray(yarr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("BridgeY")
         ss = np.zeros(yarr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(yarr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
-        yarr = nan_to_zero(yarr,zero=3)
+        yarr = nan_to_zero(yarr,zero=1)
 
     else:   #CPUs do this
         blocks_x = []

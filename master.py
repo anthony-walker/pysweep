@@ -86,7 +86,7 @@ def test(args):
     #         comm.Barrier()
     #For testing individual sweep
 
-    ct = sweep(initial_vortex,targs,dx,dy,ops,(8,8,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
+    ct = sweep(initial_vortex,targs,dx,dy,ops,(16,8,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
 
 
 

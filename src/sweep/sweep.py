@@ -194,7 +194,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
     #Creating sets for CPU Calculations
     idx_sets = create_iidx_sets(block_size,ops)
-    bridge_sets = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
+    bridge_sets, bridge_dims = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     local_array = create_local_array(shared_arr,rregion,dType)
@@ -243,21 +243,26 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = shared_arr[0,wregion[1],wregion[2],wregion[3]]
     comm.Barrier() #Ensure all processes are prepared to solve
 
+    # for b in boundaries:
+    #     print(rank,b[2:])
+    #     print(rank,wregion[2:],wregion[2:])
     #-------------------------------SWEPT RULE---------------------------------------------#
-    #UpPyramid - shifts data appropriately
+    # UpPyramid - shifts data appropriately
     UpPyramid(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,boundaries,cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
     comm.Barrier()
+    print(bridge_sets[1])
+    print(local_array.shape)
 
-    # Octahedron steps
     # while(GST<=MGST):
+    #Copy from the appropriate array
     x_array[:,:,:,:] = shared_arr[xbregion]
     y_array[:,:,:,:] = shared_arr[ybregion]
-
+    #Bridge Step
     # Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,boundaries,cpu_regions,shared_arr,bridge_sets,ops,printer=printer) #THis modifies shared array
     # comm.Barrier()
-    #
-    # # for boundary in cregions:
-    # #     print(rank,boundary)
+    # printer(shared_arr[2,0,:,:])
+    # for boundary in cregions:
+    #     print(rank,boundary)
     # boundary_update(shared_arr,ops,cregions,ZERO)
     #
     # comm.Barrier()

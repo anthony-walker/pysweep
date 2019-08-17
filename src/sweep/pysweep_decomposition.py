@@ -95,13 +95,12 @@ def create_boundary_regions(wregion,SPLITX,SPLITY,ops,ss):
     c1 = wregion[2].start==ops
     c2 = wregion[3].start==ops
     sx = ss[2]-ops-SPLITX
-    sy = ss[3]-ops-SPLITX
+    sy = ss[3]-ops-SPLITY
     xm = wregion[2].stop-wregion[2].start
     ym = wregion[3].stop-wregion[3].start
     x_reg = slice(ops,xm+ops,1)
     y_reg = slice(ops,ym+ops,1)
     tops = 2*ops
-
     if c1:
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wregion[3]),)
         comm_regions += (region_start+(slice(ops,SPLITX+tops,1),wregion[3],slice(sx,ss[2],1),wregion[3]),)
@@ -235,6 +234,7 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
     min_bs = int(min(bsx,bsy)/(2*ops))
     iidx = tuple(np.ndindex((bsx,bsy)))
     riidx = [iidx[(x)*bsy:(x+1)*bsy] for x in range(bsx)]
+    xbd = (slice(lx,ux,1),)
     x_bridge = tuple()
     for i in range(MPSS-1):
         temp = tuple()
@@ -245,16 +245,18 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
         ux+=ops
         ly+=ops
         uy-=ops
-
+    xbd+=(slice(ly-ops,uy+ops,1),)
     # Finding the second bridge - if the block is symmetric then it is the inverse
     if block_size[0] == block_size[1]:
         y_bridge = x_bridge[::-1]
+        ybd = xbd[::-1]
     else:
         lx = ops+ops   #This first block with be in ops, plus the ghost points
         ly = (MPSS-1)*ops+ops    #This first block with be in ops, plus the ghost points
         ux = bsx-ops-ops
         uy = ly+2*ops
         y_bridge = tuple()
+        ybd = (slice(ly,uy,1),)
         for i in range(MPSS-1):
             temp = tuple()
             for row in (riidx[ly:uy]):
@@ -264,7 +266,8 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
             uy+=ops
             lx+=ops
             ux-=ops
-    return x_bridge, y_bridge
+        ybd+=(slice(lx-ops,ux+ops,1),)
+    return (x_bridge, y_bridge), (xbd, ybd)
 
 
 def create_blocks_list(arr_shape,block_size,ops):
@@ -291,6 +294,8 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
         return arr
     else:
         return blocks[0]
+
+
 
 def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
     """Use this function to write to the hdf file and shift the shared array
