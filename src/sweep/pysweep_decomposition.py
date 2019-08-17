@@ -87,10 +87,11 @@ def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices
     y_slice = slice(int(block_size[1]*rank_blocks[0]+ops),int(block_size[1]*rank_blocks[1]+ops),1)
     return (slice(0,time_steps,1),slices[0],x_slice,y_slice)
 
-def create_boundary_regions(wregion,SPLITX,SPLITY,ops,ss):
+def create_boundary_regions(wregion,SPLITX,SPLITY,ops,ss,MPSS):
     """Use this function to create boundary write regions."""
     boundary_regions = tuple()
-    comm_regions =tuple()
+    x_regions = tuple()
+    y_regions = tuple()
     region_start = wregion[:2]
     c1 = wregion[2].start==ops
     c2 = wregion[3].start==ops
@@ -100,17 +101,25 @@ def create_boundary_regions(wregion,SPLITX,SPLITY,ops,ss):
     ym = wregion[3].stop-wregion[3].start
     x_reg = slice(ops,xm+ops,1)
     y_reg = slice(ops,ym+ops,1)
+    minx = slice(MPSS*ops,2*SPLITX+2*ops-MPSS*ops,1)
+    miny = slice(MPSS*ops,2*SPLITY+2*ops-MPSS*ops,1)
+
     tops = 2*ops
     if c1:
+        #Boundaries for up pyramid and octahedron
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wregion[3]),)
-        comm_regions += (region_start+(slice(ops,SPLITX+tops,1),wregion[3],slice(sx,ss[2],1),wregion[3]),)
+        #Boundaries for bridge
+        sminy = slice(miny.start+wregion[3].start+ops,miny.stop+wregion[3].start+ops,1)
+        x_regions += (region_start+(slice(ops,SPLITX+2*ops,1),miny,slice(sx,ss[2],1),sminy),)
+
     if c2:
+        sminx = slice(minx.start+wregion[2].start+ops,minx.stop+wregion[2].start+ops,1)
         boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wregion[2],slice(sy,ss[3],1)),)
-        comm_regions += (region_start+(wregion[2],slice(ops,SPLITY+tops,1),wregion[2],slice(sy,ss[3],1)),)
+        y_regions += (region_start+(minx,slice(ops,SPLITY+2*ops,1),sminx,slice(sy,ss[3],1)),)
     if c1 and c2:
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
-        comm_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
-    return boundary_regions,comm_regions
+        #A bridge can never be on a corner so there is not bridge communication here
+    return boundary_regions,(x_regions,y_regions)
 
 def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,mod=0):
     """Use this function to create a shifted region(s)."""
@@ -225,12 +234,14 @@ def create_iidx_sets(block_size,ops):
 
 def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
     """Use this function to create the iidx sets for bridges."""
+    # if mbx == mby:
     bsx = block_size[0]+2*ops
     bsy = block_size[1]+2*ops
     ly = ops+ops   #This first block with be in ops, plus the ghost points
-    lx = (MPSS-1)*ops+ops    #This first block with be in ops, plus the ghost points
-    uy = bsy-ops-ops
+    lx = int(block_size[0]/2)    #This first block with be in ops, plus the ghost points
+    uy = ly+block_size[1]-2*ops
     ux = lx+2*ops
+    # print(ux,uy)
     min_bs = int(min(bsx,bsy)/(2*ops))
     iidx = tuple(np.ndindex((bsx,bsy)))
     riidx = [iidx[(x)*bsy:(x+1)*bsy] for x in range(bsx)]
@@ -238,35 +249,26 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
     x_bridge = tuple()
     for i in range(MPSS-1):
         temp = tuple()
-        for row in (riidx[ly:uy]):
-            temp+=row[lx:ux][:]
+        for row in (riidx[lx:ux]):
+            temp+=row[ly:uy][:]
         x_bridge+=temp,
         lx-=ops
         ux+=ops
         ly+=ops
         uy-=ops
     xbd+=(slice(ly-ops,uy+ops,1),)
-    # Finding the second bridge - if the block is symmetric then it is the inverse
-    if block_size[0] == block_size[1]:
-        y_bridge = x_bridge[::-1]
-        ybd = xbd[::-1]
-    else:
-        lx = ops+ops   #This first block with be in ops, plus the ghost points
-        ly = (MPSS-1)*ops+ops    #This first block with be in ops, plus the ghost points
-        ux = bsx-ops-ops
-        uy = ly+2*ops
-        y_bridge = tuple()
-        ybd = (slice(ly,uy,1),)
-        for i in range(MPSS-1):
-            temp = tuple()
-            for row in (riidx[ly:uy]):
-                temp+=row[lx:ux][:]
-            y_bridge+=temp,
-            ly-=ops
-            uy+=ops
-            lx+=ops
-            ux-=ops
-        ybd+=(slice(lx-ops,ux+ops,1),)
+    #Y_bridge
+    y_bridge = tuple()
+    for bridge in x_bridge:
+        temp = tuple()
+        for item in bridge:
+            temp+=(item[::-1],)
+        y_bridge+=(temp,)
+    ybd = xbd[::-1]
+    # elif mbx > mby: #This need to be added for non-square blocks then kernels need updated
+    #     pass
+    # elif mbx < mby:
+    #     pass
     return (x_bridge, y_bridge), (xbd, ybd)
 
 

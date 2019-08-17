@@ -30,7 +30,7 @@ def edge_comm(SPLITX,SPLITY,ops):
     pass
 
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,boundaries,cpu_regions,shared_arr,idx_sets,ops):
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -63,10 +63,10 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,boundaries,cpu
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
         arr = nan_to_zero(arr,zero=1)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
-    for br in boundaries:
+    for br in bregions:
         shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
 
-def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,boundaries,cpu_regions,shared_arr,idx_sets,ops,printer=None):
+def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cregions,cpu_regions,shared_arr,idx_sets,ops,printer=None):
     """Use this function to solve the bridge step."""
     #Finding splits again
     SPLITX = block_size[0]/2
@@ -92,6 +92,8 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
         gpu_fcn(cuda.InOut(yarr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
         yarr = nan_to_zero(yarr,zero=1)
+        # yarr-=y0arr
+        # xarr-=x0arr
 
     else:   #CPUs do this
         blocks_x = []
@@ -113,15 +115,26 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
         blocks_y = list(map(cpu_fcn,blocks_y))
         xarr = rebuild_blocks(xarr,blocks_x,cpu_regions,ops)
         yarr = rebuild_blocks(yarr,blocks_y,cpu_regions,ops)
-        yarr = nan_to_zero(yarr,zero=3)
-        xarr = nan_to_zero(xarr,zero=3)
+        yarr = nan_to_zero(yarr,zero=1)
+        xarr = nan_to_zero(xarr,zero=1)
+        # print(xarr[2,0,:,:])
+        # print(yarr[2,0,:,:])
+        # yarr-=y0arr
+        # xarr-=x0arr
+        # for idx in np.ndindex(xarr.shape):
+        #     if xarr[idx] != 0:
+        #         xarr[idx] = 5
+    # printer(xarr[2,0,:,:])
     yarr-=y0arr
     xarr-=x0arr
     shared_arr[xregion] += xarr[:,:,:,:]
     shared_arr[yregion] += yarr[:,:,:,:]
+    for br in cregions[1]:
+        shared_arr[br[0],br[1],br[4],br[5]] = xarr[br[0],br[1],br[2],br[3]]
+    for br in cregions[0]:
+        shared_arr[br[0],br[1],br[4],br[5]] = yarr[br[0],br[1],br[2],br[3]]
 
-
-def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,idx_sets,ops,printer=None):
+def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops,printer=None):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -134,20 +147,21 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_reg
         gpu_fcn = source_mod.get_function("Octahedron")
         ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=ss.nbytes)
-        # arr = nan_to_zero(arr,zero=7)
+
         cuda.Context.synchronize()
-        # printer(arr[1,0,:,:])
     else:   #CPUs do this
         blocks = []
-        for local_region in local_cpu_regions:
+        for local_region in cpu_regions:
             block = np.zeros(arr[local_region].shape)
             block += arr[local_region]
             blocks.append(block)
         cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
-        arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
-
-    shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
+        arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
+    arr = nan_to_zero(arr,zero=3)
+    shared_arr[region] = arr[:,:,:,:]#ops:-ops,ops:-ops]
+    # for br in bregions:
+    #     shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
 
 def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets,ops):
     """This is the ending inverted pyramid."""
@@ -159,13 +173,13 @@ def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,i
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks = []
-        for local_region in local_cpu_regions:
+        for local_region in cpu_regions:
             block = np.zeros(arr[local_region].shape)
             block += arr[local_region]
             blocks.append(block)
         cpu_fcn = sweep_lambda((CPU_DownPyramid,source_mod,idx_sets))
         blocks = list(map(cpu_fcn,blocks))
-        arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
+        arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 #--------------------------------CPU Specific Swept Functions------------------

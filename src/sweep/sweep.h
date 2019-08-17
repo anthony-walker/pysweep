@@ -203,7 +203,6 @@ UpPyramid(float *state)
 
 }
 
-
 /*
     Use this function to create and return the GPU X-Bridge
 */
@@ -222,10 +221,10 @@ BridgeX(float *state)
     int gid = get_gid(); //global index
 
     //Creating swept boundaries
-    int lx = (MPSS-1)*OPS+OPS; //Lower x swept bound
+    int lx = blockDim.x/2; //Lower x swept bound
     int ly = 2*OPS; // Lower y swept bound
     int ux = lx+2*OPS; //upper x
-    int uy = blockDim.y; //upper y
+    int uy = ly+blockDim.y-2*OPS; //upper y
 
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO);
@@ -238,6 +237,7 @@ BridgeX(float *state)
 
     for (int k = 1; k < MPSS; k++)
     {
+        // printf("%d,%d,%d,%d\n", lx,ly,ux,uy);
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
@@ -283,10 +283,11 @@ BridgeY(float *state)
     int gid = get_gid(); //global index
 
     //Creating swept boundaries
-    int ly = (MPSS-1)*OPS+OPS; //Lower x swept bound
     int lx = 2*OPS; // Lower y swept bound
-    int uy = lx+2*OPS; //upper x
-    int ux = blockDim.y; //upper y
+    int ly = blockDim.y/2; //Lower x swept bound
+    int ux = lx+blockDim.x-2*OPS; //upper y
+    int uy = ly+2*OPS; //upper x
+
 
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO);
