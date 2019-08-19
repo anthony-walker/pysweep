@@ -339,15 +339,15 @@ Octahedron(float *state)
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy); //Shared global index
     int gid = get_gid(); //global index
-
-
+    int TOPS = 2*OPS;
+    int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
 
     //Creating swept boundaries
-    int lx =(blockDim.x+OPS)/TWO+1-OPS; //lower x
-    int ly = (blockDim.y+OPS)/TWO+1-OPS; //lower y
-    int ux =(blockDim.x+OPS)/TWO+OPS; //upper x
-    int uy = (blockDim.y+OPS)/TWO+OPS; //upper y
+    int lx =(blockDim.x+TOPS)/TWO-OPS; //lower x
+    int ly = (blockDim.y+TOPS)/TWO-OPS; //lower y
+    int ux =(blockDim.x+TOPS)/TWO+OPS; //upper x
+    int uy = (blockDim.y+TOPS)/TWO+OPS; //upper y
 
     //Initial communication
     for (int i = 0; i < NV; i++)
@@ -356,13 +356,13 @@ Octahedron(float *state)
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-
-    for (int k = 1; k < MPSS; k++)
+    //Calculate Down Pyramid - Down Step
+    for (int k = ONE; k <= MDSS; k++)
     {
+
         // Solving step function
-        if (tidx<=ux && tidx>=lx && tidy<=uy && tidy>=ly)
+        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            // printf("%d,%d\n",ux,lx );
             step(shared_state,sgid);
             //Ensures steps are done prior to communication
             __syncthreads();
@@ -382,7 +382,7 @@ Octahedron(float *state)
         lx -= OPS;
         ly -= OPS;
     }
-
+    // printf("%d,%d,%d,%d\n",lx,ux,ly,uy );
     //------------------------UPPYRAMID of OCTAHEDRON-----------------------------
     //Reassigning swept bounds
     lx = OPS; //Lower x swept bound
@@ -390,15 +390,10 @@ Octahedron(float *state)
     ux = blockDim.x+OPS; //upper x
     uy = blockDim.y+OPS; //upper y
     //Communicating edge values to shared array
-    edge_comm(shared_state, state,MPSS);
-    // //Communicating interior points
-    // for (int i = 0; i < NV; i++)
-    // {
-    //     shared_state[sgid+i*SGIDS] = state[gid+i*VARS+MPSS*TIMES]; //Initial time step
-    // }
-    __syncthreads(); //Sync threads here to ensure all initial values are copied
+    edge_comm(shared_state, state,MDSS+ONE);
 
-    for (int k = MPSS; k < TWO*MPSS-ONE; k++)
+    __syncthreads(); //Sync threads here to ensure all initial values are copied
+    for (int k = MDSS+ONE; k <= MOSS; k++)
     {
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)

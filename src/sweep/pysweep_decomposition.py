@@ -90,6 +90,7 @@ def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices
 def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     """Use this function to create boundary write regions."""
     boundary_regions = tuple()
+    eregions = tuple()
     x_regions = tuple()
     y_regions = tuple()
     region_start = wr[:2]
@@ -99,14 +100,13 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     ox = sx-ops
     sy = ss[3]-ops-SPLITY
     oy = sy-ops
-    xm = wr[2].stop-wr[2].start
-    ym = wr[3].stop-wr[3].start
-    x_reg = slice(ops,xm+ops,1)
-    y_reg = slice(ops,ym+ops,1)
+    x_reg = slice(ops,wr[2].stop-wr[2].start+ops,1)
+    y_reg = slice(ops,wr[3].stop-wr[3].start+ops,1)
     tops = 2*ops
     if c1: #Top edge -  periodic x
         #Boundaries for up pyramid and octahedron
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wr[3]),)
+        eregions += (region_start+(slice(ops,SPLITX+tops,1),wr[3],slice(sx,ss[2],1),wr[3]),)
         x_regions = tuple()
         for x,y in bridge_slices[1]:
             tfxe = x.stop+ox
@@ -119,6 +119,7 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
             x_regions += ((nx,y,tfx,tfy),)
     if c2: #Side edge -  periodic y
         boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wr[2],slice(sy,ss[3],1)),)
+        eregions += (region_start+(wr[2],slice(ops,SPLITY+tops,1),wr[2],slice(sy,ss[3],1)),)
         y_regions = tuple()
         for x,y in bridge_slices[0]:
             tfye = y.stop+ox
@@ -131,8 +132,9 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
             y_regions += ((x,ny,tfx,tfy),)
     if c1 and c2:
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
+        eregions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
         #A bridge can never be on a corner so there is not bridge communication here
-    return boundary_regions,x_regions,y_regions
+    return boundary_regions,eregions,x_regions,y_regions
 
 
 def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,ops):
@@ -231,8 +233,8 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cuda.memcpy_htod(c_ptr,add_const[key])
 
-def create_iidx_sets(block_size,ops):
-    """Use this function to create index sets."""
+def create_up_sets(block_size,ops):
+    """Use this function to create uppyramid sets."""
     bsx = block_size[0]+2*ops
     bsy = block_size[1]+2*ops
     ly = ops
@@ -249,32 +251,41 @@ def create_iidx_sets(block_size,ops):
         uy-=ops
     return idx_sets
 
-def create_down_sets(block_size,ops,printer=None):
+def create_down_sets(block_size,ops):
     """Use this function to create the down pyramid sets from up sets."""
-    bsx = block_size[0]/2
-    bsy = block_size[1]/2
-
+    bsx = int(block_size[0]/2)
+    bsy = int(block_size[1]/2)
     #Limits
-    lx =(bsx)/2-ops; #lower x
-    ly = (bsy)/2-ops; #lower y
-    ux =(bsx)/2+ops; #upper x
-    uy = (bsy)/2+ops; #upper y
-    #Creating iidxs
-    tops = 2*ops
-    sets = tuple()
+    lx =int((bsx)-ops); #lower x
+    ly = int((bsy)-ops); #lower y
+    ux = int((bsx)+ops); #upper x
+    uy = int((bsy)+ops); #upper y
+    #Creating points
     iidx = tuple()
-    for i in range(bsx):
+    sets = tuple()
+    fset = tuple()
+    for i in range(ops,block_size[0]+ops):
         temp = tuple()
-        for j in range(bsy):
+        for j in range(ops,block_size[1]+ops):
             temp += (i,j),
+            fset += (i,j),
         iidx += temp,
     #Creating sets
     while(ux < block_size[0] and uy < block_size[1]):
-        ux+=2
-        ux += 2
+        new_set = tuple()
+        for row in iidx[lx:ux]:
+            for item in row[ly:uy]:
+                new_set+=item,
+        sets+= new_set,
+        lx-=ops
+        ly-=ops
+        ux+=ops
+        uy+=ops
+    #Adding final set
+    sets += fset,
+    return sets
 
-
-def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
+def create_bridge_sets(block_size,ops,MPSS):
     """Use this function to create the iidx sets for bridges."""
     # if mbx == mby:
     bsx = block_size[0]+2*ops
@@ -283,7 +294,6 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
     lx = int(block_size[0]/2)    #This first block with be in ops, plus the ghost points
     uy = ly+block_size[1]-2*ops
     ux = lx+2*ops
-    # print(ux,uy)
     min_bs = int(min(bsx,bsy)/(2*ops))
     iidx = tuple(np.ndindex((bsx,bsy)))
     riidx = [iidx[(x)*bsy:(x+1)*bsy] for x in range(bsx)]
@@ -301,7 +311,6 @@ def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
         ux+=ops
         ly+=ops
         uy-=ops
-
     #Y_bridge
     y_bridge = tuple()
     for bridge in x_bridge:
@@ -341,27 +350,18 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
     else:
         return blocks[0]
 
+def edge_shift(shared_arr,eregions, dir):
+    """Use this function to shift edge points>"""
+    if dir:
+        for bt,bv,x1,y1,x2,y2 in eregions:  #Back to Front
+            shared_arr[bt,bv,x1,y1] = shared_arr[bt,bv,x2,y2]
+    else:
+        for bt,bv,x1,y1,x2,y2 in eregions:  #Front to Back
+            shared_arr[bt,bv,x2,y2] = shared_arr[bt,bv,x1,y1]
 
-
-def write_and_shift(shared_arr,region1,hdf_set,ops,MPSS,GST):
+def hdf_swept_write(shared_arr,region,hdf_set,hregion,MPSS,GST):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
-    r2 = slice(region1[2].start-ops,region1[2].stop-ops,1)
-    r3 = slice(region1[3].start-ops,region1[3].stop-ops,1)
     hdf_set[MPSS*(GST-1):MPSS*(GST),region1[1],r2,r3] = shared_arr[:MPSS,region1[1],region1[2],region1[3]]
     shared_arr[:MPSS+1,region1[1],region1[2],region1[3]] = shared_arr[MPSS+1:,region1[1],region1[2],region1[3]]
     #Do edge comm after this function
-
-
-def edge_comm(shared_arr,SPLITX,SPLITY,ops,dir):
-    """Use this function to communicate edges in the shared array."""
-    #Updates shifted section of shared array
-    if not dir:
-        shared_arr[:,:,-SPLITX-ops:,:] = shared_arr[:,:,ops:SPLITX+2*ops,:]
-        shared_arr[:,:,:,-SPLITY-ops:] = shared_arr[:,:,:,ops:SPLITY+2*ops]
-    else:
-        shared_arr[:,:,ops:SPLITX+2*ops,:]=shared_arr[:,:,-SPLITX-ops:,:]
-        shared_arr[:,:,:,ops:SPLITY+2*ops]=shared_arr[:,:,:,-SPLITY-ops:]
-    #Updates ops points at front
-    shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
-    shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]

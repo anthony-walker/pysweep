@@ -16,23 +16,7 @@ def edge_shift(comm, block_size, shared_arr, wregion, SPLITX, SPLITY, ops, dir):
     temp_array[:,:,:,:] = shared_arr[wregion]
     comm.Barrier()
     if not dir:
-        shared_arr[:,:,:,:] = temp_array[:,:,:,:]
-        # shared_arr[:,:,ops:block_size[0]+ops,:] = x_arr[:,:,:,:]
-        #Repeat for y
-    # else:
-    #     shared_arr[:,:,ops:block_size[0]+2*ops,:]=shared_arr[:,:,-block_size[0]-ops:,:]
-    #     shared_arr[:,:,:,ops:block_size[1]+2*ops]=shared_arr[:,:,:,-block_size[1]-ops:]
-    # #Updates ops points at front
-    # shared_arr[:,:,:ops,:] = shared_arr[:,:,-SPLITX-2*ops:-SPLITX-ops,:]
-    # shared_arr[:,:,:,:ops] = shared_arr[:,:,:,-SPLITY-2*ops:-SPLITY-ops]
-
-# def edge_comm_forward(rank,master,shared_arr,SPLITX,SPLITY,ops):
-#     """Use this function to transfer the front edge to the back edge."""
-#     if rank == master:
-#         shared_arr[:,:,:,-SPLITY:] = shared_arr[:,:,:,2*ops:2*ops+SPLITY]
-#         shared_arr[:,:,-SPLITX:,:] = shared_arr[:,:,2*ops:2*ops+SPLITX,:]
-#         # shared_arr[:,:,-ops-SPLITX:,:] = shared_arr[:,:,ops:2*ops+SPLITX,:]
-#
+        pass
 
 def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """
@@ -81,7 +65,6 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
     x0arr[:,:,:,:] = xarr[:,:,:,:]
     #Splitting between cpu and gpu
     if gpu_rank:
-
         # X-Bridge
         xarr = np.ascontiguousarray(xarr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("BridgeX")
@@ -96,8 +79,6 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
         gpu_fcn(cuda.InOut(yarr),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
         yarr = nan_to_zero(yarr,zero=1)
-        # yarr-=y0arr
-        # xarr-=x0arr
 
     else:   #CPUs do this
         blocks_x = []
@@ -191,51 +172,36 @@ def CPU_UpPyramid(args):
     """Use this function to build the Up Pyramid."""
     block,source_mod,idx_sets = args
     #Removing elements for swept step
-    ts = 0
-    for swept_set in idx_sets:
+    for ts,swept_set in enumerate(idx_sets):
         #Calculating Step
-
         block = source_mod.step(block,swept_set,ts)
-        ts+=1
     return block
 
 def CPU_Bridge(args):
     """Use this function to build the Up Pyramid."""
     block,source_mod,idx_sets = args
     #Removing elements for swept step
-    ts = 1
-    for swept_set in idx_sets:
+    for ts,swept_set in enumerate(idx_sets,start=1):
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
-        ts+=1
     return block
 
 def CPU_Octahedron(args):
     """Use this function to build the Octahedron."""
     block,source_mod,idx_sets = args
-    #Removing elements for swept step
-    ts = 1
-    #Down Pyramid Step
-    for swept_set in idx_sets[::-1]:
+    #Oct Step
+    for ts,swept_set in enumerate(idx_sets,start=1):
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
-        ts+=1
-    #Up Pyramid Step
-    # for swept_set in idx_sets[1:]:  #Skips first element because down pyramid
-    #     #Calculating Step
-    #     block = source_mod.step(block,swept_set,ts)
-    #     ts+=1
     return block
 
 def CPU_DownPyramid(args):
     """Use this function to build the Down Pyramid."""
     block,source_mod,idx_sets = args
     #Removing elements for swept step
-    ts = 0
-    for swept_set in idx_sets[::-1]:
+    for ts, swept_set in enumerate(idx_sets,start=1):
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
-        ts+=1
     return block
 
 def nan_to_zero(arr,zero=0.):
@@ -244,13 +210,3 @@ def nan_to_zero(arr,zero=0.):
         if np.isnan(arr[i]):
             arr[i]=zero
     return arr
-
-def create_shift_regions(regions,SPLITX,SPLITY):
-    """Use this function to create shifted regions."""
-    shifted_regions = tuple()
-    for region in regions:
-        temp_region = region[:2]
-        temp_region += slice(region[2].start+SPLITX,region[2].stop+SPLITY,1),
-        temp_region += slice(region[3].start+SPLITX,region[3].stop+SPLITY,1),
-        shifted_regions+=temp_region,
-    return shifted_regions
