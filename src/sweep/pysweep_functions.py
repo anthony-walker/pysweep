@@ -133,10 +133,13 @@ def Bridge(comm,source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregi
     xarr-=x0arr
     shared_arr[xregion] += xarr[:,:,:,:]
     shared_arr[yregion] += yarr[:,:,:,:]
-    # for br in cregions[1]:
-    #     shared_arr[br[0],br[1],br[4],br[5]] = xarr[br[0],br[1],br[2],br[3]]
-    # for br in cregions[0]:
-    #     shared_arr[br[0],br[1],br[4],br[5]] = yarr[br[0],br[1],br[2],br[3]]
+    # print(xarr.shape,yarr.shape)
+    for i,bs in enumerate(cregions[1],start=2):
+        lcx,lcy,shx,shy = bs
+        shared_arr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
+    for i,bs in enumerate(cregions[0],start=2):
+        lcx,lcy,shx,shy = bs
+        shared_arr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops,printer=None):
     """
@@ -151,7 +154,6 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_
         gpu_fcn = source_mod.get_function("Octahedron")
         ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(arr),grid=grid_size, block=block_size,shared=ss.nbytes)
-
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks = []
@@ -163,9 +165,7 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
     arr = nan_to_zero(arr,zero=3)
-    shared_arr[region] = arr[:,:,:,:]#ops:-ops,ops:-ops]
-    # for br in bregions:
-    #     shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
+    shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
 
 def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets,ops):
     """This is the ending inverted pyramid."""
@@ -214,17 +214,17 @@ def CPU_Octahedron(args):
     """Use this function to build the Octahedron."""
     block,source_mod,idx_sets = args
     #Removing elements for swept step
-    ts = 0
+    ts = 1
     #Down Pyramid Step
     for swept_set in idx_sets[::-1]:
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
         ts+=1
     #Up Pyramid Step
-    for swept_set in idx_sets[1:]:  #Skips first element because down pyramid
-        #Calculating Step
-        block = source_mod.step(block,swept_set,ts)
-        ts+=1
+    # for swept_set in idx_sets[1:]:  #Skips first element because down pyramid
+    #     #Calculating Step
+    #     block = source_mod.step(block,swept_set,ts)
+    #     ts+=1
     return block
 
 def CPU_DownPyramid(args):

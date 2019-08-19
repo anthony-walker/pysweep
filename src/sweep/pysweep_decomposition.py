@@ -87,60 +87,67 @@ def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices
     y_slice = slice(int(block_size[1]*rank_blocks[0]+ops),int(block_size[1]*rank_blocks[1]+ops),1)
     return (slice(0,time_steps,1),slices[0],x_slice,y_slice)
 
-def transform_bd(wregion,bridge_slices,ops):
-    """Use this function to transform bridge slices."""
-    c1 = wregion[2].start==ops
-    c2 = wregion[3].start==ops
-
-    if c1:  #Top edge
-        pass
-    else:   #Side edge
-        pass
-
-def create_boundary_regions(wregion,SPLITX,SPLITY,ops,ss,MPSS):
+def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     """Use this function to create boundary write regions."""
     boundary_regions = tuple()
     x_regions = tuple()
     y_regions = tuple()
-    region_start = wregion[:2]
-    c1 = wregion[2].start==ops
-    c2 = wregion[3].start==ops
+    region_start = wr[:2]
+    c1 = wr[2].start==ops
+    c2 = wr[3].start==ops
     sx = ss[2]-ops-SPLITX
+    ox = sx-ops
     sy = ss[3]-ops-SPLITY
-    xm = wregion[2].stop-wregion[2].start
-    ym = wregion[3].stop-wregion[3].start
+    oy = sy-ops
+    xm = wr[2].stop-wr[2].start
+    ym = wr[3].stop-wr[3].start
     x_reg = slice(ops,xm+ops,1)
     y_reg = slice(ops,ym+ops,1)
-    minx = slice(MPSS*ops,2*SPLITX+2*ops-MPSS*ops,1)
-    miny = slice(MPSS*ops,2*SPLITY+2*ops-MPSS*ops,1)
-
     tops = 2*ops
-    if c1:
+    if c1: #Top edge -  periodic x
         #Boundaries for up pyramid and octahedron
-        boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wregion[3]),)
-        #Boundaries for bridge
-        sminy = slice(miny.start+wregion[3].start+ops,miny.stop+wregion[3].start+ops,1)
-        x_regions += (region_start+(slice(ops,SPLITX+2*ops,1),y_reg,slice(sx,ss[2],1),wregion[3]),)
-    if c2:
-        sminx = slice(minx.start+wregion[2].start+ops,minx.stop+wregion[2].start+ops,1)
-        boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wregion[2],slice(sy,ss[3],1)),)
-        y_regions += (region_start+(x_reg,slice(ops,SPLITY+2*ops,1),wregion[2],slice(sy,ss[3],1)),)
+        boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wr[3]),)
+        x_regions = tuple()
+        for x,y in bridge_slices[1]:
+            tfxe = x.stop+ox
+            xc = tfxe < ss[2]
+            tfxe = tfxe if xc else ss[2]
+            tfx = slice(x.start+ox,tfxe,1)
+            nx = x if xc else slice(x.start,tfx.stop-tfx.start+x.start,1)
+            tfys = wr[3].start-ops+y.start+SPLITY
+            tfy = slice(tfys,tfys+(y.stop-y.start),1)
+            x_regions += ((nx,y,tfx,tfy),)
+    if c2: #Side edge -  periodic y
+        boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wr[2],slice(sy,ss[3],1)),)
+        y_regions = tuple()
+        for x,y in bridge_slices[0]:
+            tfye = y.stop+ox
+            yc = tfye < ss[3]
+            tfye = tfye if yc else ss[3]
+            tfy = slice(y.start+oy,tfye,1)
+            ny = y if yc else slice(y.start,tfy.stop-tfy.start+y.start,1)
+            tfxs = wr[2].start-ops+x.start+SPLITX
+            tfx = slice(tfxs,tfxs+(x.stop-x.start),1)
+            y_regions += ((x,ny,tfx,tfy),)
     if c1 and c2:
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
         #A bridge can never be on a corner so there is not bridge communication here
-    return boundary_regions,(x_regions,y_regions)
+    return boundary_regions,x_regions,y_regions
 
 
-def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,mod=0):
+def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,ops):
     """Use this function to create a shifted region(s)."""
     #Conditions
     sregion = wregion[:2]
+    swr = wregion[:2]
     sps = (SPLITX,SPLITY)
     for i, rs in enumerate(wregion[2:]):
         sregion+=(slice(rs.start+sps[i],rs.stop+sps[i],1),)
+        swr+=(slice(rs.start+sps[i]+ops,rs.stop+sps[i]-ops,1),)
+
     xbregion =  sregion[:3]+(wregion[3],)
     ybregion =  sregion[:2]+(wregion[2],sregion[3])
-    return sregion,xbregion,ybregion
+    return sregion,swr,xbregion,ybregion
 
 def create_read_region(region,ops):
     """Use this function to obtain the regions to for reading and writing
@@ -241,6 +248,27 @@ def create_iidx_sets(block_size,ops):
         ly+=ops
         uy-=ops
     return idx_sets
+
+def create_down_sets(block_size,ops,printer=None):
+    """Use this function to create the down pyramid sets from up sets."""
+    bsx = block_size[0]
+    bsy = block_size[1]
+    tops = 2*ops
+    min_bs = int(min(bsx,bsy)/(2*ops))
+    iidx = tuple(np.ndindex((bsx,bsy)))
+    iidx = np.reshape(iidx,block_size[:-1])
+    print(iidx)
+    # idx_sets = tuple()
+    # while dsb:
+    #     iidx = iidx[ops*(bsy-i*2*ops):-ops*(bsy-i*2*ops)]
+    #     iidx = [(x,y) for x,y in iidx if y >= ly and y < uy]
+    #     if len(iidx)>0:
+    #         idx_sets+=(iidx,)
+    #     bsx-=2
+    #     bsy-=2
+    #     if bsx < tops or bsy
+    # return idx_sets
+
 
 def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
     """Use this function to create the iidx sets for bridges."""

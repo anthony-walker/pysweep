@@ -344,8 +344,8 @@ Octahedron(float *state)
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
 
     //Creating swept boundaries
-    int lx =(blockDim.x+OPS)/TWO+1-OPS; //upper x
-    int ly = (blockDim.y+OPS)/TWO+1-OPS; //upper y
+    int lx =(blockDim.x+OPS)/TWO+1-OPS; //lower x
+    int ly = (blockDim.y+OPS)/TWO+1-OPS; //lower y
     int ux =(blockDim.x+OPS)/TWO+OPS; //upper x
     int uy = (blockDim.y+OPS)/TWO+OPS; //upper y
 
@@ -357,7 +357,7 @@ Octahedron(float *state)
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
 
-    for (int k = 0; k < MPSS; k++)
+    for (int k = 1; k < MPSS; k++)
     {
         // Solving step function
         if (tidx<=ux && tidx>=lx && tidy<=uy && tidy>=ly)
@@ -391,11 +391,11 @@ Octahedron(float *state)
     uy = blockDim.y+OPS; //upper y
     //Communicating edge values to shared array
     edge_comm(shared_state, state,MPSS);
-    //Communicating interior points
-    for (int i = 0; i < NV; i++)
-    {
-        shared_state[sgid+i*SGIDS] = state[gid+i*VARS+MPSS*TIMES]; //Initial time step
-    }
+    // //Communicating interior points
+    // for (int i = 0; i < NV; i++)
+    // {
+    //     shared_state[sgid+i*SGIDS] = state[gid+i*VARS+MPSS*TIMES]; //Initial time step
+    // }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
     for (int k = MPSS; k < TWO*MPSS-ONE; k++)

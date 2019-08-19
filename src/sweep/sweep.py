@@ -189,13 +189,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
     #-----------------CREATING SETS FOR CPU CALCS-----------------------------#
     idx_sets = create_iidx_sets(block_size,ops)
-    bridge_sets, bridge_dims = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
-
+    bridge_sets, bridge_slices = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
+    down_sets = create_down_sets(idx_sets)
     #--------------------------CREATING OTHER REGIONS--------------------------#
 
     rregion = create_read_region(wregion,ops)   #Create read region
-    srregion,xbregion,ybregion = create_shift_regions(rregion,SPLITX,SPLITY,shared_shape,ops)  #Create shifted read region
-    bregions,cregions = create_boundary_regions(wregion,SPLITX,SPLITY,ops,shared_shape,MPSS)
+    srregion,swregion,xbregion,ybregion = create_shift_regions(rregion,SPLITX,SPLITY,shared_shape,ops)  #Create shifted read region
+    bregions,xtr,ytr = create_boundary_regions(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     local_array = create_local_array(shared_arr,rregion,dType)
     x_array = create_local_array(shared_arr,xbregion,dType)
@@ -247,40 +247,24 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #-------------------------------SWEPT RULE---------------------------------------------#
     # UpPyramid - shifts data appropriately
     UpPyramid(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,bregions,cpu_regions,shared_arr,idx_sets,ops) #THis modifies shared array
-
+    comm.barrier()
+    # printer(shared_arr[2,0,:,:24])
     # while(GST<=MGST):
     # Copy from the appropriate array
     comm.Barrier()
-
     x_array[:,:,:,:] = shared_arr[xbregion]
     y_array[:,:,:,:] = shared_arr[ybregion]
     comm.Barrier()  #Barrier after read
-    # if rank == master_rank:
-    #
-    # # if rank == master_rank:
-    # #     ct = 2
-    # #     for i,set in enumerate(bridge_sets[1]):
-    # #         for x in set:
-    # #             # ct+=1
-    # #             y_array[i+2,:,x[0],x[1]] = ct
-    # #             # pass
-    # # printer(x_array[3,0,:,:])
-    # #Bridge Step
-    # Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,cregions,cpu_regions,shared_arr,bridge_sets,ops,printer=printer) #THis modifies shared array
-    # comm.Barrier()  #Barrier after write
-    # # #Getting next points for the local array
-    # # local_array[:,:,:,:] = shared_arr[srregion]
-    # comm.Barrier()  #Barrier after read
-    # printer(cregions,p_iter=True)
-    # printer(wregion)
-
-    # printer(shared_arr[2,0,:,:24])
-    # printer("-----------------------------")
-    # printer(shared_arr[3,0,:,:24])
+    #Bridge Step
+    Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops,printer=printer) #THis modifies shared array
+    comm.Barrier()  #Barrier after write
+    #Getting next points for the local array
+    local_array[:,:,:,:] = shared_arr[srregion]
     #Octahedron Step
-    # Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,srregion,bregions,cpu_regions,shared_arr,idx_sets,ops)
-    # comm.Barrier()  #Write barrier
-    # printer(shared_arr[2,0,:,:])
+    Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,swregion,bregions,cpu_regions,shared_arr,idx_sets,ops)
+    comm.Barrier()  #Write barrier
+    printer(shared_arr[3,0,:,5:])
+    # print(swregion)
         #
         # if rank == master_rank and LAB:
         #     edge_comm(shared_arr,SPLITX,SPLITY,ops,(GST+1)%TWO)
