@@ -190,12 +190,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #-----------------CREATING SETS FOR CPU CALCS-----------------------------#
     idx_sets = create_iidx_sets(block_size,ops)
     bridge_sets, bridge_slices = create_bridge_sets(mbx,mby,block_size,ops,MPSS)
-    down_sets = create_down_sets(idx_sets)
+    down_sets = create_down_sets(block_size,ops,printer=printer)
     #--------------------------CREATING OTHER REGIONS--------------------------#
 
     rregion = create_read_region(wregion,ops)   #Create read region
     srregion,swregion,xbregion,ybregion = create_shift_regions(rregion,SPLITX,SPLITY,shared_shape,ops)  #Create shifted read region
     bregions,xtr,ytr = create_boundary_regions(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
+
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     local_array = create_local_array(shared_arr,rregion,dType)
     x_array = create_local_array(shared_arr,xbregion,dType)
@@ -263,7 +264,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Octahedron Step
     Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,swregion,bregions,cpu_regions,shared_arr,idx_sets,ops)
     comm.Barrier()  #Write barrier
-    printer(shared_arr[3,0,:,5:])
+    # printer(shared_arr[3,0,:,5:])
     # print(swregion)
         #
         # if rank == master_rank and LAB:

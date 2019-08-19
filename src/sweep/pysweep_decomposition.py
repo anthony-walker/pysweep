@@ -251,23 +251,27 @@ def create_iidx_sets(block_size,ops):
 
 def create_down_sets(block_size,ops,printer=None):
     """Use this function to create the down pyramid sets from up sets."""
-    bsx = block_size[0]
-    bsy = block_size[1]
+    bsx = block_size[0]/2
+    bsy = block_size[1]/2
+
+    #Limits
+    lx =(bsx)/2-ops; #lower x
+    ly = (bsy)/2-ops; #lower y
+    ux =(bsx)/2+ops; #upper x
+    uy = (bsy)/2+ops; #upper y
+    #Creating iidxs
     tops = 2*ops
-    min_bs = int(min(bsx,bsy)/(2*ops))
-    iidx = tuple(np.ndindex((bsx,bsy)))
-    iidx = np.reshape(iidx,block_size[:-1])
-    print(iidx)
-    # idx_sets = tuple()
-    # while dsb:
-    #     iidx = iidx[ops*(bsy-i*2*ops):-ops*(bsy-i*2*ops)]
-    #     iidx = [(x,y) for x,y in iidx if y >= ly and y < uy]
-    #     if len(iidx)>0:
-    #         idx_sets+=(iidx,)
-    #     bsx-=2
-    #     bsy-=2
-    #     if bsx < tops or bsy
-    # return idx_sets
+    sets = tuple()
+    iidx = tuple()
+    for i in range(bsx):
+        temp = tuple()
+        for j in range(bsy):
+            temp += (i,j),
+        iidx += temp,
+    #Creating sets
+    while(ux < block_size[0] and uy < block_size[1]):
+        ux+=2
+        ux += 2
 
 
 def create_bridge_sets(mbx,mby,block_size,ops,MPSS):
