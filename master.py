@@ -40,8 +40,8 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 20
-    npy = 20
+    npx = 16
+    npy = 16
     dx = X/npx
     dy = Y/npy
 
@@ -55,7 +55,7 @@ def test(args):
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
     initial_vortex = np.swapaxes(initial_vortex,0,2)
     initial_vortex = np.swapaxes(initial_vortex,1,3)[0]
-
+    initial_vortex[:,:,:] = 1
     #GPU Arguments
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
@@ -86,7 +86,7 @@ def test(args):
     #         comm.Barrier()
     #For testing individual sweep
 
-    ct = sweep(initial_vortex,targs,dx,dy,ops,(10,10,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
+    ct = sweep(initial_vortex,targs,dx,dy,ops,(8,8,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
 
 
 

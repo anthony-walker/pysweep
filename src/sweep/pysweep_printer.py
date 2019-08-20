@@ -1,4 +1,5 @@
 from collections import Iterable
+import sys
 
 class pysweep_printer(object):
     """This function will store the master rank and print given values."""
@@ -7,15 +8,18 @@ class pysweep_printer(object):
         self.rank = rank
         self.master = master_rank
 
-    def __call__(self, args,p_iter=False,p_ranks=False):
+    def __call__(self, args,p_iter=False,p_ranks=False,end="\n"):
 
         if (self.rank == self.master or p_ranks) and p_iter:
             if isinstance(args,Iterable):
                 for item in args:
-                    print(item)
+                    sys.stdout.write("[")
+                    for si in item:
+                        sys.stdout.write("%.0f"%si+", ")
+                    sys.stdout.write("]\n")
             else:
                 args = args,
                 for item in args:
-                    print(item)
+                    print(item,end=end)
         elif self.rank == self.master or p_ranks:
-            print(args)
+            print(args,end=end)

@@ -132,7 +132,9 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
     SPLITX = int(block_size[ZERO]/TWO)   #Split computation shift - add ops
+    # SPLITX = SPLITX if SPLITX%2==0 else SPLITX-1
     SPLITY = int(block_size[ONE]/TWO)   #Split computation shift
+    # SPLITY = SPLITY if SPLITY%2==0 else SPLITY-1
     up_sets = create_up_sets(block_size,ops)
     down_sets = create_down_sets(block_size,ops)
     oct_sets = down_sets+up_sets[1:]
@@ -152,8 +154,11 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (MOSS+TWO,arr0.shape[ZERO],arr0.shape[ONE]+TOPS+SPLITX,arr0.shape[TWO]+TOPS+SPLITY)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
-    printer(shared_shape)
-    #------------------------------DECOMPOSITION BY REGION CREATION--------------#
+    #Fill shared array and communicate initial boundaries
+    if rank == master_rank:
+        shared_arr[0,:,ops:arr0.shape[ONE]+ops,ops:arr0.shape[TWO]+ops] = arr0[:,:,:]
+        boundary_update(shared_arr,ops,SPLITX,SPLITY)   #communicate boundaries
+#------------------------------DECOMPOSITION BY REGION CREATION--------------#
     #Splits regions up amongst architecture
     if gpu_rank[0]:
         gri = gpu_comm.Get_rank()
@@ -245,23 +250,53 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
 
     # printer(shared_arr[2,0,:,:24])
 
-    for GST in range(1,MGST):
-        pass
-    comm.barrier()  #Barrier following data write
-    x_array[:,:,:,:] = shared_arr[xbregion]
-    y_array[:,:,:,:] = shared_arr[ybregion]
-    comm.Barrier()  #Barrier after read
-    #Bridge Step
-    Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
-    comm.Barrier()  #Barrier after write
-    #Getting next points for the local array
-    local_array[:,:,:,:] = shared_arr[srregion]
-    #Octahedron Step
-    Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,swregion,bregions,cpu_regions,shared_arr,oct_sets,ops)
-    comm.Barrier()  #Write barrier
-    edge_shift(shared_arr,eregions,ONE)
-    comm.Barrier()
-    printer(shared_arr[2,0,:,2:26])
+    for GST in range(1,2,1):#MGST):
+        comm.barrier()  #Barrier following data write
+        x_array[:,:,:,:] = shared_arr[xbregion]
+        y_array[:,:,:,:] = shared_arr[ybregion]
+        comm.Barrier()  #Barrier after read
+        #Bridge Step
+        Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
+        comm.Barrier()  #Solving Bridge Barrier
+        #Getting next points for the local array
+        local_array[:,:,:,:] = shared_arr[srregion]
+        #Octahedron Step
+        Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,swregion,bregions,cpu_regions,shared_arr,oct_sets,ops)
+        comm.Barrier()  #Solving Barrier
+        #Shifting Data Step
+        edge_shift(shared_arr,eregions,ONE) #
+        comm.Barrier()  #Communication Barrier
+        #Writing Step
+        hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST)
+        comm.Barrier()  #Write Barrier
+        #Updating Boundary Conditions Step
+        boundary_update(shared_arr,ops,SPLITX,SPLITY) #Communicate all boundaries
+        comm.Barrier()
+        #Reverse Bridge Read Step
+        x_array[:,:,:,:] = shared_arr[xbregion]
+        y_array[:,:,:,:] = shared_arr[ybregion]
+        comm.Barrier()  #Barrier after read
+        print("**********************************")
+        print(x_array[1,0,:,:])
+        print("**********************************")
+        #Reverse Bridge Step
+        # Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
+        # comm.Barrier()  #Solving Bridge Barrier
+
+    # level = 1
+    # printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
+    # printer(shared_arr[level,0,2:22,2:22],p_iter=True,end=" ")
+
+
+    # x_array[:,:,:,:] = shared_arr[xbregion]
+    # y_array[:,:,:,:] = shared_arr[ybregion]
+    #
+    # #Bridge Step
+    # Bridge(comm,source_mod,y_array,x_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
+    # comm.Barrier()  #Barrier after write
+
+
+
     #Write step
     # print(swregion)
         #

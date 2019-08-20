@@ -6,18 +6,6 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 from .pysweep_decomposition import *
 
-
-def edge_shift(comm, block_size, shared_arr, wregion, SPLITX, SPLITY, ops, dir):
-    """Use this function to communicate edges in the shared array."""
-    #Updates shifted section of shared array
-    ss = shared_arr.shape
-    temp_array = np.zeros((ss[0], ss[1],block_size[0],block_size[1]))
-    #Copying points to local array
-    temp_array[:,:,:,:] = shared_arr[wregion]
-    comm.Barrier()
-    if not dir:
-        pass
-
 def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
