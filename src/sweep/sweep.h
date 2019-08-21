@@ -235,7 +235,7 @@ BridgeX(float *state)
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-    for (int k = 1; k < MPSS; k++)
+    for (int k = 0; k < MPSS-ONE; k++)
     {
         // printf("%d,%d,%d,%d\n", lx,ly,ux,uy);
         // Solving step function
@@ -298,7 +298,7 @@ BridgeY(float *state)
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-    for (int k = 1; k < MPSS; k++)
+    for (int k = 0; k < MPSS-ONE; k++)
     {
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
@@ -357,7 +357,7 @@ Octahedron(float *state)
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
     //Calculate Down Pyramid - Down Step
-    for (int k = ONE; k <= MDSS; k++)
+    for (int k = 0; k <= MDSS-ONE; k++)
     {
 
         // Solving step function
@@ -393,7 +393,7 @@ Octahedron(float *state)
     edge_comm(shared_state, state,MDSS+ONE);
 
     __syncthreads(); //Sync threads here to ensure all initial values are copied
-    for (int k = MDSS+ONE; k <= MOSS; k++)
+    for (int k = MDSS; k < MOSS; k++)
     {
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)

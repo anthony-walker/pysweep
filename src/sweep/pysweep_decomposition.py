@@ -101,7 +101,6 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wr[3]),)
         yer = slice(wr[3].start,ss[3],1) if wr[3].stop+SPLITY+ops == ss[3] else slice(wr[3].start,wr[3].stop,1)
         eregions += (region_start+(slice(ops,SPLITX+ops,1),yer,slice(sx,sx+SPLITX,1),yer,),)
-        x_regions = tuple()
         for x,y in bridge_slices[1]:
             tfxe = x.stop+ox
             xc = tfxe < ss[2]
@@ -115,8 +114,8 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
         boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wr[2],slice(sy,ss[3],1)),)
         xer = slice(wr[2].start,ss[2],1) if wr[2].stop+SPLITY+ops == ss[2] else slice(wr[2].start,wr[2].stop,1)
         eregions += (region_start+(xer,slice(ops,SPLITY+ops,1),xer,slice(sy,sy+SPLITY,1)),)
-        y_regions = tuple()
         for x,y in bridge_slices[0]:
+            #Finding forward bridge
             tfye = y.stop+ox
             yc = tfye < ss[3]
             tfye = tfye if yc else ss[3]
@@ -130,6 +129,37 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
         eregions += (region_start+(slice(ops,SPLITX+ops,1),slice(ops,SPLITY+ops,1),slice(sx,sx+SPLITX,1),slice(sy,sy+SPLITY,1)),)
         #A bridge can never be on a corner so there is not bridge communication here
     return boundary_regions,eregions,x_regions,y_regions
+
+def create_rev_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
+    """Use this function to create boundary write regions."""
+    x_regions = tuple()
+    y_regions = tuple()
+    sx = ss[2]-ops-SPLITX
+    sy = ss[3]-ops-SPLITY
+    region_start = wr[:2]
+    c1 = wr[2].stop==sx
+    c2 = wr[3].stop==sy
+    tops = 2*ops
+    if c1: #Top edge -  periodic x
+        for x,y in bridge_slices[1]:
+            xc = x.start > SPLITX
+            nx = x if xc else slice(SPLITX,x.stop,1)
+            tfxs = 0+nx.start-SPLITX
+            tfx = slice(tfxs,tfxs+(nx.stop-nx.start),1)
+            tfys = wr[3].start-ops+y.start
+            tfy = slice(tfys,tfys+(y.stop-y.start),1)
+            x_regions += ((nx,y,tfx,tfy),)
+    if c2: #Side edge -  periodic y
+        for x,y in bridge_slices[0]:
+            yc = y.start > SPLITY
+            ny = y if yc else slice(SPLITY,y.stop,1)
+            tfys = 0+ny.start-SPLITY
+            tfy = slice(tfys,tfys+(ny.stop-ny.start),1)
+            tfxs = wr[2].start-ops+x.start
+            tfx = slice(tfxs,tfxs+(x.stop-x.start),1)
+            y_regions += ((x,ny,tfx,tfy),)
+    return x_regions,y_regions
+
 
 
 def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,ops):
@@ -357,8 +387,8 @@ def edge_shift(shared_arr,eregions, dir):
 def hdf_swept_write(shared_arr,reg,hdf_set,hr,MPSS,GST):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
-    hdf_set[MPSS*(GST-1)+1:MPSS*(GST)+1,hr[0],hr[1],hr[2]] = shared_arr[1:MPSS+1,reg[1],reg[2],reg[3]]
-    nte = shared_arr.shape[0]-(MPSS+1)
-    shared_arr[:nte,reg[1],reg[2],reg[3]] = shared_arr[MPSS+1:,reg[1],reg[2],reg[3]]
+    hdf_set[MPSS*(GST-1)+1:MPSS*(GST)+1,hr[0],hr[1],hr[2]] = shared_arr[0:MPSS,reg[1],reg[2],reg[3]]
+    nte = shared_arr.shape[0]-(MPSS)
+    shared_arr[:nte,reg[1],reg[2],reg[3]] = shared_arr[MPSS:,reg[1],reg[2],reg[3]]
     shared_arr[nte:,reg[1],reg[2],reg[3]] = 0
     #Do edge comm after this function

@@ -196,6 +196,8 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     rregion = create_read_region(wregion,ops)   #Create read region
     srregion,swregion,xbregion,ybregion = create_shift_regions(rregion,SPLITX,SPLITY,shared_shape,ops)  #Create shifted read region
     bregions,eregions,xtr,ytr = create_boundary_regions(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
+    xtrr,ytrr = create_rev_bridges(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
+
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     local_array = create_local_array(shared_arr,rregion,dType)
@@ -245,26 +247,34 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     comm.Barrier() #Ensure all processes are prepared to solve
 
     #-------------------------------SWEPT RULE---------------------------------------------#
-    # UpPyramid - shifts data appropriately
-    UpPyramid(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,bregions,cpu_regions,shared_arr,up_sets,ops) #THis modifies shared array
 
-    # printer(shared_arr[2,0,:,:24])
+    #-------------------------------FIRST PYRAMID-------------------------------------------#
+    UpPyramid(source_mod,local_array,gpu_rank[ZERO],block_size,grid_size,wregion,bregions,cpu_regions,shared_arr,up_sets,ops) #THis modifies shared array
+    comm.Barrier()
+    #Shift data down so timing lines up correctly
+    if rank == master_rank:
+        shared_arr[ZERO:MPSS+ONE,:,:,:] = shared_arr[ONE:MPSS+TWO,:,:,:]
 
+    #-------------------------------FIRST BRIDGE-------------------------------------------#
+    x_array[:,:,:,:] = shared_arr[xbregion]
+    y_array[:,:,:,:] = shared_arr[ybregion]
+    comm.Barrier()  #Barrier after read
+    #Bridge Step
+    Bridge(source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
+
+
+    #Swept Octahedrons and Bridges
     for GST in range(1,2,1):#MGST):
-        comm.barrier()  #Barrier following data write
-        x_array[:,:,:,:] = shared_arr[xbregion]
-        y_array[:,:,:,:] = shared_arr[ybregion]
-        comm.Barrier()  #Barrier after read
-        #Bridge Step
-        Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
+        #-------------------------------FIRST OCTAHEDRON-------------------------------------------#
         #Getting next points for the local array
         local_array[:,:,:,:] = shared_arr[srregion]
+        comm.Barrier()
         #Octahedron Step
-        Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,swregion,bregions,cpu_regions,shared_arr,oct_sets,ops)
+        Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,swregion,cpu_regions,shared_arr,oct_sets,ops)
         comm.Barrier()  #Solving Barrier
         #Shifting Data Step
-        edge_shift(shared_arr,eregions,ONE) #
+        edge_shift(shared_arr,eregions,ONE)
         comm.Barrier()  #Communication Barrier
         #Writing Step
         hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST)
@@ -272,20 +282,46 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Updating Boundary Conditions Step
         boundary_update(shared_arr,ops,SPLITX,SPLITY) #Communicate all boundaries
         comm.Barrier()
-        #Reverse Bridge Read Step
-        x_array[:,:,:,:] = shared_arr[xbregion]
-        y_array[:,:,:,:] = shared_arr[ybregion]
+        #-------------------------------FIRST REVERSE BRIDGE-------------------------------------------#
+        x_array[:,:,:,:] = shared_arr[ybregion] #Regions are purposely switched here
+        y_array[:,:,:,:] = shared_arr[xbregion]
         comm.Barrier()  #Barrier after read
-        print("**********************************")
-        print(x_array[1,0,:,:])
-        print("**********************************")
         #Reverse Bridge Step
-        # Bridge(comm,source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
-        # comm.Barrier()  #Solving Bridge Barrier
+        Bridge(source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,ybregion,xbregion,(xtrr,ytrr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
+        comm.Barrier()  #Solving Bridge Barrier
 
-    # level = 1
-    # printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
-    # printer(shared_arr[level,0,2:22,2:22],p_iter=True,end=" ")
+        if rank == master_rank:
+            nan_to_zero(shared_arr,zero=1)
+            level = 3
+            printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
+
+        #-------------------------------SECOND OCTAHEDRON-------------------------------------------#
+        #Getting next points for the local array
+        local_array[:,:,:,:] = shared_arr[rregion]
+        comm.Barrier()
+        #Octahedron Step
+        Octahedron(source_mod,local_array,gpu_rank[0],block_size,grid_size,wregion,cpu_regions,shared_arr,oct_sets,ops)
+        comm.Barrier()  #Solving Barrier
+        if rank == master_rank:
+            # nan_to_zero(shared_arr,zero=3)
+            level = 1
+            printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
+
+        # hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST)
+        # comm.Barrier()
+        # #Updating Boundary Conditions Step
+        # boundary_update(shared_arr,ops,SPLITX,SPLITY) #Communicate all boundaries
+        # comm.barrier()  #Barrier following data write
+        # #-------------------------------SECOND BRIDGE-------------------------------------------#
+        # x_array[:,:,:,:] = shared_arr[xbregion]
+        # y_array[:,:,:,:] = shared_arr[ybregion]
+        # comm.Barrier()  #Barrier after read
+        # #Bridge Step
+        # Bridge(source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
+
+    down_reg = swregion if GST%2==0 else wregion
+
+
 
 
     # x_array[:,:,:,:] = shared_arr[xbregion]

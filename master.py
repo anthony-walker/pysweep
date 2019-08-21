@@ -40,8 +40,8 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 16
-    npy = 16
+    npx = 20
+    npy = 20
     dx = X/npx
     dy = Y/npy
 
@@ -86,7 +86,7 @@ def test(args):
     #         comm.Barrier()
     #For testing individual sweep
 
-    ct = sweep(initial_vortex,targs,dx,dy,ops,(8,8,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
+    ct = sweep(initial_vortex,targs,dx,dy,ops,(10,10,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
 
 
 
