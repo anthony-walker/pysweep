@@ -77,6 +77,9 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
             block_y = np.zeros(yarr[local_region].shape)
             block_y += yarr[local_region]
             blocks_y.append(block_y)
+            # print("************************")
+            # print(len(block_x))
+            # print(blocks_x[1][1,0,:,:])
         #Solving
         cpu_fcn = sweep_lambda((CPU_Bridge,source_mod,idx_sets[0]))
         blocks_x = list(map(cpu_fcn,blocks_x))
@@ -88,12 +91,14 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
     xarr-=x0arr
     shared_arr[xregion] += xarr[:,:,:,:]
     shared_arr[yregion] += yarr[:,:,:,:]
-    for i,bs in enumerate(cregions[1],start=1):
-        lcx,lcy,shx,shy = bs
-        shared_arr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
-    for i,bs in enumerate(cregions[0],start=1):
-        lcx,lcy,shx,shy = bs
-        shared_arr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
+    for i, x_item in enumerate(cregions[1],start=1):
+        for bs in x_item:
+            lcx,lcy,shx,shy = bs
+            shared_arr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
+    for i, x_item in enumerate(cregions[0],start=1):
+        for bs in x_item:
+            lcx,lcy,shx,shy = bs
+            shared_arr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
 
 def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """

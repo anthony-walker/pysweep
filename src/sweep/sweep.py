@@ -138,7 +138,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
     bridge_sets, bridge_slices = create_bridge_sets(block_size,ops,MPSS)
-
     #----------------Data Input setup -------------------------#
     time_steps = int((targs[ONE]-targs[ZERO])/targs[TWO])+ONE  #Number of time steps +ONE becuase initial time step
     #Global swept step
@@ -192,8 +191,9 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #--------------------------CREATING OTHER REGIONS--------------------------#
     rregion = create_read_region(wregion,ops)   #Create read region
     srregion,swregion,xbregion,ybregion = create_shift_regions(rregion,SPLITX,SPLITY,shared_shape,ops)  #Create shifted read region
-    bregions,eregions,xtr,ytr = create_boundary_regions(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
-    xtrr,ytrr = create_rev_bridges(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
+    bregions,eregions = create_boundary_regions(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices)
+    xtr,ytr = create_bridges(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices,block_size)
+    xtrr,ytrr = create_rev_bridges(wregion,SPLITX,SPLITY,ops,shared_shape,bridge_slices,block_size)
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     local_array = create_local_array(shared_arr,rregion,dType)
@@ -250,6 +250,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Shift data down so timing lines up correctly
     if rank == master_rank:
         shared_arr[ZERO:MPSS+ONE,:,:,:] = shared_arr[ONE:MPSS+TWO,:,:,:]
+        nan_to_zero(shared_arr,zero=0)
     comm.Barrier()
 
     #-------------------------------FIRST BRIDGE-------------------------------------------#
@@ -257,21 +258,19 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     x_array[:,:,:,:] = shared_arr[xbregion]
     y_array[:,:,:,:] = shared_arr[ybregion]
     comm.Barrier()  #Barrier after read
+    # print("*********************",rank,"***********************")
+    # print(x_array[1,0,:,:])
     #Bridge Step
     Bridge(source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
-    #-------------------------PRINT STUFf-------------------------
     if rank == master_rank:
-        nan_to_zero(shared_arr,zero=2)
-        level = 1
-        print(ytr)
-        printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
+        nan_to_zero(shared_arr,zero=0)
     comm.Barrier()
-    #-------------------------END PRINT STUFf-------------------------
+    #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
     local_array[:,:,:,:] = shared_arr[srregion]
     #Swept Octahedrons and Bridges
-    for GST in range(1,MGST):
+    for GST in range(1,2,1):#MGST):
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         #Octahedron Step
@@ -286,7 +285,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Updating Boundary Conditions Step
         boundary_update(shared_arr,ops,SPLITX,SPLITY) #Communicate all boundaries
         comm.Barrier()
-
         #-------------------------------FIRST REVERSE BRIDGE-------------------------------------------#
         #Getting reverse x and y arrays
         x_array[:,:,:,:] = shared_arr[ybregion] #Regions are purposely switched here
@@ -295,7 +293,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Reverse Bridge Step
         Bridge(source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,ybregion,xbregion,(xtrr,ytrr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
-
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         local_array[:,:,:,:] = shared_arr[rregion]
@@ -309,7 +306,6 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         #Updating Boundary Conditions Step
         boundary_update(shared_arr,ops,SPLITX,SPLITY) #Communicate all boundaries
         comm.barrier()  #Barrier following data write
-
         #-------------------------------SECOND BRIDGE (NON-REVERSED)-------------------------------------------#
         #Getting x and y arrays
         x_array[:,:,:,:] = shared_arr[xbregion]

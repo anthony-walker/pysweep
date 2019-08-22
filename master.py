@@ -40,14 +40,14 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 30
-    npy = 30
+    npx = 40
+    npy = 40
     dx = X/npx
     dy = Y/npy
 
     #Time testing arguments
     t0 = 0
-    t_b = 2
+    t_b = 1
     dt = 0.1
     targs = (t0,t_b,dt)
 
