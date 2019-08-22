@@ -32,10 +32,13 @@ import GPUtil
 
 #Swept imports
 from .pysweep_lambda import sweep_lambda
-from .pysweep_dev import *
 from .pysweep_functions import *
 from .pysweep_printer import pysweep_printer
 from .pysweep_decomposition import *
+from .pysweep_block import *
+from .pysweep_regions import *
+from .pysweep_source import *
+
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -262,7 +265,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         nan_to_zero(shared_arr,zero=2)
         level = 1
         print(ytr)
-        # printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
+        printer(shared_arr[level,0,:,:],p_iter=True,end=" ")
     comm.Barrier()
     #-------------------------END PRINT STUFf-------------------------
     #Getting next points for the local array

@@ -5,7 +5,7 @@ import sys
 from .pysweep_lambda import sweep_lambda
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
-from .pysweep_decomposition import *
+from .pysweep_block import *
 
 def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """

@@ -40,8 +40,8 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 40
-    npy = 40
+    npx = 30
+    npy = 30
     dx = X/npx
     dy = Y/npy
 
