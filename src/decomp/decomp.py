@@ -38,7 +38,7 @@ from .decomp_functions import *
 #Testing
 import time as timer
 
-def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict()):
+def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict(),exid=[]):
     """Use this function to perform standard decomposition
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -57,98 +57,130 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
     ONE = 1
     TWO = 2
 
+    start = timer.time()
+    #Local Constants
+    ZERO = 0
+    QUARTER = 0.25
+    HALF = 0.5
+    ONE = 1
+    TWO = 2
+    TOPS = TWO*ops
     #Getting GPU info
-    gpu_ids = GPUtil.getAvailable(order = 'load',excludeID=[],limit=10000) #getting devices by load
-        #-------------MPI Set up----------------------------#
+    #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-    gpu_rank = False    #Says whether or not the rank is a GPU rank
-    #None is in place for device ID
-    rank_info = comm.allgather((rank,processor,gpu_ids,gpu_rank,None))
 
-    #----------------Data Input setup -------------------------#
-    time_steps = int((targs[ONE]-targs[ZERO])/targs[TWO])+ONE  #Number of time steps +ONE becuase initial time step
-    itemsize = int(dType.itemsize)
-    shared_shape = (time_steps,arr0.shape[ZERO],arr0.shape[ONE]+TWO*ops ,arr0.shape[TWO]+TWO*ops )
-    shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*itemsize)
-
+    #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     if rank == master_rank:
-        new_rank_info, total_gpus = get_gpu_ranks(rank_info,affinity)
-        #Adjusting if affinity is 0
-        if affinity==ZERO:
-            total_gpus = ZERO
+        #Determining the split between gpu and cpu
+        gpu_slices,cpu_slices = get_affinity_slices(affinity,block_size,arr0.shape)
+        #Getting gpus
+        if affinity>0:
+            gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
+            gpu_rank = [(True,id) for id in gpu_rank]
+            num_gpus = len(gpu_rank)
         else:
-            total_gpus = num_ranks if num_ranks<total_gpus else total_gpus
-        #Getting total cpus
-        total_cpus = num_ranks-total_gpus
-        #Adjusting affinity if no cpus avaliable
-        affinity = affinity if total_cpus != ZERO else ONE   #sets affinity to ONE if there are no cpus avaliable
-        #Adjust for number of cpus/gpus
-        # affinity*=(total_gpus/total_cpus)
-        # affinity = affinity if affinity <= ONE else ONE #If the number becomes greater than ONE due to adjusting for number of cpus/gpus set to ONE
-        # total_cpus = total_cpus if total_cpus%TWO==ZERO else total_cpus-total_cpus%TWO #Making total cpus divisible by TWO
-        gpu_ranks = list()
-        cpu_ranks = list()
-        for ri in new_rank_info:
-            if ri[3]:
-                gpu_ranks.append(ri[ZERO])
-            else:
-                cpu_ranks.append(ri[ZERO])
-        #Getting slices for data
-        gpu_slices,cpu_slices = affinity_split(affinity,block_size,arr0.shape,total_gpus)
+            gpu_rank = []
+            num_gpus = 0
+        gpu_rank += [(False,None) for i in range(num_gpus,num_ranks)]
+        gpu_ranks = np.array([i for i in range(ZERO,num_gpus)])
+        cpu_ranks = np.array([i for i in range(num_gpus,num_ranks)])
+        #Update boundary points
     else:
-        new_rank_info = None
-        total_gpus=None
-        total_cpus = None
+        gpu_rank = None
         gpu_ranks = None
         cpu_ranks = None
         gpu_slices = None
         cpu_slices = None
 
-    #Scattering new rank information
-    new_rank_info = comm.scatter(new_rank_info)
-    #Updating gpu_rank bools
-    gpu_rank = new_rank_info[3]
-    #Broadcasting new shapes and number of gpus
-    total_gpus = comm.bcast(total_gpus,root=master_rank)
-    total_cpus = comm.bcast(total_cpus,root=master_rank)
+    #-------------------------------INITIAL COLLECTIVE COMMUNICATION
+    gpu_rank = comm.scatter(gpu_rank,root=master_rank)
     gpu_ranks = comm.bcast(gpu_ranks,root=master_rank)
     cpu_ranks = comm.bcast(cpu_ranks,root=master_rank)
     gpu_slices = comm.bcast(gpu_slices,root=master_rank)
     cpu_slices = comm.bcast(cpu_slices,root=master_rank)
 
-    #New master ranks for each architecture
-    gpu_master_rank = gpu_ranks[ZERO] if len(gpu_ranks)>ZERO else None
-    cpu_master_rank = cpu_ranks[ZERO] if len(cpu_ranks)>ZERO else None
+    #GPU rank- MPI Variables
+    if affinity > 0:
+        gpu_group  = comm.group.Incl(gpu_ranks)
+        gpu_comm = comm.Create_group(gpu_group)
+        gpu_master = ZERO
 
-    #Creating GPU group comm
-    gpu_group = comm.group.Incl(gpu_ranks)
-    gpu_comm = comm.Create_group(gpu_group)
+    #Destroys cpu processes if affinity is one
+    if affinity == 1:
+        comm = comm.Create_group(gpu_group)
+        if rank not in gpu_ranks:
+            MPI.Finalize()
+            exit(0)
+    else:
+        #CPU rank- MPI Variables
+        cpu_group  = comm.group.Incl(cpu_ranks)
+        cpu_comm = comm.Create_group(cpu_group)
+        cpu_master = ZERO
+    #Number of each architecture
+    num_gpus = len(gpu_ranks)
+    num_cpus = len(cpu_ranks)
+    #----------------Data Input setup -------------------------#
+    time_steps = int((targs[ONE]-targs[ZERO])/targs[TWO])+ONE  #Number of time steps +ONE becuase initial time step
 
-    #Creating CPU group comm
-    cpu_group = comm.group.Incl(cpu_ranks)
-    cpu_comm = comm.Create_group(cpu_group)
+    #-----------------------SHARED ARRAY CREATION----------------------#
+    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
+    shared_shape = (TWO,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
+    shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    #Fill shared array and communicate initial boundaries
+    if rank == master_rank:
+        edge_comm(shared_arr,ops)
 
-    #Grouping architecture arguments
-    gargs = (gpu_comm,gpu_master_rank,total_gpus,gpu_slices,gpu_rank)
-    cargs = (cpu_comm,cpu_master_rank,total_cpus,cpu_slices)
+    #------------------------------DECOMPOSITION BY REGION CREATION--------------#
+    #Splits regions up amongst architecture
+    if gpu_rank[0]:
+        gri = gpu_comm.Get_rank()
+        cri = None
+        regions = create_write_region(gpu_comm,gri,gpu_master,num_gpus,block_size,arr0.shape,gpu_slices,shared_shape[0],ops)
+    else:
+        cri = cpu_comm.Get_rank()
+        gri = None
+        regions = create_write_region(cpu_comm,cri,cpu_master,num_cpus,block_size,arr0.shape,cpu_slices,shared_shape[0],ops)
+    regions = (create_read_region(regions,ops),regions) #Creating read region
 
-    #Create regions and local array here
-    regions = create_write_region(rank,gargs,cargs,block_size,ops)
-    regions = (create_read_region(regions,ops),regions)
-    local_array = local_array_create(shared_arr,regions[ZERO],dType)
+    #--------------------------------CREATING LOCAL ARRAY-----------------------------------------#
+    local_array = create_local_array(shared_arr,regions[ZERO],dType)
 
-    # Specifying which source mod to use
-    if gpu_rank:
+    #---------------------_REMOVING UNWANTED RANKS---------------------------#
+    #Checking if rank is useful
+    if regions[ONE][3].start == regions[ONE][3].stop or regions[ONE][2].start == regions[ONE][2].stop:
+        include_ranks = None
+    else:
+        include_ranks = rank
+    #Gathering results
+    include_ranks = comm.gather(include_ranks,root=master_rank)
+    if rank == master_rank:
+        include_ranks = list(filter(lambda a: a is not None, include_ranks))
+    #Distributing new results
+    include_ranks = comm.bcast(include_ranks,root=master_rank)
+    #Creating new comm group
+    comm_group = comm.group.Incl(include_ranks)
+    #Killing unwanted processes
+    if rank not in include_ranks:
+        MPI.Finalize()
+        exit(0)
+    #Updating comm
+    comm = comm.Create_group(comm_group)
+    #Sync all processes - Ensures boundaries are updated
+    comm.Barrier()
+    #
+
+    #---------------Generating Source Modules----------------------------------#
+    if gpu_rank[0]:
         # Creating cuda device and Context
         cuda.init()
-        cuda_device = cuda.Device(new_rank_info[-ONE])
+        cuda_device = cuda.Device(gpu_rank[ONE])
         cuda_context = cuda_device.make_context()
         #Creating local GPU array with split
-        grid_size = (int(local_array.shape[TWO]/block_size[ZERO]),int(local_array.shape[3]/block_size[ONE]))   #Grid size
+        grid_size = (int((local_array.shape[TWO]-TOPS)/block_size[ZERO]),int((local_array.shape[3]-TOPS)/block_size[ONE]))   #Grid size
         #Creating constants
         NV = local_array.shape[ONE]
         SGIDS = (block_size[ZERO]+TWO*ops)*(block_size[ONE]+TWO*ops)
@@ -162,50 +194,40 @@ def decomp(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dTyp
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
         constant_copy(source_mod,const_dict,add_consts)
-        local_cpu_regions = None
+        cpu_regions = None
     else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
-        local_cpu_regions = create_blocks_list(local_array,block_size,ops)
+        cpu_regions = create_blocks_list(local_array.shape,block_size,ops)
         grid_size = None
 
-    #Setting local array boolean
-    if local_array is None:
-        LAB = False
-    else:
-        LAB = True
-
-    #Creating HDF5 file
+    #------------------------------HDF5 File------------------------------------------#
     filename+=".hdf5"
-    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=MPI.COMM_WORLD)
+    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
     hdf_bs = hdf5_file.create_dataset("block_size",(len(block_size),))
-    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,))
-    hdf_aff = hdf5_file.create_dataset("affinity",(1,))
+    hdf_bs[:] = block_size[:]
+    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,))
+    hdf_as[:] = (time_steps,)+arr0.shape
+    hdf_aff = hdf5_file.create_dataset("affinity",(ONE,))
+    hdf_aff[ZERO] = affinity
     hdf_time = hdf5_file.create_dataset("time",(1,))
     hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-
-    if LAB:
-        hdf_bs[:] = block_size[:]
-        hdf_as[:] = (time_steps,)+arr0.shape
-        hdf_aff[0] = affinity
-        hdfr1 = slice(regions[1][2].start-ops,regions[1][2].stop-ops)
-        hdfr2 = slice(regions[1][3].start-ops,regions[1][3].stop-ops)
-        hdf5_data_set[0,:,hdfr1,hdfr2] = shared_arr[0,regions[1][1],regions[1][2],regions[1][3]]
-    comm.Barrier()
+    hregion = (regions[ONE][1],slice(regions[ONE][2].start-ops,regions[ONE][2].stop-ops,1),slice(regions[ONE][3].start-ops,regions[ONE][3].stop-ops,1))
+    hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
 
     #Solution
     for i in range(1,time_steps):
-        if LAB:
-            decomposition(source_mod,local_array, gpu_rank, block_size, grid_size,regions[ONE],local_cpu_regions,shared_arr,ops)
+        comm.Barrier()
+        decomposition(source_mod,local_array, gpu_rank[0], block_size, grid_size,regions[ONE],cpu_regions,shared_arr,ops)
         comm.Barrier()
         if rank == master_rank:
             edge_comm(shared_arr,ops)
         comm.Barrier()
         #Writing Data after it has been shifted
-        if LAB:
-            hdf5_data_set[i,:,hdfr1,hdfr2] = shared_arr[0,regions[1][1],regions[1][2],regions[1][3]]
+        hdf5_data_set[i,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
+    #Final barrier
     comm.Barrier()
     #CUDA clean up - One of the last steps
-    if gpu_rank:
+    if gpu_rank[0]:
         cuda_context.pop()
     comm.Barrier()
     #Timer

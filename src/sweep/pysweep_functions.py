@@ -77,9 +77,6 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
             block_y = np.zeros(yarr[local_region].shape)
             block_y += yarr[local_region]
             blocks_y.append(block_y)
-            # print("************************")
-            # print(len(block_x))
-            # print(blocks_x[1][1,0,:,:])
         #Solving
         cpu_fcn = sweep_lambda((CPU_Bridge,source_mod,idx_sets[0]))
         blocks_x = list(map(cpu_fcn,blocks_x))
@@ -91,6 +88,7 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
     xarr-=x0arr
     shared_arr[xregion] += xarr[:,:,:,:]
     shared_arr[yregion] += yarr[:,:,:,:]
+
     for i, x_item in enumerate(cregions[1],start=1):
         for bs in x_item:
             lcx,lcy,shx,shy = bs
@@ -183,10 +181,3 @@ def CPU_DownPyramid(args):
         #Calculating Step
         block = source_mod.step(block,swept_set,ts)
     return block
-
-def nan_to_zero(arr,zero=0.):
-    """Use this function to turn nans to zero."""
-    for i in np.ndindex(arr.shape):
-        if np.isnan(arr[i]):
-            arr[i]=zero
-    return arr

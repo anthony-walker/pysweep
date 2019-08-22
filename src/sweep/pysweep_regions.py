@@ -82,8 +82,8 @@ def create_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):
             #Adjustment for multiple blocks per rank
             xtt += ((nx,y,tfx,tfy),)
             for i in range(1,y_blocks):
-                y = slice(y.start+i*block_size[1],y.stop+i*block_size[1],1)
-                tfy = slice(tfy.start+i*block_size[1],tfy.stop+i*block_size[1],1)
+                y = slice(y.start+block_size[1],y.stop+block_size[1],1)
+                tfy = slice(tfy.start+block_size[1],tfy.stop+block_size[1],1)
                 xtt += ((nx,y,tfx,tfy),)
             x_regions += (xtt,)
     if c2: #Side edge -  periodic y
@@ -100,8 +100,8 @@ def create_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):
             ytt += ((x,ny,tfx,tfy),)
             #Adjustment for multiple blocks
             for i in range(1,x_blocks):
-                x = slice(x.start+i*block_size[0],x.stop+i*block_size[0],1)
-                tfx = slice(tfx.start+i*block_size[0],tfx.stop+i*block_size[0],1)
+                x = slice(x.start+block_size[0],x.stop+block_size[0],1)
+                tfx = slice(tfx.start+block_size[0],tfx.stop+block_size[0],1)
                 ytt += ((x,ny,tfx,tfy),)
             y_regions += (ytt,)
     return x_regions,y_regions
@@ -130,8 +130,8 @@ def create_rev_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):
             #Adjustment for multiple blocks per rank
             xtt += ((nx,y,tfx,tfy),)
             for i in range(1,y_blocks):
-                y = slice(y.start+i*block_size[1],y.stop+i*block_size[1],1)
-                tfy = slice(tfy.start+i*block_size[1],tfy.stop+i*block_size[1],1)
+                y = slice(y.start+block_size[1],y.stop+block_size[1],1)
+                tfy = slice(tfy.start+block_size[1],tfy.stop+block_size[1],1)
                 xtt += ((nx,y,tfx,tfy),)
             x_regions += (xtt,)
     if c2: #Side edge -  periodic y
@@ -146,13 +146,11 @@ def create_rev_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):
             ytt += ((x,ny,tfx,tfy),)
             #Adjustment for multiple blocks
             for i in range(1,x_blocks):
-                x = slice(x.start+i*block_size[0],x.stop+i*block_size[0],1)
-                tfx = slice(tfx.start+i*block_size[0],tfx.stop+i*block_size[0],1)
+                x = slice(x.start+block_size[0],x.stop+block_size[0],1)
+                tfx = slice(tfx.start+block_size[0],tfx.stop+block_size[0],1)
                 ytt += ((x,ny,tfx,tfy),)
             y_regions += (ytt,)
     return x_regions,y_regions
-
-
 
 def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,ops):
     """Use this function to create a shifted region(s)."""

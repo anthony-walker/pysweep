@@ -7,9 +7,7 @@ from pycuda.compiler import SourceModule
 #MPI imports
 from mpi4py import MPI
 import importlib
-#System imports
-import os.path as op
-import inspect
+
 
 def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):
     """Use this function to create shared memory arrays for node communication."""
@@ -85,3 +83,11 @@ def hdf_swept_write(shared_arr,reg,hdf_set,hr,MPSS,GST):
     shared_arr[:nte,reg[1],reg[2],reg[3]] = shared_arr[MPSS:,reg[1],reg[2],reg[3]]
     shared_arr[nte:,reg[1],reg[2],reg[3]] = 0
     #Do edge comm after this function
+
+#Nan to zero is a testing function - it doesn't really belong here
+def nan_to_zero(arr,zero=0.):
+    """Use this function to turn nans to zero."""
+    for i in np.ndindex(arr.shape):
+        if np.isnan(arr[i]):
+            arr[i]=zero
+    return arr

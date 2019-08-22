@@ -40,8 +40,9 @@ def test(args):
     X = cvics.L
     Y = cvics.L
     #Dimensions and steps
-    npx = 40
-    npy = 40
+    opt_grid_size = int(4*5*6*7)
+    npx = 64
+    npy = 64
     dx = X/npx
     dy = Y/npy
 
@@ -85,14 +86,12 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-
-    ct = sweep(initial_vortex,targs,dx,dy,ops,(10,10,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
-
-
+    cts = sweep(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
+    ct = decomp(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/decomp")
+    return (cts,ct)
 
 if __name__ == "__main__":
     args = tuple()
-    # sm = "Hi,\nYour function run is complete.\n"
-    # notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
-    # notifier.run()
-    test(args)
+    sm = "Hi,\nYour function run is complete.\n"
+    notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
+    notifier.run()

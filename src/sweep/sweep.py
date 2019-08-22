@@ -33,12 +33,10 @@ import GPUtil
 #Swept imports
 from .pysweep_lambda import sweep_lambda
 from .pysweep_functions import *
-from .pysweep_printer import pysweep_printer
 from .pysweep_decomposition import *
 from .pysweep_block import *
 from .pysweep_regions import *
 from .pysweep_source import *
-
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -68,13 +66,13 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     TWO = 2
     TOPS = TWO*ops
     #Getting GPU info
-        #-------------MPI Set up----------------------------#
+    #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-    printer = pysweep_printer(rank,master_rank)
+
     #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     if rank == master_rank:
         #Determining the split between gpu and cpu
@@ -243,34 +241,26 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     comm.Barrier() #Ensure all processes are prepared to solve
 
     #-------------------------------SWEPT RULE---------------------------------------------#
-
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     UpPyramid(source_mod,local_array,gpu_rank[ZERO],block_size,grid_size,wregion,bregions,cpu_regions,shared_arr,up_sets,ops) #THis modifies shared array
     comm.Barrier()
     #Shift data down so timing lines up correctly
     if rank == master_rank:
         shared_arr[ZERO:MPSS+ONE,:,:,:] = shared_arr[ONE:MPSS+TWO,:,:,:]
-        nan_to_zero(shared_arr,zero=0)
     comm.Barrier()
-
     #-------------------------------FIRST BRIDGE-------------------------------------------#
     #Getting x and y arrays
     x_array[:,:,:,:] = shared_arr[xbregion]
     y_array[:,:,:,:] = shared_arr[ybregion]
     comm.Barrier()  #Barrier after read
-    # print("*********************",rank,"***********************")
-    # print(x_array[1,0,:,:])
     #Bridge Step
     Bridge(source_mod,x_array,y_array,gpu_rank[0],block_size,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,ops) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
-    if rank == master_rank:
-        nan_to_zero(shared_arr,zero=0)
-    comm.Barrier()
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
     local_array[:,:,:,:] = shared_arr[srregion]
     #Swept Octahedrons and Bridges
-    for GST in range(1,2,1):#MGST):
+    for GST in range(1,MGST):
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         #Octahedron Step
@@ -327,7 +317,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #Writing Step
     hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST+1)
     comm.Barrier()  #Write Barrier
-    #CUDA clean up - One of the last steps
+    # CUDA clean up - One of the last steps
     if gpu_rank[0]:
         cuda_context.pop()
     comm.Barrier()
@@ -345,30 +335,3 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     #This if for testing only
     if rank == master_rank:
         return avg_time
-
-if __name__ == "__main__":
-    # print("Starting execution.")
-    dims = (4,int(32),int(32))
-    arr0 = np.zeros(dims)
-    arr0[0,:,:] = 0.1
-    arr0[1,:,:] = 0.5
-    arr0[2,:,:] = 0.2
-    arr0[3,:,:] = 0.125
-
-    #GPU Arguments
-    block_size = (8,8,1)
-    kernel = "/home/walkanth/pysweep/src/equations/euler.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
-    affinity = 0
-    #Time testing arguments
-    t0 = 0
-    t_b = 1
-    dt = 0.01
-    targs = (t0,t_b,dt)
-
-    #Space testing arguments
-    dx = 0.1
-    dy = 0.1
-    ops = 2
-
-    sweep(arr0,targs,dx,dy,ops,block_size,kernel,cpu_source,affinity)

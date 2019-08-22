@@ -5,6 +5,7 @@
 #Import statements
 import numpy as np
 import os
+import h5py
 
 def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
