@@ -95,7 +95,7 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
         lcx,lcy,shx,shy = bs
         shared_arr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
 
-def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,shared_arr,idx_sets,ops):
+def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -119,8 +119,10 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,s
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
+    for br in bregions:
+        shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
 
-def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,shared_arr,idx_sets,ops):
+def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,shared_arr,idx_sets,ops):
     """This is the ending inverted pyramid."""
     if gpu_rank:
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
@@ -170,6 +172,7 @@ def CPU_Octahedron(args):
 def CPU_DownPyramid(args):
     """Use this function to build the Down Pyramid."""
     block,source_mod,idx_sets = args
+
     #Removing elements for swept step
     for ts, swept_set in enumerate(idx_sets,start=0):
         #Calculating Step

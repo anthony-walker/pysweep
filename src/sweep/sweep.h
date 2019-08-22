@@ -431,16 +431,15 @@ DownPyramid(float *state)
   int tidy = threadIdx.y+OPS;
   int sgid = get_sgid(tidx,tidy); //Shared global index
   int gid = get_gid(); //global index
+  int TOPS = 2*OPS;
+  int MDSS = MOSS-MPSS;
+  //------------------------DOWNPYRAMID -----------------------------
 
-  //Communicating edge values to shared array
-  edge_comm(shared_state, state, MPSS);
-
-  //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
   //Creating swept boundaries
-  int lx =(blockDim.x+OPS)/TWO+1-OPS; //upper x
-  int ly = (blockDim.y+OPS)/TWO+1-OPS; //upper y
-  int ux =(blockDim.x+OPS)/TWO+OPS; //upper x
-  int uy = (blockDim.y+OPS)/TWO+OPS; //upper y
+  int lx =(blockDim.x+TOPS)/TWO-OPS; //lower x
+  int ly = (blockDim.y+TOPS)/TWO-OPS; //lower y
+  int ux =(blockDim.x+TOPS)/TWO+OPS; //upper x
+  int uy = (blockDim.y+TOPS)/TWO+OPS; //upper y
 
   //Initial communication
   for (int i = 0; i < NV; i++)
@@ -449,11 +448,12 @@ DownPyramid(float *state)
   }
   __syncthreads(); //Sync threads here to ensure all initial values are copied
 
-
-  for (int k = 0; k < MPSS; k++)
+  //Calculate Down Pyramid - Down Step
+  for (int k = 0; k <= MDSS; k++)
   {
+
       // Solving step function
-      if (tidx<=ux && tidx>=lx && tidy<=uy && tidy>=ly)
+      if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
       {
           step(shared_state,sgid);
           //Ensures steps are done prior to communication
