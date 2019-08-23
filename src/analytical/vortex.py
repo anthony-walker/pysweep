@@ -12,7 +12,6 @@ mpl.use("Tkagg")
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from collections.abc import Iterable
-import matplotlib.animation as animation
 #Indicies
 pid = 0
 did = 1
@@ -122,21 +121,7 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./
     y_velocity[:,0,:,:] =state[:,vid,:,:]
     return state,args
 
-def convert_to_flux(vortex_data,gamma):
-    """Use this function to convert a vortex to flux data."""
-    flux = np.zeros(vortex_data.shape)
-    P = vortex_data[:,pid,:,:]
-    rho = vortex_data[:,did,:,:]
-    u = vortex_data[:,uid,:,:]
-    v = vortex_data[:,vid,:,:]
-    flux[:,0,:,:] = rho
-    flux[:,1,:,:] = rho*u
-    flux[:,2,:,:] = rho*v
-    rhoe = P/(gamma-1)+rho*u*u/2+rho*v*v/2
-    flux[:,3,:,:] = rhoe
-    return flux
-
-def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./vortex_plot"):
+def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./vortex_plot.png"):
     """Use this function to plot a property with a given time."""
     file = h5py.File(filename,"r")
     data = file[property]
@@ -150,29 +135,15 @@ def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./v
     xpts = np.linspace(-x,x,npx,dtype=np.float64)
     ypts = np.linspace(-y,y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-
+    zgrid = data[time,:,:,:][0]
     fig, ax =plt.subplots()
-    ax.set_ylim(-Y, Y)
-    ax.set_xlim(-X, X)
-    ax.set_title(property)
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-
-    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
-    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:,:][0],levels=levels,cmap=cm.inferno)
 
     if isinstance(time,Iterable):
-        frames = len(tuple(time))
-        anim = animation.FuncAnimation(fig,animate,frames)
-        anim.save(savepath+".gif",writer="imagemagick")
+        pass
     else:
-        animate(time)
-        fig.savefig(savepath+".png")
-        plt.show()
-
-# def animate(ax,xgrid,ygrid,data,levels):
-#     ax.contourf(xgrid,ygrid,zgrid,levels=levels,cmap=cm.inferno)
+        ctr = ax.contourf(xgrid,ygrid,zgrid,levels=levels,cmap=cm.inferno)
+        fig.savefig(savepath)
+    plt.show()
 
 
 class vics(object):
@@ -532,6 +503,6 @@ if __name__ == "__main__":
     cvics.vortex_args = cvics.vortex_args[:2]+(50,50)
     X,Y,npx,npy = cvics.vortex_args
     #Calling analytical solution
-    num_times = 100
-    # create_vortex_data(cvics,X,Y,npx,npy,times=np.linspace(0,10,num_times))
-    vortex_plot("./vortex/vortex1.hdf5",'x-velocity',range(0,num_times,1))
+    # state = vortex(cvics,X,Y,npx,npy,times=np.linspace(0,1,100))
+    # create_vortex_data(cvics,X,Y,npx,npy,times=np.linspace(0,1,250))
+    vortex_plot("./vortex/vortex0.hdf5",'x-velocity',50)
