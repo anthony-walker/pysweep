@@ -30,14 +30,13 @@ def dfdxy(state,idx):
     ops = 2 #number of atomic operations
     idxx=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1),idx[3])
     idxy=(idx[0],idx[1],idx[2],slice(idx[3]-ops,idx[3]+ops+1,1))
-
+    quarter = 0.25
     #Finding pressure ratio
     Prx = pressure_ratio(state[idxx])
     Pry = pressure_ratio(state[idxy])
-
     #Finding spatial derivatives
-    dfdx = direction_flux(state[idxx],Prx,True)
-    dfdy = direction_flux(state[idxy],Pry,False)
+    dfdx = quarter*direction_flux(state[idxx],Prx,True)
+    dfdy = quarter*direction_flux(state[idxy],Pry,False)
     return dfdx, dfdy
 
 def pressure_ratio(state):
@@ -79,11 +78,13 @@ def direction_flux(state,Pr,xy):
     #Atomic Operation 1
     tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
     tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
+
     flux += eflux(tsl,tsr,xy)
     flux += espectral(tsl,tsr,xy)
     #Atomic Operation 2
     tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
     tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
+
     flux -= eflux(tsl,tsr,xy)
     flux -= espectral(tsl,tsr,xy)
     return flux
@@ -143,7 +144,6 @@ def espectral(left_state,right_state,xy):
     P = pressure(spec_state*spec_state[0])
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
-
 
 def set_globals(**args):
     """Use this function to set cpu global variables"""

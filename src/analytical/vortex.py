@@ -142,13 +142,13 @@ def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./v
     data = file[property]
     #Dimensions
     dims = file['dimensions']
-    x = dims[0]
-    y = dims[1]
+    X = dims[0]
+    Y = dims[1]
     npx = dims[2]
     npy = dims[3]
     #Meshgrid
-    xpts = np.linspace(-x,x,npx,dtype=np.float64)
-    ypts = np.linspace(-y,y,npy,dtype=np.float64)
+    xpts = np.linspace(-X,X,npx,dtype=np.float64)
+    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
 
     fig, ax =plt.subplots()
@@ -157,7 +157,6 @@ def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./v
     ax.set_title(property)
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
-
     # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
     fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
     animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:,:][0],levels=levels,cmap=cm.inferno)
@@ -533,5 +532,5 @@ if __name__ == "__main__":
     X,Y,npx,npy = cvics.vortex_args
     #Calling analytical solution
     num_times = 100
-    # create_vortex_data(cvics,X,Y,npx,npy,times=np.linspace(0,10,num_times))
-    vortex_plot("./vortex/vortex1.hdf5",'x-velocity',range(0,num_times,1))
+    create_vortex_data(cvics,X,Y,npx,npy,times=np.linspace(0,10,num_times))
+    vortex_plot("./vortex/vortex0.hdf5",'density',range(0,num_times,1))
