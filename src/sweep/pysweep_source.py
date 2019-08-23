@@ -61,6 +61,6 @@ def constant_copy(source_mod,const_dict,add_const=None):
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
 
-    for key in add_const:
-        c_ptr,_ = source_mod.get_global(key)
-        cuda.memcpy_htod(c_ptr,add_const[key])
+    # for key in add_const:
+    #     c_ptr,_ = source_mod.get_global(key)
+    #     cuda.memcpy_htod(c_ptr,add_const[key])

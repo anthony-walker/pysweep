@@ -149,8 +149,7 @@ def set_globals(**args):
     """Use this function to set cpu global variables"""
     dx = args["dx"]
     dy = args["dy"]
-    dt = args["dt"]
-    print("woo")
+    dt = args["targs"][2]
     gam = args["gamma"]
     global dtdx
     dtdx = dt/dx

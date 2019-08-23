@@ -55,7 +55,7 @@ def test(args):
 
     # Creating initial vortex from analytical code
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
-    
+    flux_vortex = convert_to_flux(initial_vortex,gamma)
     #GPU Arguments
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
@@ -90,9 +90,9 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    cts = sweep(initial_vortex,eargs,sargs,filename="./results/swept")
+    cts = sweep(flux_vortex[0],eargs,sargs,filename="./results/swept")
     # ct = decomp(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/decomp")
-    return (cts,ct)
+    # return (cts,ct)
 
 if __name__ == "__main__":
     args = tuple()

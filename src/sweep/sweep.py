@@ -229,11 +229,11 @@ def sweep(arr0,eargs,sargs,dType=np.dtype('float32'),filename ="results",exid=[]
                     ,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":ops})
         #Building CUDA source code
         source_mod = build_gpu_source(gpu_source)
-        constant_copy(source_mod,const_dict,add_consts)
+        constant_copy(source_mod,const_dict)
         cpu_regions = None
     else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
-        source_mod.set_globals(eargs)
+        source_mod.set_globals(**eargs)
         cpu_regions = create_blocks_list(local_array.shape,block_size,ops)
         grid_size = None
 
