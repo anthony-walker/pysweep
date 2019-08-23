@@ -4,9 +4,9 @@
 
 import numpy as np
 #----------------------------------Globals-------------------------------------#
-gamma = 1.4
-dtdx = 0.001
-dtdy = 0.002
+gamma = 0
+dtdx = 0
+dtdy = 0
 #----------------------------------End Globals-------------------------------------#
 
 def step(state,iidx,ts):
@@ -143,6 +143,17 @@ def espectral(left_state,right_state,xy):
     P = pressure(spec_state*spec_state[0])
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
+
+
+def set_cpu_globals(args):
+    """Use this function to set cpu global variables"""
+    dx,dy,dt,gam = args
+    global dtdx
+    dtdx = dt/dx
+    global dtdy
+    dtdy = dt/dy
+    global gamma
+    gamma = gam
 
 def test_mod_load():
     """Use this function to test created cu source module."""
