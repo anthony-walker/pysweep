@@ -46,7 +46,7 @@ warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
 #----------------------End Global Variables------------------------#
 
-def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType=np.dtype('float32'),filename = "results",add_consts=dict(),exid=[]):
+def sweep(arr0,eargs,sargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -57,6 +57,17 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
     block_size - gpu block size (check your architecture requirements)
     affinity -  the GPU affinity (GPU work/CPU work)/TotalWork
     """
+    #Unpacking arguments
+    dx = eargs["dx"]
+    dy  = eargs["dy"]
+    targs = eargs["targs"]
+    ops = sargs["ops"]
+    block_size = sargs["block_size"]
+    affinity = sargs["affinity"]
+    gpu_source = sargs["gpu_source"]
+    cpu_source = sargs["cpu_source"]
+
+
     start = timer.time()
     #Local Constants
     ZERO = 0
@@ -222,6 +233,7 @@ def sweep(arr0,targs,dx,dy,ops,block_size,gpu_source,cpu_source,affinity=1,dType
         cpu_regions = None
     else:
         source_mod = build_cpu_source(cpu_source) #Building Python source code
+        source_mod.set_globals(eargs)
         cpu_regions = create_blocks_list(local_array.shape,block_size,ops)
         grid_size = None
 

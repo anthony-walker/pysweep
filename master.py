@@ -42,8 +42,8 @@ def test(args):
 
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 512
-    npy = 512
+    npx = 64
+    npy = 64
     dx = X/npx
     dy = Y/npy
 
@@ -55,7 +55,7 @@ def test(args):
 
     # Creating initial vortex from analytical code
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
-
+    
     #GPU Arguments
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
@@ -66,8 +66,13 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
+    block_size = (32,32,1)
+    affinity = 0.5
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
+    eargs = {"dx":dx,"dy":dy,"targs":targs,"gamma":gamma}
+    sargs = {"ops":ops,"block_size":block_size,"affinity":affinity,"gpu_source":kernel,"cpu_source":cpu_source}
+
     # #Swept results
     # for i,bs in enumerate(block_sizes):
     #     for j,aff in enumerate(affinities):
@@ -85,12 +90,13 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    cts = sweep(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/swept")
-    ct = decomp(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/decomp")
+    cts = sweep(initial_vortex,eargs,sargs,filename="./results/swept")
+    # ct = decomp(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/decomp")
     return (cts,ct)
 
 if __name__ == "__main__":
     args = tuple()
-    sm = "Hi,\nYour function run is complete.\n"
-    notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
-    notifier.run()
+    # sm = "Hi,\nYour function run is complete.\n"
+    # notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
+    # notifier.run()
+    test(args)

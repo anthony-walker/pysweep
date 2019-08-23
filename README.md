@@ -6,7 +6,8 @@ heterogeneous computing architecture.
 # Constraints
 - The grid used is uniform and rectangular.
 - block_size should be (2^n,2^n,1) and constrained by your GPU. Note the block_size should have the same x and y dimension.
-
+- A total of three functions must be named accordingly and take specific arguments.
+- This code is currently limited to periodic boundary conditions
 
 ### General Approach
 

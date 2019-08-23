@@ -145,9 +145,13 @@ def espectral(left_state,right_state,xy):
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
 
-def set_cpu_globals(args):
+def set_globals(**args):
     """Use this function to set cpu global variables"""
-    dx,dy,dt,gam = args
+    dx = args["dx"]
+    dy = args["dy"]
+    dt = args["dt"]
+    print("woo")
+    gam = args["gamma"]
     global dtdx
     dtdx = dt/dx
     global dtdy
