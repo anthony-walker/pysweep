@@ -6,6 +6,18 @@
 import numpy as np
 import os
 import h5py
+#Plottign
+import matplotlib as mpl
+mpl.use("Tkagg")
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from collections.abc import Iterable
+import matplotlib.animation as animation
+#Indicies
+pid = 0
+did = 1
+uid = 2
+vid = 3
 
 def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
@@ -20,7 +32,6 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
        Persson, P. O., Bonet, J., & Peraire, J. (2009).
        Discontinuous Galerkin solution of the Navier–Stokes equations on deformable domains.
        Computer Methods in Applied Mechanics and Engineering, 198(17-20), 1585-1595.
-
     """
     alpha, M_inf, P_inf, rho_inf, T_inf, gamma, R_gas, c, sigma, beta, r_c, L = cvics.get_args()
     PI = np.pi
@@ -38,10 +49,11 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     xpts = np.linspace(-X,X,npx,dtype=np.float64)
     ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-    state = np.zeros(xgrid.shape+np.shape(times)+(4,),dtype=np.float64) #Initialization of state
-    idxs = np.ndindex(xgrid.shape)  #Indicies of the array
+    state = np.zeros(np.shape(times)+(4,)+xgrid.shape,dtype=np.float64) #Initialization of state
+    idxs = tuple(np.ndindex(xgrid.shape))  #Indicies of the array
+
     #Solving times
-    for t in times:
+    for i in range(len(times)):
         for idx in idxs:
             #getting x and y location
             x = xgrid[idx]
@@ -50,10 +62,9 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
             #differences from origin
             dx0 = (x-x0)
             dy0 = (y-y0)
-
             #Common terms
-            uterm = (dx0-u_bar*t)
-            vterm = (dy0-v_bar*t)
+            uterm = (dx0-u_bar*times[i])
+            vterm = (dy0-v_bar*times[i])
             pterm = beta*beta*(gamma-1)*M_inf*M_inf/(8*PI*PI)
 
             #function calculation f(x,y,t)
@@ -62,53 +73,107 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
             f = (1-fx-fy)/(r_c*r_c)
 
             #Finding state variables
-            state[idx+(t,0)] = rho_inf*(1-pterm*np.exp(f))**(1/(gamma-1)) #density
-            state[idx+(t,1)] = V_inf*(np.cos(alpha)-beta*vterm/(2*PI*r_c)*np.exp(f/2)) #x velocity
-            state[idx+(t,2)] = V_inf*(np.sin(alpha)-beta*uterm/(2*PI*r_c)*np.exp(f/2)) #y velocity
-            state[idx+(t,3)] = P_inf*(1-pterm*np.exp(f))**(gamma/(gamma-1)) #pressure
+            state[(i,pid)+idx] = P_inf*(1-pterm*np.exp(f))**(gamma/(gamma-1)) #pressure
+            state[(i,did)+idx] = rho_inf*(1-pterm*np.exp(f))**(1/(gamma-1)) #density
+            state[(i,uid)+idx] = V_inf*(np.cos(alpha)-beta*vterm/(2*PI*r_c)*np.exp(f/2)) #x velocity
+            state[(i,vid)+idx] = V_inf*(np.sin(alpha)-beta*uterm/(2*PI*r_c)*np.exp(f/2)) #y velocity
     return state
 
 
-
-def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, dirpath = "./vortex"):
+def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex"):
     """Use this function to create vortex data from the vortex funciton.
     Note, this function will create a directory called "vortex#" unless otherwise specified.
-    Subdirectories will be created for density, x-velocity, y-velocity, and pressure.
+    An hdf5 file will be created with the groups pressure, density, x-velocity, and y-velocity.
     files in these directories will be labeled in time order e.g. density1.txt, density2.txt etc.
     the time will be stored in each file as well.
     """
+    #Args tuple
+    args = (cvics,X,Y,npx,npy,times,x0,y0)
     #Making directories
-    if os.path.isdir:
-        ctr = 0
-        dirpath+=str(ctr)
+    if filepath == "./vortex/":
+        if not os.path.isdir(filepath):
+            os.mkdir(filepath)
+    #Making new file
+    ctr=0
+    hdf_end = ".hdf5"
+    tpath = filepath+filename+str(ctr)
+    while os.path.isfile(tpath+hdf_end):
+        tpath=tpath[:-len(str(ctr))]
+        tpath+=str(ctr+1)
         ctr+=1
-        while os.path.isdir(dirpath):
-            dirpath=dirpath[:-len(str(ctr-1))]
-            dirpath+=str(ctr)
-            ctr+=1
-        rpath = dirpath+"/density/"
-        xpath = dirpath+"/x-velocity/"
-        ypath = dirpath+"/y-velocity/"
-        ppath = dirpath+"/pressure/"
-        os.mkdir(dirpath)
-        os.mkdir(rpath)
-        os.mkdir(xpath)
-        os.mkdir(ypath)
-        os.mkdir(ppath)
-        str_array = [rpath+"density",xpath+"x-velocity",ypath+"y-velocity",ppath+"pressure"]
-        text_end = ".txt"
+    file = h5py.File(tpath+".hdf5","w")
+    pressure = file.create_dataset("pressure",(len(times),1,npx,npy))
+    density = file.create_dataset("density",(len(times),1,npx,npy))
+    x_velocity = file.create_dataset("x-velocity",(len(times),1,npx,npy))
+    y_velocity = file.create_dataset("y-velocity",(len(times),1,npx,npy))
+    cvic_args = [item  if item is not None else 1e-32 for item in cvics.get_args()]
+    ic_data = file.create_dataset("ic",np.shape(cvic_args))
+    ic_data[:]=cvic_args[:]
+    origin_data = file.create_dataset("origin",(2,))
+    origin_data[:] = (x0,y0)
+    dim_data = file.create_dataset("dimensions",(4,))
+    dim_data[:] = (X,Y,npx,npy)
+
+    #Creating state data
     state = vortex(cvics,X,Y,npx,npy, times, x0=x0, y0=y0)
-    states = np.array_split(state,len(times),axis=2)
-    tsc = 0
-    for temp_state in states:
-        temp_states = np.array_split(temp_state,4,axis=3)
-        fc = 0
-        for prop_state in temp_states:
-            temp_prop_state = np.reshape(prop_state,prop_state.shape[:2])
-            np.savetxt(str_array[fc]+str(tsc),temp_prop_state,fmt="%.10f",delimiter=",",header="time_step: "+str(times[tsc]))
-            fc+=1
-        tsc+=1
-    return state
+    pressure[:,0,:,:] = state[:,pid,:,:]
+    density[:,0,:,:] = state[:,did,:,:]
+    x_velocity[:,0,:,:] =state[:,uid,:,:]
+    y_velocity[:,0,:,:] =state[:,vid,:,:]
+    return state,args
+
+def convert_to_flux(vortex_data,gamma):
+    """Use this function to convert a vortex to flux data."""
+    flux = np.zeros(vortex_data.shape)
+    P = vortex_data[:,pid,:,:]
+    rho = vortex_data[:,did,:,:]
+    u = vortex_data[:,uid,:,:]
+    v = vortex_data[:,vid,:,:]
+    flux[:,0,:,:] = rho
+    flux[:,1,:,:] = rho*u
+    flux[:,2,:,:] = rho*v
+    rhoe = P/(gamma-1)+rho*u*u/2+rho*v*v/2
+    flux[:,3,:,:] = rhoe
+    return flux
+
+def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./vortex_plot"):
+    """Use this function to plot a property with a given time."""
+    file = h5py.File(filename,"r")
+    data = file[property]
+    #Dimensions
+    dims = file['dimensions']
+    x = dims[0]
+    y = dims[1]
+    npx = dims[2]
+    npy = dims[3]
+    #Meshgrid
+    xpts = np.linspace(-x,x,npx,dtype=np.float64)
+    ypts = np.linspace(-y,y,npy,dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+
+    fig, ax =plt.subplots()
+    ax.set_ylim(-Y, Y)
+    ax.set_xlim(-X, X)
+    ax.set_title(property)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+
+    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
+    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:,:][0],levels=levels,cmap=cm.inferno)
+
+    if isinstance(time,Iterable):
+        frames = len(tuple(time))
+        anim = animation.FuncAnimation(fig,animate,frames)
+        anim.save(savepath+".gif",writer="imagemagick")
+    else:
+        animate(time)
+        fig.savefig(savepath+".png")
+        plt.show()
+
+# def animate(ax,xgrid,ygrid,data,levels):
+#     ax.contourf(xgrid,ygrid,zgrid,levels=levels,cmap=cm.inferno)
+
 
 class vics(object):
     """This class contains functions for vortex initial conditions
@@ -462,9 +527,11 @@ class vics(object):
 if __name__ == "__main__":
     #HighOrder Workshop Fast
     gamma = 1.4
-    times = np.linspace(1,5,10)
     cvics = vics()  #Creating vortex ics object
     cvics.Shu(gamma) #Initializing with Shu parameters
+    cvics.vortex_args = cvics.vortex_args[:2]+(50,50)
     X,Y,npx,npy = cvics.vortex_args
     #Calling analytical solution
-    create_vortex_data(cvics,X,Y,npx,npy,times=(0,0.1))
+    num_times = 100
+    # create_vortex_data(cvics,X,Y,npx,npy,times=np.linspace(0,10,num_times))
+    vortex_plot("./vortex/vortex1.hdf5",'x-velocity',range(0,num_times,1))
