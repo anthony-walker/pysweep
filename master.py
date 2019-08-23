@@ -39,24 +39,23 @@ def test(args):
     initial_args = cvics.get_args()
     X = cvics.L
     Y = cvics.L
+
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 64
-    npy = 64
+    npx = 512
+    npy = 512
     dx = X/npx
     dy = Y/npy
 
     #Time testing arguments
     t0 = 0
     t_b = 1
-    dt = 0.1
+    dt = 0.01
     targs = (t0,t_b,dt)
 
     # Creating initial vortex from analytical code
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
-    initial_vortex = np.swapaxes(initial_vortex,0,2)
-    initial_vortex = np.swapaxes(initial_vortex,1,3)[0]
-    initial_vortex[:,:,:] = 1
+
     #GPU Arguments
     kernel = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
@@ -86,7 +85,7 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    cts = sweep(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/temp")
+    cts = sweep(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/swept")
     ct = decomp(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/decomp")
     return (cts,ct)
 
