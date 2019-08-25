@@ -24,11 +24,12 @@ def step(state,iidx,ts,gts):
     for idx in iidx:
         nidx = (ts+1,vSlice)+idx  #next step index
         idx=(ts,vSlice)+idx  #current step index
+        pidx=(ts-1,vSlice)+idx  #previous step index
         dfdx,dfdy = dfdxy(state,idx)
         if gts%2!=0:
             state[nidx] += state[idx]+half*dtdx*dfdx+half*dtdy*dfdy
         else:
-            state[nidx] += state[idx]+dtdx*dfdx+dtdy*dfdy
+            state[nidx] += state[pidx]+dtdx*dfdx+dtdy*dfdy
         gts+=1
     return state
 

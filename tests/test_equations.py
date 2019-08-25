@@ -75,7 +75,7 @@ def test_RK2():
     gamma = 1.4
     leftBC = (1.0,0,0,2.5)
     rightBC = (0.125,0,0,.25)
-    num_test = np.zeros((2,4,5,5))
+    num_test = np.zeros((3,4,5,5))
     for i in range(3):
         for j in range(3):
             num_test[0,:,i,j]=leftBC[:]
@@ -102,7 +102,7 @@ def test_RK2():
     assert np.isclose(f1d[2,1], f2d[1,1,2,2])
     assert np.isclose(f1d[2,1], f2d[1,2,2,2])
 
-    f1d = source_mod_1D.RK2S2(f1d)
+    f1d = source_mod_1D.RK2S2(f1d,Qx)
     f2d[0,:,:,:] = f2d[1,:,:,:]
     f2d = source_mod_2D.step(f2d,iidx,0,2)
 
