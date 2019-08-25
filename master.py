@@ -57,7 +57,7 @@ def test(args):
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
     flux_vortex = convert_to_flux(initial_vortex,gamma)
     #GPU Arguments
-    kernel = "/home/walkanth/pysweep/src/equations/euler.h"
+    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
     ops = 2 #number of atomic operations
     #File args
@@ -71,13 +71,13 @@ def test(args):
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
     gargs = (t0,t_b,dt,dx,dy,gamma)
-    swargs = (ops,block_size,affinity,kernel,cpu_source)
+    swargs = (ops,block_size,affinity,gpu_source,cpu_source)
 
     # #Swept results
     # for i,bs in enumerate(block_sizes):
     #     for j,aff in enumerate(affinities):
     #         fname = swept_name+"_"+str(i)+"_"+str(j)
-    #         ct = sweep(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
+    #         ct = sweep(initial_vortex,targs,dx,dy,ops,bs,gpu_source,cpu_source,affinity=aff,filename=fname)
     #         if rank == master_rank:
     #             f.write("Swept: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
@@ -85,13 +85,13 @@ def test(args):
     # for i,bs in enumerate(block_sizes[:1]):
     #     for j,aff in enumerate(affinities):
     #         fname = decomp_name+"_"+str(i)+"_"+str(j)
-    #         ct = decomp(initial_vortex,targs,dx,dy,ops,bs,kernel,cpu_source,affinity=aff,filename=fname)
+    #         ct = decomp(initial_vortex,targs,dx,dy,ops,bs,gpu_source,cpu_source,affinity=aff,filename=fname)
     #         if rank == master_rank:
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
-    # ct = decomp(initial_vortex,targs,dx,dy,ops,(32,32,1),kernel,cpu_source,affinity=0.5,filename="./results/decomp")
+    # cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
+    ct = decomp(flux_vortex[0],gargs,swargs,filename="./results/decomp")
     # return (cts,ct)
 
 if __name__ == "__main__":

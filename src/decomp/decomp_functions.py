@@ -48,10 +48,10 @@ def build_gpu_source(kernel_source):
     file = inspect.getfile(build_cpu_source)
     fname = file.split("/")[-1]
     fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+"decomp.h"
-    source_code = source_code_read(fpath)
-    split_source_code = source_code.split("//!!(@#\n")
-    source_code = split_source_code[0]+"\n"+source_code_read(kernel_source)+"\n"+split_source_code[1]
-    source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
+    source_code = source_code_read(kernel_source)
+    split_source_code = source_code_read(fpath).split("//!!(@#\n")
+    source_code = split_source_code[0]+"\n"+source_code+"\n"+split_source_code[1]
+    source_mod = SourceModule(source_code)
     return source_mod
 
 def get_slices_shape(slices):
@@ -164,7 +164,7 @@ def source_code_read(filename):
     f.closed
     return source
 
-def constant_copy(source_mod,const_dict,add_const=None):
+def decomp_constant_copy(source_mod,const_dict):
     """Use this function to copy constant args to cuda memory.
         source_mod - the source module obtained from pycuda and source code
         const_dict - dictionary of constants where the key is the global
@@ -180,10 +180,6 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
-
-    for key in add_const:
-        c_ptr,_ = source_mod.get_global(key)
-        cuda.memcpy_htod(c_ptr,add_const[key])
 
 def create_blocks_list(arr_shape,block_size,ops):
     """Use this function to create a list of blocks from the array."""

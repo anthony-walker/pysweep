@@ -48,13 +48,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
-    gargs:   (global variables to pass to source code arguments)
+    gargs:   (global args)
         The first three variables must be time arguments (t0,tf,dt).
         Subsequent variables can be anything passed to the source code in the
         "set_globals" function
     swargs: (Swept args)
-        OPS - number of atomic operations
-        BS - gpu block size (check your architecture requirements)
+        OPS - operating points to remove from each side for a function step
+            (e.g. a 5 point stencil would result in OPS=2).
+        BS - gpu block size (check your architecture requirements) - (x,x,1)
         AF -  the GPU affinity (GPU work/CPU work)/TotalWork
         GS - GPU source code file
         CS - CPU source code file
@@ -216,9 +217,9 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS})
         #Building CUDA source code
         source_mod = build_gpu_source(GS)
+        swept_constant_copy(source_mod,const_dict)
         cpu_source_mod = build_cpu_source(CS)   #Building cpu source for set_globals
         cpu_source_mod.set_globals(gpu_rank[0],source_mod,*gargs)
-        swept_constant_copy(source_mod,const_dict)
         del cpu_source_mod
         cpu_regions = None
     else:
