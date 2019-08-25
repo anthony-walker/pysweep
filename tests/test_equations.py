@@ -23,11 +23,12 @@ def test_flux():
     to test whether the 2D fluxes are correctly computing
     """
     #Sod Shock BC's
+    t0 = 0
+    tf = 1
     dt = 0.01
     dx = 0.1
     dy = 0.1
     gamma = 1.4
-    targs = (0,1,dt)
     leftBC = (1.0,0,0,2.5)
     rightBC = (0.125,0,0,.25)
     num_test = np.zeros((2,4,5,5))
@@ -46,12 +47,13 @@ def test_flux():
     P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
     source_mod_2D = build_cpu_source("./src/equations/euler.py")
-    source_mod_2D.set_globals(**{"dx":dx,"dy":dy,"targs":targs,"gamma":gamma})
+    source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
     iidx = (0,slice(0,4,1),2,2)
     #Testing Flux
     dfdx,dfdy = source_mod_2D.dfdxy(num_test,iidx)
-    df = source_mod_1D.fv5p(Qx,P)[2]/2
+    df = source_mod_1D.fv5p(Qx,P)[2]
+
     assert np.isclose(df[1],dfdx[1])
     assert np.isclose(df[1],dfdy[2])
     assert np.isclose(df[0],dfdx[0])
@@ -65,11 +67,12 @@ def test_RK2():
     to test whether the 2D fluxes are correctly computing
     """
     #Sod Shock BC's
+    t0 = 0
+    tf = 1
     dt = 0.01
     dx = 0.1
     dy = 0.1
     gamma = 1.4
-    targs = (0,1,dt)
     leftBC = (1.0,0,0,2.5)
     rightBC = (0.125,0,0,.25)
     num_test = np.zeros((2,4,5,5))
@@ -88,18 +91,20 @@ def test_RK2():
     P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
     source_mod_2D = build_cpu_source("./src/equations/euler.py")
-    source_mod_2D.set_globals(**{"dx":dx,"dy":dy,"targs":targs,"gamma":gamma})
+    source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
-    iidx = (0,slice(0,4,1),2,2)
-    #Testing Flux
-    df = source_mod_1D.RK2(Qx,P)
-    assert np.isclose(df[1],dfdx[1])
-    assert np.isclose(df[1],dfdy[2])
-    assert np.isclose(df[0],dfdx[0])
-    assert np.isclose(df[0],dfdy[0])
-    assert np.isclose(df[2],dfdx[3])
-    assert np.isclose(df[2],dfdy[3])
+    iidx = (2,2),
 
+    #Testing RK2 step 1
+    f1d = source_mod_1D.RK2S1(Qx,P)
+    f2d = source_mod_2D.step(num_test,iidx,0,1)
+    #Checking velocities in each direction as they should be the same
+    assert np.isclose(f1d[2,1], f2d[1,1,2,2])
+    assert np.isclose(f1d[2,1], f2d[1,2,2,2])
+
+    f1d = source_mod_1D.RK2S2(f1d)
+    f2d[0,:,:,:] = f2d[1,:,:,:]
+    f2d = source_mod_2D.step(f2d,iidx,0,2)
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
@@ -177,4 +182,4 @@ def test_python_euler():
     anim = animation.FuncAnimation(fig,animate,frames)
     anim.save("test.gif",writer="imagemagick")
 
-test_2D_flux()
+test_RK2()

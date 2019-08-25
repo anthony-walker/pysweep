@@ -42,8 +42,8 @@ def test(args):
 
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 16
-    npy = 16
+    npx = 20
+    npy = 20
     dx = X/npx
     dy = Y/npy
 
@@ -66,7 +66,7 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = (8,8,1)
+    block_size = (10,10,1)
     affinity = 0.5
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
@@ -90,8 +90,8 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    # cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
-    ct = decomp(flux_vortex[0],gargs,swargs,filename="./results/decomp")
+    cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
+    # ct = decomp(flux_vortex[0],gargs,swargs,filename="./results/decomp")
     # return (cts,ct)
 
 if __name__ == "__main__":

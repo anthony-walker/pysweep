@@ -9,9 +9,13 @@ mG = 0.4
 gamma = 1.4
 dtdx = 0.01/0.1
 
-def RK2(Q,P):
+def RK2S1(Q,P):
     """Use this method to solve a function with RK2 in time."""
     QS = Q+dtdx*0.5*fv5p(Q,P)
+    return QS
+    
+def RK2S1(QS,Q):
+    """Use this method to solve a function with RK2 in time."""
     P = eqnStateQ(QS[:,0],QS[:,1],QS[:,2])
     Q = Q+dtdx*fv5p(QS,P)
     return Q

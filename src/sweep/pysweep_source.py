@@ -10,11 +10,6 @@ import os.path as op
 import inspect
 import importlib
 
-def get_var_name(var):
-    """Use this function to retrieve variable name"""
-    vars = inspect.currentframe().f_back.f_locals.items()
-    return [var_name for var_name, var_val in vars if var_val is var]
-
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
     module_name = cpu_source.split("/")[-1]

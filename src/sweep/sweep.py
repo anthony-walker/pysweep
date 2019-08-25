@@ -244,8 +244,10 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     comm.Barrier() #Ensure all processes are prepared to solve
 
     #-------------------------------SWEPT RULE---------------------------------------------#
+
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-    UpPyramid(source_mod,local_array,gpu_rank[ZERO],BS,grid_size,wregion,bregions,cpu_regions,shared_arr,up_sets,OPS) #THis modifies shared array
+    gts = 1
+    UpPyramid(source_mod,local_array,gpu_rank[ZERO],BS,grid_size,wregion,bregions,cpu_regions,shared_arr,up_sets,OPS,gts) #THis modifies shared array
     comm.Barrier()
     #Shift data down so timing lines up correctly
     if rank == master_rank:
@@ -257,7 +259,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     y_array[:,:,:,:] = shared_arr[ybregion]
     comm.Barrier()  #Barrier after read
     #Bridge Step
-    Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,OPS) #THis modifies shared array
+    Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,OPS,gts) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
@@ -267,7 +269,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         #Octahedron Step
-        Octahedron(source_mod,local_array,gpu_rank[0],BS,grid_size,swregion,tuple(),cpu_regions,shared_arr,oct_sets,OPS)
+        Octahedron(source_mod,local_array,gpu_rank[0],BS,grid_size,swregion,tuple(),cpu_regions,shared_arr,oct_sets,OPS,gts)
         comm.Barrier()  #Solving Barrier
         #Shifting Data Step
         edge_shift(shared_arr,eregions,ONE)
@@ -284,14 +286,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         y_array[:,:,:,:] = shared_arr[xbregion]
         comm.Barrier()  #Barrier after read
         #Reverse Bridge Step
-        Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,ybregion,xbregion,(xtrr,ytrr),cpu_regions,shared_arr,bridge_sets,OPS) #THis modifies shared array
+        Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,ybregion,xbregion,(xtrr,ytrr),cpu_regions,shared_arr,bridge_sets,OPS,gts) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         local_array[:,:,:,:] = shared_arr[rregion]
         comm.Barrier()
         #Octahedron Step
-        Octahedron(source_mod,local_array,gpu_rank[0],BS,grid_size,wregion,bregions,cpu_regions,shared_arr,oct_sets,OPS)
+        Octahedron(source_mod,local_array,gpu_rank[0],BS,grid_size,wregion,bregions,cpu_regions,shared_arr,oct_sets,OPS,gts)
         comm.Barrier()  #Solving Barrier
         #Write step
         hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST)
@@ -305,14 +307,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         y_array[:,:,:,:] = shared_arr[ybregion]
         comm.Barrier()  #Barrier after read
         #Bridge Step
-        Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,OPS) #THis modifies shared array
+        Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,OPS,gts) #THis modifies shared array
         comm.Barrier()
         #Getting next points for the local array
         local_array[:,:,:,:] = shared_arr[srregion]
     #Last read barrier for down pyramid
     comm.Barrier()
     #--------------------------------------DOWN PYRAMID------------------------#
-    DownPyramid(source_mod,local_array,gpu_rank[0],BS,grid_size,swregion,cpu_regions,shared_arr,down_sets,OPS)
+    DownPyramid(source_mod,local_array,gpu_rank[0],BS,grid_size,swregion,cpu_regions,shared_arr,down_sets,OPS,gts)
     comm.Barrier()
     #Shifting Data Step
     edge_shift(shared_arr,eregions,ONE)

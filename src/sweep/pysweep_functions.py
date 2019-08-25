@@ -7,7 +7,7 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 from .pysweep_block import *
 
-def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
+def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops,gts):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -18,6 +18,7 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_r
     SPLITX = block_size[0]/2
     SPLITY = block_size[1]/2
     #Splitting between cpu and gpu
+
     if gpu_rank:
         # Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
@@ -34,14 +35,14 @@ def UpPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_r
             block = np.zeros(arr[local_region].shape)
             block += arr[local_region]
             blocks.append(block)
-        cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets))
+        cpu_fcn = sweep_lambda((CPU_UpPyramid,source_mod,idx_sets,gts))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
     for br in bregions:
         shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
 
-def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cregions,cpu_regions,shared_arr,idx_sets,ops):
+def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cregions,cpu_regions,shared_arr,idx_sets,ops,gts):
     """Use this function to solve the bridge step."""
     #Finding splits again
     SPLITX = block_size[0]/2
@@ -78,9 +79,9 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
             block_y += yarr[local_region]
             blocks_y.append(block_y)
         #Solving
-        cpu_fcn = sweep_lambda((CPU_Bridge,source_mod,idx_sets[0]))
+        cpu_fcn = sweep_lambda((CPU_Bridge,source_mod,idx_sets[0],gts))
         blocks_x = list(map(cpu_fcn,blocks_x))
-        cpu_fcn.args = (CPU_Bridge,source_mod,idx_sets[1])
+        cpu_fcn.args = (CPU_Bridge,source_mod,idx_sets[1],gts)
         blocks_y = list(map(cpu_fcn,blocks_y))
         xarr = rebuild_blocks(xarr,blocks_x,cpu_regions,ops)
         yarr = rebuild_blocks(yarr,blocks_y,cpu_regions,ops)
@@ -98,7 +99,7 @@ def Bridge(source_mod,xarr,yarr,gpu_rank,block_size,grid_size,xregion,yregion,cr
             lcx,lcy,shx,shy = bs
             shared_arr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
 
-def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops):
+def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_regions,shared_arr,idx_sets,ops,gts):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -118,14 +119,14 @@ def Octahedron(source_mod,arr,gpu_rank,block_size,grid_size,region,bregions,cpu_
             block = np.zeros(arr[local_region].shape)
             block += arr[local_region]
             blocks.append(block)
-        cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,idx_sets))
+        cpu_fcn = sweep_lambda((CPU_Octahedron,source_mod,idx_sets,gts))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
     for br in bregions:
         shared_arr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
 
-def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,shared_arr,idx_sets,ops):
+def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,shared_arr,idx_sets,ops,gts):
     """This is the ending inverted pyramid."""
     if gpu_rank:
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
@@ -139,7 +140,7 @@ def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,
             block = np.zeros(arr[local_region].shape)
             block += arr[local_region]
             blocks.append(block)
-        cpu_fcn = sweep_lambda((CPU_DownPyramid,source_mod,idx_sets))
+        cpu_fcn = sweep_lambda((CPU_DownPyramid,source_mod,idx_sets,gts))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,cpu_regions,ops)
     shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
@@ -147,37 +148,37 @@ def DownPyramid(source_mod,arr,gpu_rank,block_size,grid_size,region,cpu_regions,
 #--------------------------------CPU Specific Swept Functions------------------
 def CPU_UpPyramid(args):
     """Use this function to build the Up Pyramid."""
-    block,source_mod,idx_sets = args
+    block,source_mod,idx_sets,gts = args
     #Removing elements for swept step
-    for ts,swept_set in enumerate(idx_sets):
+    for ts,swept_set in enumerate(idx_sets,start=0):
         #Calculating Step
-        block = source_mod.step(block,swept_set,ts)
+        block = source_mod.step(block,swept_set,ts,gts)
     return block
 
 def CPU_Bridge(args):
     """Use this function to build the Up Pyramid."""
-    block,source_mod,idx_sets = args
+    block,source_mod,idx_sets,gts = args
     #Removing elements for swept step
     for ts,swept_set in enumerate(idx_sets,start=0):
         #Calculating Step
-        block = source_mod.step(block,swept_set,ts)
+        block = source_mod.step(block,swept_set,ts,gts)
     return block
 
 def CPU_Octahedron(args):
     """Use this function to build the Octahedron."""
-    block,source_mod,idx_sets = args
+    block,source_mod,idx_sets,gts = args
     #Oct Step
     for ts,swept_set in enumerate(idx_sets,start=0):
         #Calculating Step
-        block = source_mod.step(block,swept_set,ts)
+        block = source_mod.step(block,swept_set,ts,gts)
     return block
 
 def CPU_DownPyramid(args):
     """Use this function to build the Down Pyramid."""
-    block,source_mod,idx_sets = args
+    block,source_mod,idx_sets,gts = args
 
     #Removing elements for swept step
     for ts, swept_set in enumerate(idx_sets,start=0):
         #Calculating Step
-        block = source_mod.step(block,swept_set,ts)
+        block = source_mod.step(block,swept_set,ts,gts)
     return block
