@@ -6,16 +6,13 @@
 #define ABSOLUTE(x)   abs(x)
 #define MIN(x,y)   min(x,y)
 #define ISNAN(x)   isnan(x)
-// #define ARRCPY(a,b,c) memcpy(a,b,c) //Not working as expected
 
-__device__ __constant__  const int SS=5; //stencil size
+__device__ __constant__  float DX;
+__device__ __constant__  float DY;
+__device__ __constant__  float DT;
+__device__ __constant__ float GAMMA; //Gamma
+__device__ __constant__ float GAM_M1;
 __device__ __constant__ const int NVC=4; //Number of variables
-__device__ __constant__ const float GAMMA=1.4; //Gamma
-__device__ __constant__ const float GAM_M1=GAMMA-1;
-__device__ __constant__ const int NR = 3;
-__device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
-__device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
-
 /*
   Use this function to get point data
 */
@@ -137,7 +134,7 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     getPoint(eepoint,shared_state,idx+2*blockDim.y);
     float wwpoint[NVC];
     getPoint(wwpoint,shared_state,idx-2*blockDim.y);
-    float Pr[NR]={0};
+    float Pr[3]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 1;  //spectral radius idx
@@ -198,7 +195,7 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     getPoint(eepoint,shared_state,idx+2);
     float wwpoint[NVC];
     getPoint(wwpoint,shared_state,idx-2);
-    float Pr[NR]={0};
+    float Pr[3]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 2;  //spectral radius idx

@@ -3,6 +3,8 @@
 #the swept rule or in a standard way
 
 import numpy as np
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 #----------------------------------Globals-------------------------------------#
 gamma = 0
 dtdx = 0
@@ -22,6 +24,27 @@ def step(state,iidx,ts):
         dfdx,dfdy = dfdxy(state,idx)
         state[nidx] += state[idx]+dtdx*dfdx+dtdy*dfdy
     return state
+
+def set_globals(gpu,source_mod,*args):
+    """Use this function to set cpu global variables"""
+    if gpu:
+        t0,tf,dt,dx,dy,gam = args
+        keys = "DT","DX","DY","GAMMA","GAM_M1"
+        nargs = args[2:]+(gam-1,)
+        fc = lambda x:np.float32(x)
+        for i,key in enumerate(keys):
+            ckey,_ = source_mod.get_global(key)
+            cuda.memcpy_htod(ckey,fc(nargs[i]))
+    else:
+        t0,tf,dt,dx,dy,gam = args
+        global dtdx
+        dtdx = dt/dx
+        global dtdy
+        dtdy = dt/dy
+        global gamma
+        gamma = gam
+
+#---------------------------------------------Solving functions
 
 def dfdxy(state,idx):
     """This method is a five point finite volume method in 2D."""
@@ -144,19 +167,6 @@ def espectral(left_state,right_state,xy):
     P = pressure(spec_state*spec_state[0])
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
-
-def set_globals(**args):
-    """Use this function to set cpu global variables"""
-    dx = args["dx"]
-    dy = args["dy"]
-    dt = args["targs"][2]
-    gam = args["gamma"]
-    global dtdx
-    dtdx = dt/dx
-    global dtdy
-    dtdy = dt/dy
-    global gamma
-    gamma = gam
 
 def test_mod_load():
     """Use this function to test created cu source module."""

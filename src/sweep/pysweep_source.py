@@ -10,6 +10,11 @@ import os.path as op
 import inspect
 import importlib
 
+def get_var_name(var):
+    """Use this function to retrieve variable name"""
+    vars = inspect.currentframe().f_back.f_locals.items()
+    return [var_name for var_name, var_val in vars if var_val is var]
+
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
     module_name = cpu_source.split("/")[-1]
@@ -27,10 +32,10 @@ def build_gpu_source(kernel_source):
     file = inspect.getfile(build_cpu_source)
     fname = file.split("/")[-1]
     fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+"sweep.h"
-    source_code = source_code_read(fpath)
-    split_source_code = source_code.split("//!!(@#\n")
-    source_code = split_source_code[0]+"\n"+source_code_read(kernel_source)+"\n"+split_source_code[1]
-    source_mod = SourceModule(source_code)#,options=["--ptxas-options=-v"])
+    source_code = source_code_read(kernel_source)
+    split_source_code = source_code_read(fpath).split("//!!(@#\n")
+    source_code = split_source_code[0]+"\n"+source_code+"\n"+split_source_code[1]
+    source_mod = SourceModule(source_code)
     return source_mod
 
 def source_code_read(filename):
@@ -44,7 +49,7 @@ def source_code_read(filename):
     f.closed
     return source
 
-def constant_copy(source_mod,const_dict,add_const=None):
+def swept_constant_copy(source_mod,const_dict):
     """Use this function to copy constant args to cuda memory.
         source_mod - the source module obtained from pycuda and source code
         const_dict - dictionary of constants where the key is the global
@@ -60,7 +65,3 @@ def constant_copy(source_mod,const_dict,add_const=None):
         c_ptr,_ = source_mod.get_global(key)
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
-
-    # for key in add_const:
-    #     c_ptr,_ = source_mod.get_global(key)
-    #     cuda.memcpy_htod(c_ptr,add_const[key])
