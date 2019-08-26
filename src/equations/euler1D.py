@@ -14,7 +14,7 @@ def RK2S1(Q,P):
     QS = Q+dtdx*0.5*fv5p(Q,P)
     return QS
 
-def RK2S1(QS,Q):
+def RK2S2(QS,Q):
     """Use this method to solve a function with RK2 in time."""
     P = eqnStateQ(QS[:,0],QS[:,1],QS[:,2])
     Q = Q+dtdx*fv5p(QS,P)

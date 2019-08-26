@@ -97,14 +97,15 @@ def test_RK2():
 
     #Testing RK2 step 1
     f1d = source_mod_1D.RK2S1(Qx,P)
-    f2d = source_mod_2D.step(num_test,iidx,0,1)
+    num_test = source_mod_2D.step(num_test,iidx,0,1)
     #Checking velocities in each direction as they should be the same
-    assert np.isclose(f1d[2,1], f2d[1,1,2,2])
-    assert np.isclose(f1d[2,1], f2d[1,2,2,2])
-
+    assert np.isclose(f1d[2,1], num_test[1,1,2,2])
+    assert np.isclose(f1d[2,1], num_test[1,2,2,2])
+    print(num_test[1,0,2,2])
     f1d = source_mod_1D.RK2S2(f1d,Qx)
-    f2d[0,:,:,:] = f2d[1,:,:,:]
-    f2d = source_mod_2D.step(f2d,iidx,0,2)
+    # f2d[0,:,:,:] = f2d[1,:,:,:]
+    num_test = source_mod_2D.step(num_test,iidx,1,2)
+    print(num_test[2,1,2,2])
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
