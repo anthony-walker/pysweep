@@ -37,6 +37,7 @@ from .pysweep_decomposition import *
 from .pysweep_block import *
 from .pysweep_regions import *
 from .pysweep_source import *
+from .pysweep_printer import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -53,6 +54,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         Subsequent variables can be anything passed to the source code in the
         "set_globals" function
     swargs: (Swept args)
+        TSO - order of the time scheme
         OPS - operating points to remove from each side for a function step
             (e.g. a 5 point stencil would result in OPS=2).
         BS - gpu block size (check your architecture requirements) - (x,x,1)
@@ -65,7 +67,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     """
     #Unpacking arguments
     t0,tf,dt = gargs[:3]
-    OPS,BS,AF,GS,CS = swargs
+    TSO,OPS,BS,AF,GS,CS = swargs
 
     start = timer.time()
     #Local Constants
@@ -144,32 +146,33 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     MOSS = len(oct_sets)
     bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
     #----------------Data Input setup -------------------------#
-    time_steps = int((tf-t0)/dt)+ONE  #Number of time steps +ONE becuase initial time step
+    time_steps = int((tf-t0)/dt)  #Number of time steps
     #Global swept step
     GST = ZERO #This is a variable to track which swept step the simulation is on
-    MGST = int(np.ceil(time_steps/MOSS))    #THIS ASSUMES THAT time_steps > MOSS
+    MGST = TSO*int(np.ceil(time_steps/MOSS))    #THIS ASSUMES THAT time_steps > MOSS
     time_steps = MGST*MOSS+1 #Updating time steps
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (MOSS+TWO,arr0.shape[ZERO],arr0.shape[ONE]+TOPS+SPLITX,arr0.shape[TWO]+TOPS+SPLITY)
-    shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS+SPLITX,arr0.shape[TWO]+TOPS+SPLITY)
+    sarr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
-        shared_arr[0,:,OPS:arr0.shape[ONE]+OPS,OPS:arr0.shape[TWO]+OPS] = arr0[:,:,:]
-        boundary_update(shared_arr,OPS,SPLITX,SPLITY)   #communicate boundaries
+        sarr[TSO-ONE,:,OPS:arr0.shape[ONE]+OPS,OPS:arr0.shape[TWO]+OPS] = arr0[:,:,:]
+        boundary_update(sarr,OPS,SPLITX,SPLITY)   #communicate boundaries
     #------------------------------DECOMPOSITION BY REGION CREATION--------------#
+    GRB = gpu_rank[ZERO]
     #Splits regions up amongst architecture
-    if gpu_rank[0]:
+    if GRB:
         gri = gpu_comm.Get_rank()
         cri = None
-        wregion = create_write_region(gpu_comm,gri,gpu_master,num_gpus,BS,arr0.shape,gpu_slices,shared_shape[0],OPS)
+        WR = create_write_region(gpu_comm,gri,gpu_master,num_gpus,BS,arr0.shape,gpu_slices,shared_shape[0],OPS)
     else:
         cri = cpu_comm.Get_rank()
         gri = None
-        wregion = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
+        WR = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
     #---------------------_REMOVING UNWANTED RANKS---------------------------#
     #Checking if rank is useful
-    if wregion[3].start == wregion[3].stop or wregion[2].start == wregion[2].stop:
+    if WR[3].start == WR[3].stop or WR[2].start == WR[2].stop:
         include_ranks = None
     else:
         include_ranks = rank
@@ -190,43 +193,43 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #Sync all processes - Ensures boundaries are updated
     comm.Barrier()
     #--------------------------CREATING OTHER REGIONS--------------------------#
-    rregion = create_read_region(wregion,OPS)   #Create read region
-    srregion,swregion,xbregion,ybregion = create_shift_regions(rregion,SPLITX,SPLITY,shared_shape,OPS)  #Create shifted read region
-    bregions,eregions = create_boundary_regions(wregion,SPLITX,SPLITY,OPS,shared_shape,bridge_slices)
-    xtr,ytr = create_bridges(wregion,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
-    xtrr,ytrr = create_rev_bridges(wregion,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
+    RR = create_read_region(WR,OPS)   #Create read region
+    SRR,SWR,XR,YR = create_shift_regions(RR,SPLITX,SPLITY,shared_shape,OPS)  #Create shifted read region
+    BDR,ERS = create_boundary_regions(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices)
+    xtr,ytr = create_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
+    xtrr,ytrr = create_rev_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
-    local_array = create_local_array(shared_arr,rregion,dType)
-    x_array = create_local_array(shared_arr,xbregion,dType)
-    y_array = create_local_array(shared_arr,ybregion,dType)
+    larr = create_local_array(sarr,RR,dType)
+    xarr = create_local_array(sarr,XR,dType)
+    yarr = create_local_array(sarr,YR,dType)
 
     #---------------Generating Source Modules----------------------------------#
-    if gpu_rank[0]:
+    if GRB:
         # Creating cuda device and Context
         cuda.init()
         cuda_device = cuda.Device(gpu_rank[ONE])
         cuda_context = cuda_device.make_context()
         #Creating local GPU array with split
-        grid_size = (int((local_array.shape[TWO]-TOPS)/BS[ZERO]),int((local_array.shape[3]-TOPS)/BS[ONE]))   #Grid size
+        GRD = (int((larr.shape[TWO]-TOPS)/BS[ZERO]),int((larr.shape[3]-TOPS)/BS[ONE]))   #Grid size
         #Creating constants
-        NV = local_array.shape[ONE]
+        NV = larr.shape[ONE]
         SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
-        VARS =  local_array.shape[TWO]*local_array.shape[3]
+        VARS =  larr.shape[TWO]*larr.shape[3]
         TIMES = VARS*NV
-        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS})
+        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO})
         #Building CUDA source code
-        source_mod = build_gpu_source(GS)
-        swept_constant_copy(source_mod,const_dict)
-        cpu_source_mod = build_cpu_source(CS)   #Building cpu source for set_globals
-        cpu_source_mod.set_globals(gpu_rank[0],source_mod,*gargs)
-        del cpu_source_mod
-        cpu_regions = None
+        SM = build_gpu_source(GS)
+        swept_constant_copy(SM,const_dict)
+        cpu_SM = build_cpu_source(CS)   #Building cpu source for set_globals
+        cpu_SM.set_globals(GRB,SM,*gargs)
+        del cpu_SM
+        CRS = None
     else:
-        source_mod = build_cpu_source(CS) #Building Python source code
-        source_mod.set_globals(gpu_rank[0],source_mod,*gargs)
-        cpu_regions = create_blocks_list(local_array.shape,BS,OPS)
-        grid_size = None
+        SM = build_cpu_source(CS) #Building Python source code
+        SM.set_globals(GRB,SM,*gargs)
+        CRS = create_blocks_list(larr.shape,BS,OPS)
+        GRD = None
 
     #------------------------------HDF5 File------------------------------------------#
     filename+=".hdf5"
@@ -238,92 +241,104 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     hdf_aff = hdf5_file.create_dataset("AF",(ONE,))
     hdf_aff[ZERO] = AF
     hdf_time = hdf5_file.create_dataset("time",(1,))
-    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-    hregion = (wregion[1],slice(wregion[2].start-OPS,wregion[2].stop-OPS,1),slice(wregion[3].start-OPS,wregion[3].stop-OPS,1))
-    hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = shared_arr[0,wregion[1],wregion[2],wregion[3]]
+    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+    hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
+    hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
+    cwt = 1 #Current write time
+    wb = 1  #Counter for writing on the appropriate step
     comm.Barrier() #Ensure all processes are prepared to solve
 
-    #-------------------------------SWEPT RULE---------------------------------------------#
+    printer = pysweep_printer(rank,master_rank)
 
+    #-------------------------------SWEPT RULE---------------------------------------------#
+    pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     gts = 1
-    UpPyramid(source_mod,local_array,gpu_rank[ZERO],BS,grid_size,wregion,bregions,cpu_regions,shared_arr,up_sets,OPS,gts) #THis modifies shared array
+    UpPyramid(sarr,larr,WR,BDR,up_sets,gts,pargs) #THis modifies shared array
     comm.Barrier()
     #Shift data down so timing lines up correctly
-    if rank == master_rank:
-        shared_arr[ZERO:MPSS+ONE,:,:,:] = shared_arr[ONE:MPSS+TWO,:,:,:]
-    comm.Barrier()
+    # if rank == master_rank:
+    #     sarr[ZERO:MPSS+ONE,:,:,:] = sarr[ONE:MPSS+TWO,:,:,:]
+    # comm.Barrier()
     #-------------------------------FIRST BRIDGE-------------------------------------------#
     #Getting x and y arrays
-    x_array[:,:,:,:] = shared_arr[xbregion]
-    y_array[:,:,:,:] = shared_arr[ybregion]
+    xarr[:,:,:,:] = sarr[XR]
+    yarr[:,:,:,:] = sarr[YR]
     comm.Barrier()  #Barrier after read
+    printer(xarr[4,0,:,:],p_iter=True)
     #Bridge Step
-    Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,OPS,gts) #THis modifies shared array
+    Bridge(sarr,xarr,yarr,XR,YR,(xtr,ytr),bridge_sets,gts,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
+
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
-    local_array[:,:,:,:] = shared_arr[srregion]
+    larr[:,:,:,:] = sarr[SRR]
     #Swept Octahedrons and Bridges
-    for GST in range(1,MGST):
+    for GST in range(1,2,1):#MGST):
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         #Octahedron Step
-        Octahedron(source_mod,local_array,gpu_rank[0],BS,grid_size,swregion,tuple(),cpu_regions,shared_arr,oct_sets,OPS,gts)
+        Octahedron(sarr,larr,SWR,tuple(),oct_sets,gts,pargs)
         comm.Barrier()  #Solving Barrier
         #Shifting Data Step
-        edge_shift(shared_arr,eregions,ONE)
+        edge_shift(sarr,ERS,ONE)
         comm.Barrier()  #Communication Barrier
         #Writing Step
-        hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST)
+        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,GST,TSO)
         comm.Barrier()  #Write Barrier
         #Updating Boundary Conditions Step
-        boundary_update(shared_arr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+        boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+        comm.Barrier()
+        nan_to_zero(sarr,zero=5)
+        comm.Barrier()
+        printer(sarr[4,0,:,:],p_iter=True)
         comm.Barrier()
         #-------------------------------FIRST REVERSE BRIDGE-------------------------------------------#
         #Getting reverse x and y arrays
-        x_array[:,:,:,:] = shared_arr[ybregion] #Regions are purposely switched here
-        y_array[:,:,:,:] = shared_arr[xbregion]
+        xarr[:,:,:,:] = sarr[YR] #Regions are purposely switched here
+        yarr[:,:,:,:] = sarr[XR]
+        print(xarr[4,0,:,:])
         comm.Barrier()  #Barrier after read
         #Reverse Bridge Step
-        Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,ybregion,xbregion,(xtrr,ytrr),cpu_regions,shared_arr,bridge_sets,OPS,gts) #THis modifies shared array
+        Bridge(sarr,xarr,yarr,XR,YR,(xtrr,ytrr),bridge_sets,gts,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
-        #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
-        #Getting next points for the local array
-        local_array[:,:,:,:] = shared_arr[rregion]
-        comm.Barrier()
-        #Octahedron Step
-        Octahedron(source_mod,local_array,gpu_rank[0],BS,grid_size,wregion,bregions,cpu_regions,shared_arr,oct_sets,OPS,gts)
-        comm.Barrier()  #Solving Barrier
-        #Write step
-        hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST)
-        comm.Barrier()
-        #Updating Boundary Conditions Step
-        boundary_update(shared_arr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-        comm.barrier()  #Barrier following data write
-        #-------------------------------SECOND BRIDGE (NON-REVERSED)-------------------------------------------#
-        #Getting x and y arrays
-        x_array[:,:,:,:] = shared_arr[xbregion]
-        y_array[:,:,:,:] = shared_arr[ybregion]
-        comm.Barrier()  #Barrier after read
-        #Bridge Step
-        Bridge(source_mod,x_array,y_array,gpu_rank[0],BS,grid_size,xbregion,ybregion,(xtr,ytr),cpu_regions,shared_arr,bridge_sets,OPS,gts) #THis modifies shared array
-        comm.Barrier()
-        #Getting next points for the local array
-        local_array[:,:,:,:] = shared_arr[srregion]
-    #Last read barrier for down pyramid
-    comm.Barrier()
-    #--------------------------------------DOWN PYRAMID------------------------#
-    DownPyramid(source_mod,local_array,gpu_rank[0],BS,grid_size,swregion,cpu_regions,shared_arr,down_sets,OPS,gts)
-    comm.Barrier()
-    #Shifting Data Step
-    edge_shift(shared_arr,eregions,ONE)
-    comm.Barrier()  #Communication Barrier
-    #Writing Step
-    hdf_swept_write(shared_arr,wregion,hdf5_data_set,hregion,MPSS,GST+1)
-    comm.Barrier()  #Write Barrier
+
+    #     #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
+    #     #Getting next points for the local array
+    #     larr[:,:,:,:] = sarr[RR]
+    #     comm.Barrier()
+    #     #Octahedron Step
+    #     Octahedron(sarr,larr,WR,BDR,oct_sets,gts,pargs)
+    #     comm.Barrier()  #Solving Barrier
+    #     #Write step
+    #     hdf_swept_write(sarr,WR,hdf5_data_set,hregion,MPSS,GST)
+    #     comm.Barrier()
+    #     #Updating Boundary Conditions Step
+    #     boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+    #     comm.barrier()  #Barrier following data write
+    #     #-------------------------------SECOND BRIDGE (NON-REVERSED)-------------------------------------------#
+    #     #Getting x and y arrays
+    #     xarr[:,:,:,:] = sarr[XR]
+    #     yarr[:,:,:,:] = sarr[YR]
+    #     comm.Barrier()  #Barrier after read
+    #     #Bridge Step
+    #     Bridge(sarr,xarr,yarr,XR,YR,(xtr,ytr),bridge_sets,gts,pargs) #THis modifies shared array
+    #     comm.Barrier()
+    #     #Getting next points for the local array
+    #     larr[:,:,:,:] = sarr[SRR]
+    # #Last read barrier for down pyramid
+    # comm.Barrier()
+    # #--------------------------------------DOWN PYRAMID------------------------#
+    # DownPyramid(sarr,larr,SWR,down_sets,gts,pargs)
+    # comm.Barrier()
+    # #Shifting Data Step
+    # edge_shift(sarr,ERS,ONE)
+    # comm.Barrier()  #Communication Barrier
+    # #Writing Step
+    # hdf_swept_write(sarr,WR,hdf5_data_set,hregion,MPSS,GST+1)
+    # comm.Barrier()  #Write Barrier
     # CUDA clean up - One of the last steps
-    if gpu_rank[0]:
+    if GRB:
         cuda_context.pop()
     comm.Barrier()
     #-------------------------------TIMING-------------------------------------#

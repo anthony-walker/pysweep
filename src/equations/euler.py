@@ -15,7 +15,7 @@ dtdy = 0
 def step(state,iidx,ts,gts):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
-    iidx an iterable of indexs
+    iidx -  an iterable of indexs
     ts - the current time step
     gts - starting global time, starting at 1
     """
@@ -24,13 +24,13 @@ def step(state,iidx,ts,gts):
     for idx in iidx:
         nidx = (ts+1,vSlice)+idx  #next step index
         idx=(ts,vSlice)+idx  #current step index
-        pidx=(ts-1,vSlice)+idx  #previous step index
+        # pidx=(ts-1,vSlice)+idx  #previous step index
         dfdx,dfdy = dfdxy(state,idx)
-        if gts%2!=0:
-            state[nidx] += state[idx]+half*dtdx*dfdx+half*dtdy*dfdy
-        else:
-            state[nidx] += state[pidx]+dtdx*dfdx+dtdy*dfdy
-        gts+=1
+        # if gts%2!=0:
+        state[nidx] += state[idx]+half*dtdx*dfdx+half*dtdy*dfdy
+        # else:
+        #     state[nidx] += state[pidx]+dtdx*dfdx+dtdy*dfdy
+        # gts+=1
     return state
 
 def set_globals(gpu,source_mod,*args):

@@ -21,7 +21,7 @@ __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
 __device__ __constant__  float SPLITX; //half an octahedron x
 __device__ __constant__  float SPLITY; //half an octahedron y
-
+__device__ __constant__ int TSO; //Time scheme order
 //GPU Constants
 __device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
 __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
@@ -159,7 +159,7 @@ UpPyramid(float *state)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy); //Shared global index
-    int gid = get_gid(); //global index
+    int gid = get_gid()+(TSO-ONE)*TIMES; //global index
 
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
@@ -219,7 +219,7 @@ BridgeX(float *state)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy); //Shared global index
-    int gid = get_gid(); //global index
+    int gid = get_gid()+TSO*TIMES; //global index
 
     //Creating swept boundaries
     int lx = blockDim.x/2; //Lower x swept bound
@@ -281,7 +281,7 @@ BridgeY(float *state)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy); //Shared global index
-    int gid = get_gid(); //global index
+    int gid = get_gid()+TSO*TIMES; //global index
 
     //Creating swept boundaries
     int lx = 2*OPS; // Lower y swept bound
@@ -339,7 +339,7 @@ Octahedron(float *state)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy); //Shared global index
-    int gid = get_gid(); //global index
+    int gid = get_gid()+TSO*TIMES; //global index
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------

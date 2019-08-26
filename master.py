@@ -50,7 +50,7 @@ def test(args):
     #Time testing arguments
     t0 = 0
     t_b = 1
-    dt = 0.01
+    dt = 0.1
     targs = (t0,t_b,dt)
 
     # Creating initial vortex from analytical code
@@ -60,6 +60,7 @@ def test(args):
     gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
     cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
     ops = 2 #number of atomic operations
+    tso = 2 #RK2
     #File args
     swept_name = "./results/swept"
     decomp_name = "./results/decomp"
@@ -71,7 +72,7 @@ def test(args):
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
     gargs = (t0,t_b,dt,dx,dy,gamma)
-    swargs = (ops,block_size,affinity,gpu_source,cpu_source)
+    swargs = (tso,ops,block_size,affinity,gpu_source,cpu_source)
 
     # #Swept results
     # for i,bs in enumerate(block_sizes):
