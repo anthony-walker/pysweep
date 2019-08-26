@@ -265,7 +265,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     xarr[:,:,:,:] = sarr[XR]
     yarr[:,:,:,:] = sarr[YR]
     comm.Barrier()  #Barrier after read
-    printer(xarr[4,0,:,:],p_iter=True)
     #Bridge Step
     Bridge(sarr,xarr,yarr,XR,YR,(xtr,ytr),bridge_sets,gts,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
