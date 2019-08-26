@@ -76,7 +76,7 @@ def edge_shift(shared_arr,eregions, dir):
             shared_arr[bt,bv,x2,y2] = shared_arr[bt,bv,x1,y1]
 
 
-def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,GST,TSO):
+def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,TSO):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
     i = 0
@@ -91,18 +91,6 @@ def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,GST,TSO):
     shared_arr[nte:,reg[1],reg[2],reg[3]] = 0
     #Do edge comm after this function
     return cwt,wb
-
-
-#
-# def hdf_swept_write(shared_arr,reg,hdf_set,hr,MPSS,GST,TSO):
-#     """Use this function to write to the hdf file and shift the shared array
-#         # data after writing."""
-#     hdf_set[MPSS*(GST-1)+1:MPSS*(GST)+1,hr[0],hr[1],hr[2]] = shared_arr[TSO:MPSS+TSO,reg[1],reg[2],reg[3]]
-#     nte = shared_arr.shape[0]-(MPSS)
-#     shared_arr[:nte,reg[1],reg[2],reg[3]] = shared_arr[MPSS:,reg[1],reg[2],reg[3]]
-#     shared_arr[nte:,reg[1],reg[2],reg[3]] = 0
-#     #Do edge comm after this function
-
 
 #Nan to zero is a testing function - it doesn't really belong here
 def nan_to_zero(arr,zero=0.):

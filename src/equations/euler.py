@@ -17,20 +17,20 @@ def step(state,iidx,ts,gts):
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
     ts - the current time step
-    gts - starting global time, starting at 1
+    gts - a step counter that allows implementation of the scheme
     """
     half = 0.5
     vSlice = slice(0,state.shape[1],1)
     for idx in iidx:
         nidx = (ts+1,vSlice)+idx  #next step index
-        idx=(ts,vSlice)+idx  #current step index
-        # pidx=(ts-1,vSlice)+idx  #previous step index
-        dfdx,dfdy = dfdxy(state,idx)
-        # if gts%2!=0:
-        state[nidx] += state[idx]+half*dtdx*dfdx+half*dtdy*dfdy
-        # else:
-        #     state[nidx] += state[pidx]+dtdx*dfdx+dtdy*dfdy
-        # gts+=1
+        pidx = (ts-1,vSlice)+idx  #previous step index
+        cidx = (ts,vSlice)+idx  #current step index
+        dfdx,dfdy = dfdxy(state,cidx)
+        if gts%2!=0:
+            state[nidx] += state[cidx]+half*dtdx*dfdx+half*dtdy*dfdy
+        else:
+            state[nidx] += state[pidx]+dtdx*dfdx+dtdy*dfdy
+        gts+=1
     return state
 
 def set_globals(gpu,source_mod,*args):

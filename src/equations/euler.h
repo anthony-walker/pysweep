@@ -10,6 +10,8 @@
 __device__ __constant__  float DX;
 __device__ __constant__  float DY;
 __device__ __constant__  float DT;
+__device__ __constant__ float DTDX;
+__device__ __constant__ float DTDY;
 __device__ __constant__ float GAMMA; //Gamma
 __device__ __constant__ float GAM_M1;
 __device__ __constant__ const int NVC=4; //Number of variables
@@ -219,15 +221,25 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
 }
 
 __device__
-void step(float *shared_state, int idx)
+void step(float *shared_state, int idx, int gts)
 {
   float dfdx[NVC]={0,0,0,0};
   float dfdy[NVC]={0,0,0,0};
   get_dfdy(dfdx,shared_state,idx);
   get_dfdx(dfdx,shared_state,idx);
   __syncthreads();
-  for (int i = 0; i < NVC; i++)
+  if (gts%2==0)
   {
-      shared_state[idx+i*SGIDS]+=dfdx[i]+dfdy[i];
+      for (int i = 0; i < NVC; i++)
+      {
+          shared_state[idx+i*SGIDS]+=HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+      }
+  }
+  else
+  {
+      for (int i = 0; i < NVC; i++)
+      {
+          shared_state[idx+i*SGIDS]+=DTDX*dfdx[i]+DTDY*dfdy[i];
+      }
   }
 }

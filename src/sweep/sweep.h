@@ -149,12 +149,11 @@ void shared_state_zero(float * shared_state)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-UpPyramid(float *state)
+UpPyramid(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
     shared_state_zero(shared_state);
-
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
@@ -181,7 +180,8 @@ UpPyramid(float *state)
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid);
+            step(shared_state,sgid,gts);
+            gts += 1;
             //Ensures steps are done prior to communication
             __syncthreads();
             for (int j = 0; j < NV; j++)
@@ -209,7 +209,7 @@ UpPyramid(float *state)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-BridgeX(float *state)
+BridgeX(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -242,7 +242,8 @@ BridgeX(float *state)
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid);
+            step(shared_state,sgid,gts);
+            gts += 1;
             //Ensures steps are done prior to communication
             __syncthreads();
             for (int j = 0; j < NV; j++)
@@ -271,7 +272,7 @@ BridgeX(float *state)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-BridgeY(float *state)
+BridgeY(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -304,7 +305,8 @@ BridgeY(float *state)
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid);
+            step(shared_state,sgid,gts);
+            gts += 1;
             //Ensures steps are done prior to communication
             __syncthreads();
             for (int j = 0; j < NV; j++)
@@ -329,7 +331,7 @@ BridgeY(float *state)
 
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-Octahedron(float *state)
+Octahedron(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -364,7 +366,8 @@ Octahedron(float *state)
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid);
+            step(shared_state,sgid,gts);
+            gts += 1;
             //Ensures steps are done prior to communication
             __syncthreads();
             // Place values back in original matrix
@@ -399,7 +402,8 @@ Octahedron(float *state)
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid);
+            step(shared_state,sgid,gts);
+            gts += 1;
             //Ensures steps are done prior to communication
             __syncthreads();
             for (int j = 0; j < NV; j++)
@@ -421,7 +425,7 @@ Octahedron(float *state)
 
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-DownPyramid(float *state)
+DownPyramid(float *state, int gts)
 {
   //Creating flattened shared array ptr (x,y,v) length
   extern __shared__ float shared_state[];    //Shared state specified externally
@@ -431,7 +435,7 @@ DownPyramid(float *state)
   int tidx = threadIdx.x+OPS;
   int tidy = threadIdx.y+OPS;
   int sgid = get_sgid(tidx,tidy); //Shared global index
-  int gid = get_gid(); //global index
+  int gid = get_gid()+TSO*TIMES; //global index
   int TOPS = 2*OPS;
   int MDSS = MOSS-MPSS;
   //------------------------DOWNPYRAMID -----------------------------
@@ -456,7 +460,8 @@ DownPyramid(float *state)
       // Solving step function
       if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
       {
-          step(shared_state,sgid);
+          step(shared_state,sgid,gts);
+          gts += 1;
           //Ensures steps are done prior to communication
           __syncthreads();
           // Place values back in original matrix

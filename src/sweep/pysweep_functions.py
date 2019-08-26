@@ -24,8 +24,8 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
         # Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("UpPyramid")
-        ss = np.zeros(arr[0,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
-        gpu_fcn(cuda.InOut(arr),grid=GRD, block=BS,shared=ss.nbytes)
+        ss = np.zeros(arr[TSO+1,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks = []
@@ -58,14 +58,14 @@ def Bridge(sarr,xarr,yarr,XR,YR,CMRS,isets,gts,pargs):
         # X-Bridge
         xarr = np.ascontiguousarray(xarr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("BridgeX")
-        ss = np.zeros(xarr[0,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
-        gpu_fcn(cuda.InOut(xarr),grid=GRD, block=BS,shared=ss.nbytes)
+        ss = np.zeros(xarr[TSO+1,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+        gpu_fcn(cuda.InOut(xarr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
         # Y-Bridge
         yarr = np.ascontiguousarray(yarr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("BridgeY")
-        ss = np.zeros(yarr[0,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
-        gpu_fcn(cuda.InOut(yarr),grid=GRD, block=BS,shared=ss.nbytes)
+        ss = np.zeros(yarr[TSO+1,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+        gpu_fcn(cuda.InOut(yarr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks_x = []
@@ -113,8 +113,8 @@ def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
         #Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("Octahedron")
-        ss = np.zeros(arr[0,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
-        gpu_fcn(cuda.InOut(arr),grid=GRD, block=BS,shared=ss.nbytes)
+        ss = np.zeros(arr[TSO+1,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks = []
@@ -135,8 +135,8 @@ def DownPyramid(sarr,arr,WR,isets,gts,pargs):
     if GRB:
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("DownPyramid")
-        ss = np.zeros(arr[0,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
-        gpu_fcn(cuda.InOut(arr),grid=GRD, block=BS,shared=ss.nbytes)
+        ss = np.zeros(arr[TSO+1,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks = []
@@ -182,7 +182,7 @@ def CPU_DownPyramid(args):
     block,SM,isets,gts,TSO = args
 
     #Removing elements for swept step
-    for ts, swept_set in enumerate(isets,start=0):
+    for ts, swept_set in enumerate(isets,start=TSO):
         #Calculating Step
         block = SM.step(block,swept_set,ts,gts)
     return block
