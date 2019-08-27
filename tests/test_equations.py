@@ -107,8 +107,6 @@ def test_RK2_CPU():
     assert np.isclose(f1d[2,1], num_test[2,1,2,2])
     assert np.isclose(f1d[2,1], num_test[2,2,2,2])
 
-
-
 def test_RK2_GPU():
     """Use this function to test the python version of the euler code.
     This test uses a formerly validate 1D code and computes the fluxes in each direction
@@ -142,6 +140,7 @@ def test_RK2_GPU():
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
     iidx = (2,2),
+
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
