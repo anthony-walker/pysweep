@@ -30,7 +30,6 @@ def step(state,iidx,ts,gts):
             state[nidx] = state[cidx]+half*dtdx*dfdx+half*dtdy*dfdy
         else:
             state[nidx] = state[pidx]+dtdx*dfdx+dtdy*dfdy
-        gts+=1
     return state
 
 def set_globals(gpu,source_mod,*args):

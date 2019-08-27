@@ -1,0 +1,43 @@
+#Programmer: Anthony Walker
+#This file contains a test step function for debugging the swept rule
+
+import numpy as np
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
+
+def step(state,iidx,ts,gts):
+    """This is the method that will be called by the swept solver.
+    state - 4D numpy array(t,v,x,y (v is variables length))
+    iidx -  an iterable of indexs
+    ts - the current time step
+    gts - a step counter that allows implementation of the scheme
+    """
+    half = 0.5
+    vSlice = slice(0,state.shape[1],1)
+    for idx in iidx:
+        nidx = (ts+1,vSlice)+idx  #next step index
+        cidx = (ts,vSlice)+idx
+        pidx = (ts-1,vSlice)+idx  #next step index
+        if gts%2!=0:
+            state[nidx] = 1+state[cidx]
+        else:
+            state[nidx] = 2+state[pidx]
+    return state
+
+def set_globals(gpu,source_mod,*args):
+    """Use this function to set cpu global variables"""
+    t0,tf,dt,dx,dy,gam = args
+    if gpu:
+        keys = "DT","DX","DY","GAMMA","GAM_M1"
+        nargs = args[2:]+(gam-1,)
+        fc = lambda x:np.float32(x)
+        for i,key in enumerate(keys):
+            ckey,_ = source_mod.get_global(key)
+            cuda.memcpy_htod(ckey,fc(nargs[i]))
+    else:
+        global dtdx
+        dtdx = dt/dx
+        global dtdy
+        dtdy = dt/dy
+        global gamma
+        gamma = gam

@@ -42,8 +42,8 @@ def test(args):
 
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 20
-    npy = 20
+    npx = 32
+    npy = 32
     dx = X/npx
     dy = Y/npy
 
@@ -57,8 +57,8 @@ def test(args):
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
     flux_vortex = convert_to_flux(initial_vortex,gamma)
     #GPU Arguments
-    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    gpu_source = "/home/walkanth/pysweep/src/equations/eqt.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/eqt.py"
     ops = 2 #number of atomic operations
     tso = 2 #RK2
     #File args
@@ -67,7 +67,7 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = 10
+    block_size = 16
     affinity = 0.5
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
