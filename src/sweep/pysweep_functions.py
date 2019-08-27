@@ -61,33 +61,31 @@ def Bridge(sarr,xarr,yarr,XR,YR,CMRS,isets,gts,pargs):
         ss = np.zeros(xarr[2,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
         gpu_fcn(cuda.InOut(xarr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
-        # print(xarr[4,0,:,:])
         # Y-Bridge
-        # yarr = np.ascontiguousarray(yarr) #Ensure array is contiguous
-        # gpu_fcn = SM.get_function("BridgeY")
-        # gpu_fcn(cuda.InOut(yarr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
-        # cuda.Context.synchronize()
+        yarr = np.ascontiguousarray(yarr) #Ensure array is contiguous
+        gpu_fcn = SM.get_function("BridgeY")
+        gpu_fcn(cuda.InOut(yarr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
+        cuda.Context.synchronize()
     else:   #CPUs do this
-        pass
-        # blocks_x = []
-        # blocks_y = []
-        #
-        # for local_region in CRS:
-        #     #X blocks
-        #     block_x = np.zeros(xarr[local_region].shape)
-        #     block_x += xarr[local_region]
-        #     blocks_x.append(block_x)
-        #     #Y_blocks
-        #     block_y = np.zeros(yarr[local_region].shape)
-        #     block_y += yarr[local_region]
-        #     blocks_y.append(block_y)
-        # #Solving
-        # cpu_fcn = sweep_lambda((CPU_Bridge,SM,isets[0],gts,TSO))
-        # blocks_x = list(map(cpu_fcn,blocks_x))
-        # cpu_fcn.args = (CPU_Bridge,SM,isets[1],gts,TSO)
-        # blocks_y = list(map(cpu_fcn,blocks_y))
-        # xarr = rebuild_blocks(xarr,blocks_x,CRS,OPS)
-        # yarr = rebuild_blocks(yarr,blocks_y,CRS,OPS)
+        blocks_x = []
+        blocks_y = []
+
+        for local_region in CRS:
+            #X blocks
+            block_x = np.zeros(xarr[local_region].shape)
+            block_x += xarr[local_region]
+            blocks_x.append(block_x)
+            #Y_blocks
+            block_y = np.zeros(yarr[local_region].shape)
+            block_y += yarr[local_region]
+            blocks_y.append(block_y)
+        #Solving
+        cpu_fcn = sweep_lambda((CPU_Bridge,SM,isets[0],gts,TSO))
+        blocks_x = list(map(cpu_fcn,blocks_x))
+        cpu_fcn.args = (CPU_Bridge,SM,isets[1],gts,TSO)
+        blocks_y = list(map(cpu_fcn,blocks_y))
+        xarr = rebuild_blocks(xarr,blocks_x,CRS,OPS)
+        yarr = rebuild_blocks(yarr,blocks_y,CRS,OPS)
     yarr-=y0arr
     xarr-=x0arr
     sarr[XR] += xarr[:,:,:,:]
