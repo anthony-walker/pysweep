@@ -27,9 +27,9 @@ def step(state,iidx,ts,gts):
         cidx = (ts,vSlice)+idx  #current step index
         dfdx,dfdy = dfdxy(state,cidx)
         if gts%2!=0:
-            state[nidx] += state[cidx]+half*dtdx*dfdx+half*dtdy*dfdy
+            state[nidx] = state[cidx]+half*dtdx*dfdx+half*dtdy*dfdy
         else:
-            state[nidx] += state[pidx]+dtdx*dfdx+dtdy*dfdy
+            state[nidx] = state[pidx]+dtdx*dfdx+dtdy*dfdy
         gts+=1
     return state
 

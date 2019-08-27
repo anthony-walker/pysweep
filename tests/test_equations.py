@@ -61,7 +61,7 @@ def test_flux():
     assert np.isclose(df[2],dfdx[3])
     assert np.isclose(df[2],dfdy[3])
 
-def test_RK2():
+def test_RK2_CPU():
     """Use this function to test the python version of the euler code.
     This test uses a formerly validate 1D code and computes the fluxes in each direction
     to test whether the 2D fluxes are correctly computing
@@ -94,18 +94,54 @@ def test_RK2():
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
     iidx = (2,2),
-
     #Testing RK2 step 1
     f1d = source_mod_1D.RK2S1(Qx,P)
     num_test = source_mod_2D.step(num_test,iidx,0,1)
     #Checking velocities in each direction as they should be the same
     assert np.isclose(f1d[2,1], num_test[1,1,2,2])
     assert np.isclose(f1d[2,1], num_test[1,2,2,2])
-    print(num_test[1,0,2,2])
-    f1d = source_mod_1D.RK2S2(f1d,Qx)
-    # f2d[0,:,:,:] = f2d[1,:,:,:]
+    f1d = source_mod_1D.RK2S2(Qx,Qx)
+    num_test[1,:,:,:] = num_test[0,:,:,:]
+    #Test second step
     num_test = source_mod_2D.step(num_test,iidx,1,2)
-    print(num_test[2,1,2,2])
+    assert np.isclose(f1d[2,1], num_test[2,1,2,2])
+    assert np.isclose(f1d[2,1], num_test[2,2,2,2])
+
+
+
+def test_RK2_GPU():
+    """Use this function to test the python version of the euler code.
+    This test uses a formerly validate 1D code and computes the fluxes in each direction
+    to test whether the 2D fluxes are correctly computing
+    """
+    #Sod Shock BC's
+    t0 = 0
+    tf = 1
+    dt = 0.01
+    dx = 0.1
+    dy = 0.1
+    gamma = 1.4
+    leftBC = (1.0,0,0,2.5)
+    rightBC = (0.125,0,0,.25)
+    num_test = np.zeros((3,4,5,5))
+    for i in range(3):
+        for j in range(3):
+            num_test[0,:,i,j]=leftBC[:]
+    for i in range(2,5):
+        for j in range(2,5):
+            num_test[0,:,i,j]=rightBC[:]
+
+    Qx = np.zeros((5,3))
+    Qx[:,0] = num_test[0,0,:,2]
+    Qx[:,1] = num_test[0,1,:,2]
+    Qx[:,2] = num_test[0,3,:,2]
+    P = np.zeros(5)
+    P[:] = [1,1,0.1,0.1,0.1]
+    # #Get source module
+    source_mod_2D = build_gpu_source("./src/equations/euler.h")
+    source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
+    source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
+    iidx = (2,2),
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
@@ -182,5 +218,3 @@ def test_python_euler():
     frames = len(tuple(range(time_steps+1)))
     anim = animation.FuncAnimation(fig,animate,frames)
     anim.save("test.gif",writer="imagemagick")
-
-test_RK2()

@@ -57,7 +57,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         TSO - order of the time scheme
         OPS - operating points to remove from each side for a function step
             (e.g. a 5 point stencil would result in OPS=2).
-        BS - gpu block size (check your architecture requirements) - (x,x,1)
+        BS - an integer which represents the x and y dimensions of the gpu block size
         AF -  the GPU affinity (GPU work/CPU work)/TotalWork
         GS - GPU source code file
         CS - CPU source code file
@@ -68,7 +68,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #Unpacking arguments
     t0,tf,dt = gargs[:3]
     TSO,OPS,BS,AF,GS,CS = swargs
-
+    BS = (BS,BS,1)
     start = timer.time()
     #Local Constants
     ZERO = 0
@@ -215,9 +215,10 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Creating constants
         NV = larr.shape[ONE]
         SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
+        STS = SGIDS*NV #Shared time shift
         VARS =  larr.shape[TWO]*larr.shape[3]
         TIMES = VARS*NV
-        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO})
+        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
         SM = build_gpu_source(GS)
         swept_constant_copy(SM,const_dict)
