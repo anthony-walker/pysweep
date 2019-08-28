@@ -91,8 +91,8 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
-    # ct = decomp(flux_vortex[0],gargs,swargs,filename="./results/decomp")
+    # cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
+    ct = decomp(flux_vortex[0],gargs,swargs,filename="./results/decomp")
     # return (cts,ct)
 
 if __name__ == "__main__":

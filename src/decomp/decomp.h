@@ -145,7 +145,7 @@ void shared_state_zero(float * shared_state)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-Decomp(float *state)
+Decomp(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -167,7 +167,7 @@ Decomp(float *state)
       __syncthreads(); //Sync threads here to ensure all initial values are copied
 
       // Solving step function
-      step(shared_state,sgid);
+      step(shared_state,sgid,gts);
 
       // Place values back in original matrix
       for (int j = 0; j < NV; j++)

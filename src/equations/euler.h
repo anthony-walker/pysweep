@@ -243,3 +243,10 @@ void step(float *shared_state, int idx, int gts)
       }
   }
 }
+
+// __global__
+// void test_gpu_euler(float *state, int idx, int gts)
+// {
+//   extern shared_state
+//   step(state,idx,gts)
+// }

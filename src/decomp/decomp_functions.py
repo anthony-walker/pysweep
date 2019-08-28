@@ -122,6 +122,22 @@ def create_read_region(region,ops):
     new_region += slice(region[3].start-ops,region[3].stop+ops,1),
     return new_region
 
+def create_boundary_regions(wr,ss,ops):
+    """Use this function to create boundary write regions."""
+    boundary_regions = tuple()
+    region_start = wr[:2]
+    c1 = wr[2].start==ops
+    c2 = wr[3].start==ops
+    tops = 2*ops
+    if c1: #Top edge -  periodic x
+        #Boundaries for up pyramid and octahedron
+        boundary_regions += (region_start+(slice(ops,tops,1),wr[3],slice(ss[2]-ops,ss[2],1),wr[3]),)
+        boundary_regions += (region_start+(slice(ss[2]-tops,ss[2]-ops,1),wr[3],slice(0,ops,1),wr[3]),)
+    if c2: #Side edge -  periodic y
+        boundary_regions += (region_start+(wr[2],slice(ops,tops,1),wr[2],slice(ss[3]-ops,ss[3])),)
+        boundary_regions += (region_start+(wr[2],slice(ss[3]-tops,ss[3]-ops,1),wr[2],slice(0,ops,1)),)
+    return boundary_regions
+
 def get_gpu_ranks(rank_info,affinity):
     """Use this funciton to determine which ranks with have a GPU.
         given: rank_info - a list of tuples of (rank, processor, gpu_ids, gpu_rank)

@@ -114,33 +114,37 @@ def test_RK2_GPU():
     """
     #Sod Shock BC's
     t0 = 0
-    tf = 1
+    tf = 0.03
     dt = 0.01
     dx = 0.1
     dy = 0.1
     gamma = 1.4
     leftBC = (1.0,0,0,2.5)
     rightBC = (0.125,0,0,.25)
-    num_test = np.zeros((3,4,5,5))
-    for i in range(3):
-        for j in range(3):
-            num_test[0,:,i,j]=leftBC[:]
-    for i in range(2,5):
-        for j in range(2,5):
-            num_test[0,:,i,j]=rightBC[:]
 
-    Qx = np.zeros((5,3))
-    Qx[:,0] = num_test[0,0,:,2]
-    Qx[:,1] = num_test[0,1,:,2]
-    Qx[:,2] = num_test[0,3,:,2]
-    P = np.zeros(5)
-    P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
-    source_mod_2D = build_gpu_source("./src/equations/euler.h")
+    c_mod_2D =  build_cpu_source(".src/decomp/decomp.py")
+
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
-    iidx = (2,2),
 
+    # num_test = np.zeros((3,4,5,5))
+    # for i in range(3):
+    #     for j in range(3):
+    #         num_test[0,:,i,j]=leftBC[:]
+    # for i in range(2,5):
+    #     for j in range(2,5):
+    #         num_test[0,:,i,j]=rightBC[:]
+    #
+    # Qx = np.zeros((5,3))
+    # Qx[:,0] = num_test[0,0,:,2]
+    # Qx[:,1] = num_test[0,1,:,2]
+    # Qx[:,2] = num_test[0,3,:,2]
+    # P = np.zeros(5)
+    # P[:] = [1,1,0.1,0.1,0.1]
+
+def test_decomp():
+    """Use this function to test decomp."""
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""

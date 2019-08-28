@@ -47,9 +47,10 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         Subsequent variables can be anything passed to the source code in the
         "set_globals" function
     swargs: (Swept args)
+        TSO - Time scheme order
         OPS - operating points to remove from each side for a function step
             (e.g. a 5 point stencil would result in OPS=2).
-        BS - gpu block size (check your architecture requirements) - (x,x,1)
+        BS - gpu block size as integer which represents x and y dimensions
         AF -  the GPU affinity (GPU work/CPU work)/TotalWork
         GS - GPU source code file
         CS - CPU source code file
@@ -58,8 +59,8 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     exid: GPU ids to exclude from the calculation.
     """
     t0,tf,dt = gargs[:3]
-    OPS,BS,AF,GS,CS = swargs
-
+    TSO,OPS,BS,AF,GS,CS = swargs
+    BS = (BS,BS,1)
     start = timer.time()
     #Local Constants
     ZERO = 0
@@ -128,10 +129,9 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     num_cpus = len(cpu_ranks)
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)+ONE  #Number of time steps +ONE becuase initial time step
-
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (TWO,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
+    shared_shape = (TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
@@ -148,7 +148,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         gri = None
         regions = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
     regions = (create_read_region(regions,OPS),regions) #Creating read region
-
+    brs = create_boundary_regions(regions[1],shared_shape,OPS)
     #--------------------------------CREATING LOCAL ARRAY-----------------------------------------#
     local_array = create_local_array(shared_arr,regions[ZERO],dType)
 
