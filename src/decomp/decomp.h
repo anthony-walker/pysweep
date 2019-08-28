@@ -155,8 +155,8 @@ Decomp(float *state, int gts)
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
-    int sgid = get_sgid(tidx,tidy); //Shared global index
-    int gid = get_gid(); //global index
+    int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
+    int gid = get_gid()+(TSO-ONE)*TIMES; //global index
 
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO);

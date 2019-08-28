@@ -129,13 +129,13 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     num_cpus = len(cpu_ranks)
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)+ONE  #Number of time steps +ONE becuase initial time step
-    #-----------------------SHARED ARRAY CREATION----------------------#
+    #-----------------------SHARED [ARRAY] CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
-        edge_comm(shared_arr,OPS)
+        shared_arr[1,:,OPS:shared_shape[2]-OPS,OPS:shared_shape[3]-OPS] = arr0[:,:,:] #Filling array
 
     #------------------------------DECOMPOSITION BY REGION CREATION--------------#
     #Splits regions up amongst architecture
@@ -149,8 +149,11 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         regions = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
     regions = (create_read_region(regions,OPS),regions) #Creating read region
     brs = create_boundary_regions(regions[1],shared_shape,OPS)
+    reg_edge_comm(shared_arr,OPS,brs,regions[1])
+    comm.Barrier()
     #--------------------------------CREATING LOCAL ARRAY-----------------------------------------#
     local_array = create_local_array(shared_arr,regions[ZERO],dType)
+    #Communicating array edges
 
     #---------------------_REMOVING UNWANTED RANKS---------------------------#
     #Checking if rank is useful
@@ -221,7 +224,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     ct = 1
     for i in range(1,TSO*time_steps):
         comm.Barrier()
-        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS,i)
+        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS,i,TSO)
         comm.Barrier()
         reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
         comm.Barrier()

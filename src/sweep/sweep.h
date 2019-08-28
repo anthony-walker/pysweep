@@ -166,11 +166,15 @@ UpPyramid(float *state, int gts)
     //Communicating edge values to shared array for the calculation point (ONE)
     edge_comm(shared_state, state,ZERO,ONE);
     //Communicating interior points for TSO data and calculation data
-    for (int i = 0; i < NV; i++)
+    if (gts%TSO!=0)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS]; //Initial time step to TSO stage
-        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step to Calc stage
+      for (int i = 0; i < NV; i++)
+      {
+          shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS]; //Initial time step to TSO stage
+          shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step to Calc stage
+      }
     }
+
 
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 

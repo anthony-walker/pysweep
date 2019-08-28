@@ -32,11 +32,11 @@ def edge_comm(shared_arr,ops):
     shared_arr[:,:,:,:ops] = shared_arr[:,:,:,ops:2*ops]
 
 def reg_edge_comm(shared_arr,ops,brs,wr):
-    """Use this function to communicate edges in the shared array."""
+    # """Use this function to communicate edges in the shared array."""
     #Shifting data down
     shared_arr[0,wr[1],wr[2],wr[3]] = shared_arr[1,wr[1],wr[2],wr[3]]
     for t,v,sb1,sb2,sb3,sb4 in brs:
-        shared_arr[t,v,sb1,sb2] = shared_arr[t,v,sb3,sb4]
+        shared_arr[t,v,sb3,sb4] = shared_arr[t,v,sb1,sb2]
 
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
@@ -141,7 +141,7 @@ def create_boundary_regions(wr,ss,ops):
         boundary_regions += (region_start+(slice(ops,tops,1),wr[3],slice(ss[2]-ops,ss[2],1),wr[3]),)
         boundary_regions += (region_start+(slice(ss[2]-tops,ss[2]-ops,1),wr[3],slice(0,ops,1),wr[3]),)
     if c2: #Side edge -  periodic y
-        boundary_regions += (region_start+(wr[2],slice(ops,tops,1),wr[2],slice(ss[3]-ops,ss[3])),)
+        boundary_regions += (region_start+(wr[2],slice(ops,tops,1),wr[2],slice(ss[3]-ops,ss[3],1)),)
         boundary_regions += (region_start+(wr[2],slice(ss[3]-tops,ss[3]-ops,1),wr[2],slice(0,ops,1)),)
     return boundary_regions
 
@@ -228,7 +228,7 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
     else:
         return blocks[0]
 
-def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,ops,gts):
+def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,ops,gts,tso):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
