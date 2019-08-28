@@ -32,9 +32,7 @@ def edge_comm(shared_arr,ops):
     shared_arr[:,:,:,:ops] = shared_arr[:,:,:,ops:2*ops]
 
 def reg_edge_comm(shared_arr,ops,brs,wr):
-    # """Use this function to communicate edges in the shared array."""
-    #Shifting data down
-    shared_arr[0,wr[1],wr[2],wr[3]] = shared_arr[1,wr[1],wr[2],wr[3]]
+    """Use this function to communicate edges with multiple ranks"""
     for t,v,sb1,sb2,sb3,sb4 in brs:
         shared_arr[t,v,sb3,sb4] = shared_arr[t,v,sb1,sb2]
 
@@ -252,7 +250,7 @@ def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
     #Writing to shared array
-    shared_arr[region] = arr[:,:,ops:-ops,ops:-ops]
+    shared_arr[1,region[1],region[2],region[3]] = arr[2,:,ops:-ops,ops:-ops]
 
 #--------------------------------CPU Specific Swept Functions------------------
 def CPU_Decomp(args):
@@ -262,7 +260,7 @@ def CPU_Decomp(args):
     iidx = tuple(np.ndindex((block.shape[2],block.shape[3])))
     iidx = iidx[block.shape[3]*ops:-block.shape[3]*ops]
     iidx = [(x,y) for x,y in iidx if y >= ops and y < block.shape[3]-ops]
-    ts = 0
+    ts = 1
     block = source_mod.step(block,iidx,ts,gts)
     return block
 

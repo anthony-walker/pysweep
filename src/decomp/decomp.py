@@ -131,10 +131,11 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     time_steps = int((tf-t0)/dt)+ONE  #Number of time steps +ONE becuase initial time step
     #-----------------------SHARED [ARRAY] CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
+    shared_shape = (3,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
+        shared_arr[0,:,OPS:shared_shape[2]-OPS,OPS:shared_shape[3]-OPS] = arr0[:,:,:] #Filling array
         shared_arr[1,:,OPS:shared_shape[2]-OPS,OPS:shared_shape[3]-OPS] = arr0[:,:,:] #Filling array
 
     #------------------------------DECOMPOSITION BY REGION CREATION--------------#
@@ -205,7 +206,6 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         source_mod = build_cpu_source(CS) #Building Python source code
         cpu_regions = create_blocks_list(local_array.shape,BS,OPS)
         grid_size = None
-
     #------------------------------HDF5 File------------------------------------------#
     filename+=".hdf5"
     hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
@@ -219,10 +219,11 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+1,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
     hregion = (regions[ONE][1],slice(regions[ONE][2].start-OPS,regions[ONE][2].stop-OPS,1),slice(regions[ONE][3].start-OPS,regions[ONE][3].stop-OPS,1))
     hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
-
+    wr = regions[1]
     #Solution
     ct = 1
-    for i in range(1,TSO*time_steps):
+    for i in range(1,TSO*(time_steps+1)):
+        local_array[:,:,:,:] = shared_arr[regions[0]]
         comm.Barrier()
         decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS,i,TSO)
         comm.Barrier()
@@ -230,6 +231,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         comm.Barrier()
         #Writing Data after it has been shifted
         if i%TSO==0:
+            shared_arr[0,wr[1],wr[2],wr[3]] = shared_arr[1,wr[1],wr[2],wr[3]]
             hdf5_data_set[ct,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
             ct+=1
     #Final barrier

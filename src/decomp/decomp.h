@@ -156,15 +156,27 @@ Decomp(float *state, int gts)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
-    int gid = get_gid()+(TSO-ONE)*TIMES; //global index
+    int gid = get_gid()+TIMES; //global index
 
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO);
+    if (gts%TSO==0)
+    {
+        for (int i = 0; i < NV; i++)
+        {
+            shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-TIMES]; //Current time step
+            shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Current time step
+        }
+    }
+    else
+    {
+        for (int i = 0; i < NV; i++)
+        {
+            shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Current time step
+            // printf("%d\n", state[gid+i*VARS]);
+        }
+    }
 
-      for (int i = 0; i < NV; i++)
-      {
-          shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Current time step
-      }
       __syncthreads(); //Sync threads here to ensure all initial values are copied
 
       // Solving step function
@@ -175,4 +187,5 @@ Decomp(float *state, int gts)
       {
           state[gid+j*VARS+TIMES]=shared_state[sgid+j*SGIDS];
       }
+      __syncthreads();
 }
