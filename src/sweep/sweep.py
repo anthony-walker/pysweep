@@ -201,11 +201,15 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     xtrr,ytrr = create_rev_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
     wxt = create_write_bridges(XR,OPS,bridge_slices[0],shared_shape,BS)
     wyt = create_write_bridges(YR,OPS,bridge_slices[1],shared_shape,BS)
-    for row in wxt:
-        print(row)
+
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     larr = np.copy(sarr[SRR])
 
+    print("************************")
+    for row in wxt:
+        for item in row:
+            print(item)
+    print("************************")
     #---------------Generating Source Modules----------------------------------#
     if GRB:
         # Creating cuda device and Context
@@ -267,7 +271,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #Bridge Step
     Bridge(sarr,xarr,yarr,wxt,wyt,(xtr,ytr),bridge_sets,wb+1,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
-    printer(sarr[4,0,:,:],p_iter=True)
+    # printer(sarr[3,0,:,:],p_iter=True)
     # if rank == master_rank:
     #     print(bridge_slices)
     #     for i in xtr:

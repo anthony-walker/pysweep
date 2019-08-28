@@ -67,6 +67,7 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
     x_blocks = int((XR[2].stop-XR[2].start-2*ops)/bs[0])
     y_blocks = int((XR[3].stop-XR[3].start-2*ops)/bs[1])
     #Standard bridge writes
+    ttt = tuple()
     for x,y in bgs:
         #X-write
         wxs = x.start+XR[2].start
@@ -74,12 +75,14 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
         #Y-write
         wys = y.start+XR[3].start
         wyst = wys+y.stop-y.start
-        wxt += (x,y,slice(wxs,wxst,1),slice(wys,wyst,1)),
+        ttt += ((x,y,slice(wxs,wxst,1),slice(wys,wyst,1)),)
+    wxt += ttt,
     pwxt += wxt,
     wxt = tuple()
     if c1: #Top edge -  periodic x
         for x,y in bgs:
             #X-write
+            xtt = tuple()
             tfxe = x.stop+sx
             xc = tfxe < ss[2]
             tfxe = tfxe if xc else ss[2]
@@ -88,22 +91,36 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
             #Y-write
             wys = y.start+XR[3].start
             wyst = wys+y.stop-y.start
-            wxt += (nx,y,tfx,slice(wys,wyst,1)),
+            tfy = slice(wys,wyst,1)
+            xtt += ((nx,y,tfx,tfy),)
+            for i in range(1,y_blocks):
+                y = slice(y.start+bs[1],y.stop+bs[1],1)
+                tfy = slice(tfy.start+bs[1],tfy.stop+bs[1],1)
+                xtt += ((nx,y,tfx,tfy),)
+            wxt += (xtt,)
     if wxt:
         pwxt += wxt,
     wxt = tuple()
     if c2: #Side edge -  periodic y
         for x,y in bgs:
             #X-write
+            ytt = tuple()
             wxs = x.start+XR[2].start
             wxst = wxs+x.stop-x.start
+            tfx = slice(wxs,wxst,1)
             #Y-write
             tfye = y.stop+sy
             yc = tfye < ss[3]
             tfye = tfye if yc else ss[3]
             tfy = slice(y.start+sy,tfye,1)
             ny = y if yc else slice(y.start,tfy.stop-tfy.start+y.start,1)
-            wxt += (x,ny,slice(wxs,wxst,1),tfy),
+            ytt += ((x,ny,tfx,tfy),)
+            #Adjustment for multiple blocks
+            for i in range(1,x_blocks):
+                x = slice(x.start+bs[0],x.stop+bs[0],1)
+                tfx = slice(tfx.start+bs[0],tfx.stop+bs[0],1)
+                ytt += ((x,ny,tfx,tfy),)
+            wxt += (ytt,)
     if wxt:
         pwxt += wxt,
     return pwxt
