@@ -56,10 +56,10 @@ def test(args):
     # Creating initial vortex from analytical code
     initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,))
     flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
-
+    tarr = np.ones(flux_vortex.shape)
     #GPU Arguments
-    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    gpu_source = "/home/walkanth/pysweep/src/equations/eqt.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/eqt.py"
     ops = 2 #number of atomic operations
     tso = 2 #RK2
     #File args
@@ -92,8 +92,8 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    # cts = sweep(flux_vortex[0],gargs,swargs,filename="./results/swept")
-    ct = decomp(flux_vortex,gargs,swargs,filename="./results/decomp")
+    cts = sweep(tarr,gargs,swargs,filename="./results/swept",exid=[1])
+    # ct = decomp(flux_vortex,gargs,swargs,filename="./results/decomp")
     # return (cts,ct)
 
 if __name__ == "__main__":

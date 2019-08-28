@@ -42,6 +42,13 @@ __device__ int get_sgid(int tidx, int tidy)
     return tidy + (blockDim.y+2*OPS)*tidx;
 }
 
+__device__ int get_gid_ftid(int tidx, int tidy)
+{
+    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
+    int threadId = blockId * ((blockDim.x+2*OPS)*(blockDim.y+2*OPS))+ (tidy *(blockDim.x+2*OPS)) + tidx;
+    return threadId;
+}
+
 /*
     Use this function to get the global id
 */
@@ -66,6 +73,32 @@ __device__ void test_gid(int tdx,int tdy)
     }
 }
 
+/*
+    Use this function to clear the shared memory array
+*/
+__device__
+void shared_state_zero(float * shared_state)
+{
+    int M = (gridDim.y*blockDim.y+2*OPS); //Major y axis length
+    int tgid = getGlobalIdx_2D_2D()%(blockDim.x*blockDim.y);
+    int ntgid;
+    if (tgid < blockDim.y+TWO*OPS)
+    {
+        int ntgid;
+        int ngid;
+        int i;
+
+        for (i = 0; i < blockDim.x+TWO*OPS; i++)
+        {
+            for (int j = 0; j < NV; j++) {
+                ntgid = tgid+i*(blockDim.y+TWO*OPS)+j*SGIDS;
+                shared_state[ntgid] = 0;
+            }
+
+        }
+    }
+    __syncthreads();
+}
 
 /*
     Use this function to communicate the initial swept edges.
@@ -76,7 +109,6 @@ void edge_comm(float * shared_state, float * state, int curr_time, int mod_sts)
     int M = (gridDim.y*blockDim.y+2*OPS); //Major y axis length
     int tgid = getGlobalIdx_2D_2D()%(blockDim.x*blockDim.y);
     int gid = tgid+blockIdx.y*blockDim.y+blockDim.x*blockIdx.x*M;
-
     if (tgid < blockDim.y+TWO*OPS)
     {
         int ntgid;
@@ -112,36 +144,57 @@ void edge_comm(float * shared_state, float * state, int curr_time, int mod_sts)
             }
         }
     }
-    __syncthreads();
 }
+/*
+    Use this function to communicate edges more effectively
+*/
+__device__
+void state_edge_comm(float * shared_state, float * state, int smod,int tmod)
+{
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    int gid = get_gid_ftid(tidx,tidy); //Global index
 
+    for (int j = 0; j < NV; j++)
+    {
+        shared_state[sgid+j*VARS+smod*STS] = state[gid+j*VARS+tmod*TIMES];
+    }
+    tidx = threadIdx.x+2*OPS;
+    tidy = threadIdx.y+2*OPS;
+    sgid = get_sgid(tidx,tidy); //Shared global index
+    for (int j = 0; j < NV; j++)
+    {
+        shared_state[sgid+j*VARS+smod*STS] = state[gid+j*VARS+tmod*TIMES];
+    }
+}
 /*
     Use this function to clear the shared memory array
 */
 __device__
-void shared_state_zero(float * shared_state)
+void shared_state_clear(float * shared_state)
 {
-    int M = (gridDim.y*blockDim.y+2*OPS); //Major y axis length
-    int tgid = getGlobalIdx_2D_2D()%(blockDim.x*blockDim.y);
-    int ntgid;
-    if (tgid < blockDim.y+TWO*OPS)
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    for (int i = 0; i < TWO; i++)
     {
-        int ntgid;
-        int ngid;
-        int i;
-
-        for (i = 0; i < blockDim.x+TWO*OPS; i++)
+        for (int j = 0; j < NV; j++)
         {
-            for (int j = 0; j < NV; j++) {
-                ntgid = tgid+i*(blockDim.y+TWO*OPS)+j*SGIDS;
-                shared_state[ntgid] = 0;
-            }
-
+            shared_state[sgid+j*SGIDS+STS*i] = 0;
         }
     }
-    __syncthreads();
+    tidx = threadIdx.x+2*OPS;
+    tidy = threadIdx.y+2*OPS;
+    sgid = get_sgid(tidx,tidy); //Shared global index
+    for (int i = 0; i < TWO; i++)
+    {
+        for (int j = 0; j < NV; j++)
+        {
+            shared_state[sgid+j*SGIDS+STS*i] = 0;
+        }
+    }
 }
-
 /*
     Use this function to create and return the GPU UpPyramid
 */
@@ -151,12 +204,15 @@ UpPyramid(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
-    shared_state_zero(shared_state);
+    // Cleaning out shared array
+    shared_state_clear(shared_state);
+    __syncthreads();
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
     int gid = get_gid()+(TSO-ONE)*TIMES; //global index
+
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ly = OPS; // Lower y swept bound
@@ -165,17 +221,15 @@ UpPyramid(float *state, int gts)
 
     //Communicating edge values to shared array for the calculation point (ONE)
     edge_comm(shared_state, state,ZERO,ONE);
+    __syncthreads();
+
     //Communicating interior points for TSO data and calculation data
-    if (gts%TSO!=0)
+    //UpPyramid Always starts on predictor so no if needed here
+    for (int i = 0; i < NV; i++)
     {
-      for (int i = 0; i < NV; i++)
-      {
-          shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS]; //Initial time step to TSO stage
-          shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step to Calc stage
-      }
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS]; //Initial time step to TSO stage
+        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step to Calc stage
     }
-
-
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
     for (int k = 0; k < MPSS; k++)
@@ -226,8 +280,8 @@ BridgeX(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
-    shared_state_zero(shared_state);
-
+    // shared_state_clear(shared_state);
+    __syncthreads();
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
@@ -242,6 +296,7 @@ BridgeX(float *state, int gts)
 
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO,ONE);
+    __syncthreads();
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
@@ -264,6 +319,7 @@ BridgeX(float *state, int gts)
                 state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
             }
         }
+        __syncthreads();
         //Necessary communication step
         if (gts%TSO==0)
         {
@@ -305,8 +361,8 @@ BridgeY(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
-    shared_state_zero(shared_state);
-
+    shared_state_clear(shared_state);
+    __syncthreads();
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
@@ -319,9 +375,9 @@ BridgeY(float *state, int gts)
     int ux = lx+blockDim.x-2*OPS; //upper y
     int uy = ly+2*OPS; //upper x
 
-
     //Communicating edge values to shared array
     edge_comm(shared_state, state,ZERO,ONE);
+    __syncthreads();
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
@@ -344,6 +400,7 @@ BridgeY(float *state, int gts)
                 state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
             }
         }
+        __syncthreads();
         //Necessary communication step
         if (gts%TSO==0)
         {
@@ -382,8 +439,8 @@ Octahedron(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
-    shared_state_zero(shared_state);
-
+    shared_state_clear(shared_state);
+    __syncthreads();
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
@@ -460,7 +517,6 @@ Octahedron(float *state, int gts)
     uy = blockDim.y+OPS; //upper y
     //Communicating edge values to shared array
     edge_comm(shared_state, state,MDSS+ONE,ONE);
-
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     for (int k = MDSS; k < MOSS; k++)
     {
@@ -505,8 +561,8 @@ DownPyramid(float *state, int gts)
 {
   //Creating flattened shared array ptr (x,y,v) length
   extern __shared__ float shared_state[];    //Shared state specified externally
-  shared_state_zero(shared_state);
-
+  shared_state_clear(shared_state);
+  __syncthreads();
   //Other quantities for indexing
   int tidx = threadIdx.x+OPS;
   int tidy = threadIdx.y+OPS;

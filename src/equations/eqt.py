@@ -18,6 +18,8 @@ def step(state,iidx,ts,gts):
         nidx = (ts+1,vSlice)+idx  #next step index
         cidx = (ts,vSlice)+idx
         pidx = (ts-1,vSlice)+idx  #next step index
+        # state[nidx] = state[cidx]+state[ss+(idx[0],)+((idx[1]+1),)]+state[ss+(idx[0],)+((idx[1]-1),)]
+        # state[nidx] += state[ss+((idx[0]+1),)+(idx[1],)]+state[ss+((idx[0]-1),)+(idx[1],)]
         if gts%2!=0:
             state[nidx] = 1+state[cidx]
         else:

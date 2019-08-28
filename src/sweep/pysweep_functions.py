@@ -22,9 +22,10 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
 
     if GRB:
         # Getting GPU Function
+        pass
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("UpPyramid")
-        ss = np.zeros(arr[2,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+        ss = np.zeros(arr[:2,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
@@ -49,10 +50,8 @@ def Bridge(sarr,xarr,yarr,XR,YR,CMRS,isets,gts,pargs):
     #Finding splits again
     SPLITX = BS[0]/2
     SPLITY = BS[1]/2
-    y0arr = np.zeros(yarr.shape)
-    y0arr[:,:,:,:] = yarr[:,:,:,:]
-    x0arr = np.zeros(xarr.shape)
-    x0arr[:,:,:,:] = xarr[:,:,:,:]
+    y0arr = np.copy(yarr)
+    x0arr = np.copy(xarr)
     #Splitting between cpu and gpu
     if GRB:
         # X-Bridge
@@ -88,16 +87,14 @@ def Bridge(sarr,xarr,yarr,XR,YR,CMRS,isets,gts,pargs):
         yarr = rebuild_blocks(yarr,blocks_y,CRS,OPS)
     yarr-=y0arr
     xarr-=x0arr
-    sarr[XR] += xarr[:,:,:,:]
-    sarr[YR] += yarr[:,:,:,:]
 
-    for i, x_item in enumerate(CMRS[1],start=TSO+1):
-        for bs in x_item:
-            lcx,lcy,shx,shy = bs
+    for bdg in XR:
+        for i, cb  in enumerate(bdg,start=TSO+1):
+            lcx,lcy,shx,shy = cb
             sarr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
-    for i, x_item in enumerate(CMRS[0],start=TSO+1):
-        for bs in x_item:
-            lcx,lcy,shx,shy = bs
+    for bdg in YR:
+        for i, cb  in enumerate(bdg,start=TSO+1):
+            lcx,lcy,shx,shy = cb
             sarr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
 
 def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
