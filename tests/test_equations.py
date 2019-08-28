@@ -146,6 +146,7 @@ def test_RK2_GPU():
 def test_decomp():
     """Use this function to test decomp."""
 
+
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
     #Properties

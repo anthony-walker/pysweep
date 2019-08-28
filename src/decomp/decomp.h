@@ -17,7 +17,8 @@ __device__ __constant__ int VARS; //shift in variables in data
 __device__ __constant__ int TIMES; //shift in times in data
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
-
+__device__ __constant__ int TSO; //Time scheme order
+__device__ __constant__ int STS;
 //GPU Constants
 __device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
 __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block

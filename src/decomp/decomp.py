@@ -187,9 +187,10 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         #Creating constants
         NV = local_array.shape[ONE]
         SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
+        STS = SGIDS*NV #Shared time shift
         VARS =  local_array.shape[TWO]*local_array.shape[3]
         TIMES = VARS*NV
-        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":OPS})
+        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
         source_mod = build_gpu_source(GS)
         decomp_constant_copy(source_mod,const_dict)
@@ -212,20 +213,22 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     hdf_aff = hdf5_file.create_dataset("AF",(ONE,))
     hdf_aff[ZERO] = AF
     hdf_time = hdf5_file.create_dataset("time",(1,))
-    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+1,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
     hregion = (regions[ONE][1],slice(regions[ONE][2].start-OPS,regions[ONE][2].stop-OPS,1),slice(regions[ONE][3].start-OPS,regions[ONE][3].stop-OPS,1))
     hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
 
     #Solution
-    for i in range(1,time_steps):
+    ct = 1
+    for i in range(1,TSO*time_steps):
         comm.Barrier()
-        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS)
+        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS,i)
         comm.Barrier()
-        if rank == master_rank:
-            edge_comm(shared_arr,OPS)
+        reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
         comm.Barrier()
         #Writing Data after it has been shifted
-        hdf5_data_set[i,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
+        if i%TSO==0:
+            hdf5_data_set[ct,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
+            ct+=1
     #Final barrier
     comm.Barrier()
     #CUDA clean up - One of the last steps

@@ -4,5 +4,5 @@ class decomp_lambda(object):
         self.args = args
 
     def __call__(self,block):
-        sweep_fcn,source_mod,ops = self.args
-        return sweep_fcn((block,source_mod,ops))
+        sweep_fcn = self.args[0]
+        return sweep_fcn((block,)+self.args[1:])
