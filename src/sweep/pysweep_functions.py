@@ -89,12 +89,14 @@ def Bridge(sarr,xarr,yarr,XR,YR,CMRS,isets,gts,pargs):
     for bdg in XR:
         for i, cb  in enumerate(bdg,start=TSO+1):
             for lcx,lcy,shx,shy in cb:
+                print(i,":", lcx,lcy,shx,shy)
                 sarr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
 
-    # for bdg in YR:
-    #     for i, cb  in enumerate(bdg,start=TSO+1):
-    #         for lcx,lcy,shx,shy in cb:
-    #             sarr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
+    for bdg in YR:
+        for i, cb  in enumerate(bdg,start=TSO+1):
+            for lcx,lcy,shx,shy in cb:
+                # print(i,":", lcx,lcy,shx,shy)
+                sarr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
 
 def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
     """

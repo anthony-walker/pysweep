@@ -67,17 +67,26 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
     x_blocks = int((XR[2].stop-XR[2].start-2*ops)/bs[0])
     y_blocks = int((XR[3].stop-XR[3].start-2*ops)/bs[1])
     #Standard bridge writes
-    ttt = tuple()
+
     for x,y in bgs:
+        ttt = tuple()
         #X-write
         wxs = x.start+XR[2].start
         wxst = wxs+x.stop-x.start
         #Y-write
         wys = y.start+XR[3].start
         wyst = wys+y.stop-y.start
-        ttt += ((x,y,slice(wxs,wxst,1),slice(wys,wyst,1)),)
+
+        for i in range(x_blocks):
+            for j in range(y_blocks):
+                xsl = slice(x.start+bs[0]*i,x.stop+bs[0]*i,1)
+                ysl = slice(y.start+bs[1]*j,y.stop+bs[1]*j,1)
+                sxsl = slice(wxs+bs[0]*i,wxst+bs[0]*i,1)
+                sysl = slice(wys+bs[1]*j,wyst+bs[1]*j,1)
+                ttt += ((xsl,ysl,sxsl,sysl),)
     wxt += ttt,
     pwxt += wxt,
+    #Edge Bridge Writes
     wxt = tuple()
     if c1: #Top edge -  periodic x
         for x,y in bgs:
