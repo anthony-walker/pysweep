@@ -15,11 +15,7 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     OPS -  the number of atomic operations
     """
     SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
-    #Finding splits again
-    SPLITX = BS[0]/2
-    SPLITY = BS[1]/2
     #Splitting between cpu and gpu
-
     if GRB:
         # Getting GPU Function
         pass
@@ -47,11 +43,6 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
 def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
     """Use this function to solve the bridge step."""
     SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
-    #Finding splits again
-    SPLITX = BS[0]/2
-    SPLITY = BS[1]/2
-    y0arr = np.copy(yarr)
-    x0arr = np.copy(xarr)
     #Splitting between cpu and gpu
     if GRB:
         # X-Bridge
@@ -65,10 +56,10 @@ def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
         gpu_fcn = SM.get_function("BridgeY")
         gpu_fcn(cuda.InOut(yarr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
+        # print(xarr[4,0,:,:])
     else:   #CPUs do this
         blocks_x = []
         blocks_y = []
-
         for local_region in CRS:
             #X blocks
             block_x = np.zeros(xarr[local_region].shape)
@@ -86,12 +77,12 @@ def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
         xarr = rebuild_blocks(xarr,blocks_x,CRS,OPS)
         yarr = rebuild_blocks(yarr,blocks_y,CRS,OPS)
 
-    for i, bdg in enumerate(XR,start=TSO+1):
+    for i, bdg in enumerate(XR,start=3):
         for cb  in bdg:
             for lcx,lcy,shx,shy in cb:
                 sarr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
 
-    for i,bdg in enumerate(YR,start=TSO+1):
+    for i,bdg in enumerate(YR,start=3):
         for cb  in bdg:
             for lcx,lcy,shx,shy in cb:
                 sarr[i,:,shx,shy] = yarr[i,:,lcx,lcy]

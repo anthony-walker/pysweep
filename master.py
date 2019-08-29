@@ -28,7 +28,6 @@ def create_block_sizes():
         bss.append(cbs)
     return bss
 
-
 def test(args):
     #Properties
     gamma = 1.4
@@ -42,8 +41,8 @@ def test(args):
 
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 40
-    npy = 40
+    npx = 28
+    npy = 28
     dx = X/npx
     dy = Y/npy
 
@@ -68,7 +67,7 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = 10
+    block_size = 14
     affinity = 0.5
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')

@@ -268,7 +268,6 @@ UpPyramid(float *state, int gts)
         ly += OPS;
 
     }
-
 }
 
 /*
@@ -280,7 +279,7 @@ BridgeX(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
-    // shared_state_clear(shared_state);
+    shared_state_clear(shared_state);
     __syncthreads();
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;

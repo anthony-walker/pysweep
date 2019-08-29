@@ -204,15 +204,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     larr = np.copy(sarr[SRR])
-    if rank == master_rank:
-        pass
-        print(bridge_slices[0])
-        print("---------------------------------------------------")
-        for row in wxts:
-            for item in row:
-                for tup in item:
-                    print(tup)
-        print("---------------------------------------------------")
     #---------------Generating Source Modules----------------------------------#
     if GRB:
         # Creating cuda device and Context
@@ -297,49 +288,38 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         xarr = np.copy(sarr[YR]) #Regions are purposely switched here
         yarr = np.copy(sarr[XR])
         comm.Barrier()  #Barrier after read
-        # printer(sarr[3,0,:,:],p_iter=True)
-        # print("---------------------------------------------------")
-        # printer(yarr[3,0,:,:],p_iter=True)
-        # print("---------------------------------------------------")
-        # printer(xarr[3,0,:,:],p_iter=True)
         comm.Barrier()
         #Reverse Bridge Step
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
-        printer(sarr[3,0,:,:],p_iter=True)
-
-
-
-
-        # #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
-        # #Getting next points for the local array
-        # larr = np.copy(sarr[RR])
-        # comm.Barrier()
-        # #Octahedron Step
-        # Octahedron(sarr,larr,WR,BDR,oct_sets,wb+2,pargs)
-        # comm.Barrier()  #Solving Barrier
-        #
-        # #Write step
-        # cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-        # comm.Barrier()
-        # #Updating Boundary Conditions Step
-        # boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-        # comm.barrier()  #Barrier following data write
-        # #-------------------------------SECOND BRIDGE (NON-REVERSED)-------------------------------------------#
-        # #Getting x and y arrays
-        # xarr = np.copy(sarr[XR])
-        # yarr = np.copy(sarr[YR])
-        # comm.Barrier()  #Barrier after read
-        # #Bridge Step
-        # Bridge(sarr,xarr,yarr,XR,YR,(xtr,ytr),bridge_sets,wb+1,pargs) #THis modifies shared array
-        # comm.Barrier()
-        # #Getting next points for the local array
-        # larr = np.copy(sarr[RR])
+        #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
+        #Getting next points for the local array
+        larr = np.copy(sarr[RR])
+        comm.Barrier()
+        #Octahedron Step
+        Octahedron(sarr,larr,WR,BDR,oct_sets,wb+2,pargs)
+        comm.Barrier()  #Solving Barrier
+        #Write step
+        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+        comm.Barrier()
+        #Updating Boundary Conditions Step
+        boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+        comm.barrier()  #Barrier following data write
+        #-------------------------------SECOND BRIDGE (NON-REVERSED)-------------------------------------------#
+        #Getting x and y arrays
+        xarr = np.copy(sarr[XR])
+        yarr = np.copy(sarr[YR])
+        comm.Barrier()  #Barrier after read
+        #Bridge Step
+        Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+2,pargs) #THis modifies shared array
+        comm.Barrier()
+        #Getting next points for the local array
+        larr = np.copy(sarr[RR])
     #Last read barrier for down pyramid
     comm.Barrier()
     #--------------------------------------DOWN PYRAMID------------------------#
-    # DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
-    # comm.Barrier()
+    DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
+    comm.Barrier()
     #Shifting Data Step
     edge_shift(sarr,ERS,ONE)
     comm.Barrier()  #Communication Barrier

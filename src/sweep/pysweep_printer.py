@@ -13,7 +13,7 @@ class pysweep_printer(object):
         if (self.rank == self.master or p_ranks) and p_iter:
             if isinstance(args,Iterable):
                 for item in args:
-                    sys.stdout.write("[")
+                    sys.stdout.write("[ ")
                     for si in item:
                         sys.stdout.write("%.0f"%si+", ")
                     sys.stdout.write("]\n")
