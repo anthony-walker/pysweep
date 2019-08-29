@@ -197,22 +197,22 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     RR = create_read_region(WR,OPS)   #Create read region
     SRR,SWR,XR,YR = create_shift_regions(RR,SPLITX,SPLITY,shared_shape,OPS)  #Create shifted read region
     BDR,ERS = create_boundary_regions(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices)
-    xtr,ytr = create_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
-    xtrr,ytrr = create_rev_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
-    wxt = create_write_bridges(XR,OPS,bridge_slices[0],shared_shape,BS,rank)
-    wyt = create_write_bridges(YR,OPS,bridge_slices[1],shared_shape,BS,rank)
+    wxt = create_standard_bridges(XR,OPS,bridge_slices[0],shared_shape,BS,rank)
+    wyt = create_standard_bridges(YR,OPS,bridge_slices[1],shared_shape,BS,rank)
+    wxts = create_shifted_bridges(YR,OPS,bridge_slices[0],shared_shape,BS,rank)
+    wyts = create_shifted_bridges(XR,OPS,bridge_slices[1],shared_shape,BS,rank)
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     larr = np.copy(sarr[SRR])
     if rank == master_rank:
         pass
-        # print(bridge_slices[0])
-        # print("************************")
-        # for row in wxt:
-        #     for item in row:
-        #         for tup in item:
-        #             print(tup)
-        # print("************************")
+        print(bridge_slices[0])
+        print("---------------------------------------------------")
+        for row in wxts:
+            for item in row:
+                for tup in item:
+                    print(tup)
+        print("---------------------------------------------------")
     #---------------Generating Source Modules----------------------------------#
     if GRB:
         # Creating cuda device and Context
@@ -265,54 +265,51 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     UpPyramid(sarr,larr,WR,BDR,up_sets,wb,pargs) #THis modifies shared array
     comm.Barrier()
-
     #-------------------------------FIRST BRIDGE-------------------------------------------#
     #Getting x and y arrays
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
     comm.Barrier()  #Barrier after read
     #Bridge Step
-    # if rank == master_rank:
-
-    Bridge(sarr,xarr,yarr,wxt,wyt,(xtr,ytr),bridge_sets,wb+1,pargs) #THis modifies shared array
-    # printer(xarr[4,0,:,:36],p_iter=True)
-
+    Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
-    printer(sarr[4,0,:,:],p_iter=True)
-    # #------------------------------SWEPT LOOP-------------------------------#
-    # #Getting next points for the local array
-    # larr = np.copy(sarr[SRR])
-    # #Swept Octahedrons and Bridges
-    # for GST in range(1,2,1):#MGST):
-    #     comm.Barrier()  #Read barrier for local array
-    #     #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
-    #     #Octahedron Step
-    #     Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
-    #     comm.Barrier()  #Solving Barrier
-    #     # Shifting Data Step
-    #     edge_shift(sarr,ERS,ONE)
-    #     comm.Barrier()  #Communication Barrier
-    #     #Writing Step
-    #     cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-    #     comm.Barrier()  #Write Barrier
-    #     #Updating Boundary Conditions Step
-    #     boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-    #     comm.Barrier()
-    #
-    #
-    #     #-------------------------------FIRST REVERSE BRIDGE-------------------------------------------#
-    #     #Getting reverse x and y arrays
-    #     xarr = np.copy(sarr[YR]) #Regions are purposely switched here
-    #     yarr = np.copy(sarr[XR])
-    #     comm.Barrier()  #Barrier after read
-    #
-    #     #Reverse Bridge Step
-    #     Bridge(sarr,xarr,yarr,YR,XR,(xtrr,ytrr),bridge_sets,wb+2,pargs) #THis modifies shared array
-    #     comm.Barrier()  #Solving Bridge Barrier
-    #     printer(sarr[4,0,:,:],p_iter=True)
-    #     comm.Barrier()
-        # sys.stdout.flush()
-        # comm.Barrier()
+
+    #------------------------------SWEPT LOOP-------------------------------#
+    #Getting next points for the local array
+    larr = np.copy(sarr[SRR])
+    #Swept Octahedrons and Bridges
+    for GST in range(1,2,1):#MGST):
+        comm.Barrier()  #Read barrier for local array
+        #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
+        Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
+        comm.Barrier()  #Solving Barrier
+        # Shifting Data Step
+        edge_shift(sarr,ERS,ONE)
+        comm.Barrier()  #Communication Barrier
+        #Writing Step
+        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+        comm.Barrier()  #Write Barrier
+        #Updating Boundary Conditions Step
+        boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+        comm.Barrier()
+        #-------------------------------FIRST REVERSE BRIDGE-------------------------------------------#
+        #Getting reverse x and y arrays
+        xarr = np.copy(sarr[YR]) #Regions are purposely switched here
+        yarr = np.copy(sarr[XR])
+        comm.Barrier()  #Barrier after read
+        # printer(sarr[3,0,:,:],p_iter=True)
+        # print("---------------------------------------------------")
+        # printer(yarr[3,0,:,:],p_iter=True)
+        # print("---------------------------------------------------")
+        # printer(xarr[3,0,:,:],p_iter=True)
+        comm.Barrier()
+        #Reverse Bridge Step
+        Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
+        comm.Barrier()  #Solving Bridge Barrier
+        printer(sarr[3,0,:,:],p_iter=True)
+
+
+
 
         # #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         # #Getting next points for the local array

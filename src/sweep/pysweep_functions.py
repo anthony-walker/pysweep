@@ -44,7 +44,7 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     for br in BDR:
         sarr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
 
-def Bridge(sarr,xarr,yarr,XR,YR,CMRS,isets,gts,pargs):
+def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
     """Use this function to solve the bridge step."""
     SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
     #Finding splits again

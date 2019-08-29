@@ -55,7 +55,7 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     return boundary_regions,eregions
 
 
-def create_write_bridges(XR,ops,bgs,ss,bs,rank=None):
+def create_standard_bridges(XR,ops,bgs,ss,bs,rank=None):
     """Creating reg bridge write tuples"""
     pwxt = tuple()
     wxt = tuple()
@@ -83,7 +83,6 @@ def create_write_bridges(XR,ops,bgs,ss,bs,rank=None):
                 sxsl = slice(wxs+bs[0]*i,wxst+bs[0]*i,1)
                 sysl = slice(wys+bs[1]*j,wyst+bs[1]*j,1)
                 ttt += ((xsl,ysl,sxsl,sysl),)
-
         wxt += ttt,
         #Edge Bridge Writes
         if c1: #Top edge -  periodic x
@@ -127,104 +126,70 @@ def create_write_bridges(XR,ops,bgs,ss,bs,rank=None):
             pwxt += wxt,
     return pwxt
 
-def create_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):
-    """Use this function to create the forward bridges."""
-    x_regions = tuple()
-    y_regions = tuple()
-    region_start = wr[:2]
-    c1 = wr[2].start==ops
-    c2 = wr[3].start==ops
-    sx = ss[2]-ops-SPLITX
-    ox = sx-ops
-    sy = ss[3]-ops-SPLITY
-    oy = sy-ops
-    y_blocks = int((wr[3].stop-wr[3].start)/block_size[1])
-    x_blocks = int((wr[2].stop-wr[2].start)/block_size[0])
-
-    if c1: #Top edge -  periodic x
-        #Boundaries for up pyramid and octahedron
-        for x,y in bridge_slices[1]:
-            xtt = tuple()   #x temp tuple
-            tfxe = x.stop+ox
-            xc = tfxe < ss[2]
-            tfxe = tfxe if xc else ss[2]
-            tfx = slice(x.start+ox,tfxe,1)
-            nx = x if xc else slice(x.start,tfx.stop-tfx.start+x.start,1)
-            tfys = wr[3].start-ops+y.start+SPLITY
-            tfy = slice(tfys,tfys+(y.stop-y.start),1)
-            #Adjustment for multiple blocks per rank
-            xtt += ((nx,y,tfx,tfy),)
-            for i in range(1,y_blocks):
-                y = slice(y.start+block_size[1],y.stop+block_size[1],1)
-                tfy = slice(tfy.start+block_size[1],tfy.stop+block_size[1],1)
-                xtt += ((nx,y,tfx,tfy),)
-            x_regions += (xtt,)
-    if c2: #Side edge -  periodic y
-        for x,y in bridge_slices[0]:
-            #Finding forward bridge
-            ytt = tuple()   #x temp tuple
-            tfye = y.stop+oy
-            yc = tfye < ss[3]
-            tfye = tfye if yc else ss[3]
-            tfy = slice(y.start+oy,tfye,1)
-            ny = y if yc else slice(y.start,tfy.stop-tfy.start+y.start,1)
-            tfxs = wr[2].start-ops+x.start+SPLITX
-            tfx = slice(tfxs,tfxs+(x.stop-x.start),1)
-            ytt += ((x,ny,tfx,tfy),)
-            #Adjustment for multiple blocks
-            for i in range(1,x_blocks):
-                x = slice(x.start+block_size[0],x.stop+block_size[0],1)
-                tfx = slice(tfx.start+block_size[0],tfx.stop+block_size[0],1)
-                ytt += ((x,ny,tfx,tfy),)
-            y_regions += (ytt,)
-    return x_regions,y_regions
-
-def create_rev_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):
-    """Use this function to create boundary write regions."""
-    x_regions = tuple()
-    y_regions = tuple()
-    sx = ss[2]-ops-SPLITX
-    sy = ss[3]-ops-SPLITY
-    region_start = wr[:2]
-    c1 = wr[2].stop==sx
-    c2 = wr[3].stop==sy
-    tops = 2*ops
-    y_blocks = int((wr[3].stop-wr[3].start)/block_size[1])
-    x_blocks = int((wr[2].stop-wr[2].start)/block_size[0])
-    if c1: #Top edge -  periodic x
-        for x,y in bridge_slices[1]:
+def create_shifted_bridges(XR,ops,bgs,ss,bs,rank=None):
+    """Creating reg bridge write tuples"""
+    pwxt = tuple()
+    wxt = tuple()
+    SPX = int(bs[0]/2)
+    SPY = int(bs[1]/2)
+    sx = int(ss[2]-SPX-2*ops)
+    sy = int(ss[3]-SPY-2*ops)
+    c1 = XR[2].stop==ss[2]
+    c2 = XR[3].stop==ss[3]
+    x_blocks = int((XR[2].stop-XR[2].start-2*ops)/bs[0])
+    y_blocks = int((XR[3].stop-XR[3].start-2*ops)/bs[1])
+    #Standard bridge writes
+    for x,y in bgs:
+        wxt = tuple()
+        ttt = tuple()
+        #X-write
+        wxs = x.start+XR[2].start
+        wxst = wxs+x.stop-x.start
+        #Y-write
+        wys = y.start+XR[3].start
+        wyst = wys+y.stop-y.start
+        for i in range(x_blocks):
+            for j in range(y_blocks):
+                xsl = slice(x.start+bs[0]*i,x.stop+bs[0]*i,1)
+                ysl = slice(y.start+bs[1]*j,y.stop+bs[1]*j,1)
+                sxsl = slice(wxs+bs[0]*i,wxst+bs[0]*i,1)
+                sysl = slice(wys+bs[1]*j,wyst+bs[1]*j,1)
+                ttt += ((xsl,ysl,sxsl,sysl),)
+        wxt += ttt,
+        #Edge Bridge Writes
+        if c1: #Top edge -  periodic x
             xtt = tuple()
-            xc = x.start > SPLITX
-            nx = x if xc else slice(SPLITX,x.stop,1)
-            tfxs = 0+nx.start-SPLITX
+            xc = x.start > SPX
+            nx = x if xc else slice(SPX,x.stop,1)
+            tfxs = 0+nx.start-SPX
             tfx = slice(tfxs,tfxs+(nx.stop-nx.start),1)
-            tfys = wr[3].start-ops+y.start
+            tfys = XR[3].start+y.start
             tfy = slice(tfys,tfys+(y.stop-y.start),1)
             #Adjustment for multiple blocks per rank
             xtt += ((nx,y,tfx,tfy),)
             for i in range(1,y_blocks):
-                y = slice(y.start+block_size[1],y.stop+block_size[1],1)
-                tfy = slice(tfy.start+block_size[1],tfy.stop+block_size[1],1)
+                y = slice(y.start+bs[1],y.stop+bs[1],1)
+                tfy = slice(tfy.start+bs[1],tfy.stop+bs[1],1)
                 xtt += ((nx,y,tfx,tfy),)
-            x_regions += (xtt,)
-    if c2: #Side edge -  periodic y
-        for x,y in bridge_slices[0]:
+            wxt += (xtt,)
+        if c2: #Side edge -  periodic y
             ytt = tuple()
-            yc = y.start > SPLITY
-            ny = y if yc else slice(SPLITY,y.stop,1)
-            tfys = 0+ny.start-SPLITY
+            yc = y.start > SPY
+            ny = y if yc else slice(SPY,y.stop,1)
+            tfys = 0+ny.start-SPY
             tfy = slice(tfys,tfys+(ny.stop-ny.start),1)
-            tfxs = wr[2].start-ops+x.start
+            tfxs = XR[2].start+x.start
             tfx = slice(tfxs,tfxs+(x.stop-x.start),1)
             ytt += ((x,ny,tfx,tfy),)
             #Adjustment for multiple blocks
             for i in range(1,x_blocks):
-                x = slice(x.start+block_size[0],x.stop+block_size[0],1)
-                tfx = slice(tfx.start+block_size[0],tfx.stop+block_size[0],1)
+                x = slice(x.start+bs[0],x.stop+bs[0],1)
+                tfx = slice(tfx.start+bs[0],tfx.stop+bs[0],1)
                 ytt += ((x,ny,tfx,tfy),)
-            y_regions += (ytt,)
-    return x_regions,y_regions
-
+            wxt += (ytt,)
+        if wxt:
+            pwxt += wxt,
+    return pwxt
 
 def create_shift_regions(wregion,SPLITX,SPLITY,shared_shape,ops):
     """Use this function to create a shifted region(s)."""
