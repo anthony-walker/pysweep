@@ -42,8 +42,8 @@ def test(args):
 
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 24
-    npy = 24
+    npx = 40
+    npy = 40
     dx = X/npx
     dy = Y/npy
 
@@ -68,7 +68,7 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = 6
+    block_size = 10
     affinity = 0.5
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')

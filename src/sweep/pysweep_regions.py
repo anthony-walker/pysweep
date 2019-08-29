@@ -55,7 +55,7 @@ def create_boundary_regions(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     return boundary_regions,eregions
 
 
-def create_write_bridges(XR,ops,bgs,ss,bs):
+def create_write_bridges(XR,ops,bgs,ss,bs,rank=None):
     """Creating reg bridge write tuples"""
     pwxt = tuple()
     wxt = tuple()
@@ -67,8 +67,8 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
     x_blocks = int((XR[2].stop-XR[2].start-2*ops)/bs[0])
     y_blocks = int((XR[3].stop-XR[3].start-2*ops)/bs[1])
     #Standard bridge writes
-
     for x,y in bgs:
+        wxt = tuple()
         ttt = tuple()
         #X-write
         wxs = x.start+XR[2].start
@@ -76,7 +76,6 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
         #Y-write
         wys = y.start+XR[3].start
         wyst = wys+y.stop-y.start
-
         for i in range(x_blocks):
             for j in range(y_blocks):
                 xsl = slice(x.start+bs[0]*i,x.stop+bs[0]*i,1)
@@ -84,12 +83,10 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
                 sxsl = slice(wxs+bs[0]*i,wxst+bs[0]*i,1)
                 sysl = slice(wys+bs[1]*j,wyst+bs[1]*j,1)
                 ttt += ((xsl,ysl,sxsl,sysl),)
-    wxt += ttt,
-    pwxt += wxt,
-    #Edge Bridge Writes
-    wxt = tuple()
-    if c1: #Top edge -  periodic x
-        for x,y in bgs:
+
+        wxt += ttt,
+        #Edge Bridge Writes
+        if c1: #Top edge -  periodic x
             #X-write
             xtt = tuple()
             tfxe = x.stop+sx
@@ -107,11 +104,7 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
                 tfy = slice(tfy.start+bs[1],tfy.stop+bs[1],1)
                 xtt += ((nx,y,tfx,tfy),)
             wxt += (xtt,)
-    if wxt:
-        pwxt += wxt,
-    wxt = tuple()
-    if c2: #Side edge -  periodic y
-        for x,y in bgs:
+        if c2: #Side edge -  periodic y
             #X-write
             ytt = tuple()
             wxs = x.start+XR[2].start
@@ -130,8 +123,8 @@ def create_write_bridges(XR,ops,bgs,ss,bs):
                 tfx = slice(tfx.start+bs[0],tfx.stop+bs[0],1)
                 ytt += ((x,ny,tfx,tfy),)
             wxt += (ytt,)
-    if wxt:
-        pwxt += wxt,
+        if wxt:
+            pwxt += wxt,
     return pwxt
 
 def create_bridges(wr,SPLITX,SPLITY,ops,ss,bridge_slices,block_size):

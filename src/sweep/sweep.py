@@ -199,17 +199,20 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     BDR,ERS = create_boundary_regions(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices)
     xtr,ytr = create_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
     xtrr,ytrr = create_rev_bridges(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices,BS)
-    wxt = create_write_bridges(XR,OPS,bridge_slices[0],shared_shape,BS)
-    wyt = create_write_bridges(YR,OPS,bridge_slices[1],shared_shape,BS)
+    wxt = create_write_bridges(XR,OPS,bridge_slices[0],shared_shape,BS,rank)
+    wyt = create_write_bridges(YR,OPS,bridge_slices[1],shared_shape,BS,rank)
 
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     larr = np.copy(sarr[SRR])
-
-    # print("************************")
-    # for row in wyt:
-    #     for item in row:
-    #         print(item)
-    # print("************************")
+    if rank == master_rank:
+        pass
+        # print(bridge_slices[0])
+        # print("************************")
+        # for row in wxt:
+        #     for item in row:
+        #         for tup in item:
+        #             print(tup)
+        # print("************************")
     #---------------Generating Source Modules----------------------------------#
     if GRB:
         # Creating cuda device and Context
@@ -269,13 +272,13 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     yarr = np.copy(sarr[YR])
     comm.Barrier()  #Barrier after read
     #Bridge Step
-    Bridge(sarr,xarr,yarr,wxt,wyt,(xtr,ytr),bridge_sets,wb+1,pargs) #THis modifies shared array
-    comm.Barrier()  #Solving Bridge Barrier
-    printer(sarr[3,0,:,:],p_iter=True)
     # if rank == master_rank:
-    #     print(bridge_slices)
-    #     for i in xtr:
-    #         print(i)
+
+    Bridge(sarr,xarr,yarr,wxt,wyt,(xtr,ytr),bridge_sets,wb+1,pargs) #THis modifies shared array
+    # printer(xarr[4,0,:,:36],p_iter=True)
+
+    comm.Barrier()  #Solving Bridge Barrier
+    printer(sarr[4,0,:,:],p_iter=True)
     # #------------------------------SWEPT LOOP-------------------------------#
     # #Getting next points for the local array
     # larr = np.copy(sarr[SRR])
