@@ -76,13 +76,11 @@ def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
         blocks_y = list(map(cpu_fcn,blocks_y))
         xarr = rebuild_blocks(xarr,blocks_x,CRS,OPS)
         yarr = rebuild_blocks(yarr,blocks_y,CRS,OPS)
-
-    for i, bdg in enumerate(XR,start=3):
+    for i, bdg in enumerate(XR,start=TSO+1):
         for cb  in bdg:
             for lcx,lcy,shx,shy in cb:
                 sarr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
-
-    for i,bdg in enumerate(YR,start=3):
+    for i,bdg in enumerate(YR,start=TSO+1):
         for cb  in bdg:
             for lcx,lcy,shx,shy in cb:
                 sarr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
@@ -169,7 +167,6 @@ def CPU_Octahedron(args):
 def CPU_DownPyramid(args):
     """Use this function to build the Down Pyramid."""
     block,SM,isets,gts,TSO = args
-
     #Removing elements for swept step
     for ts, swept_set in enumerate(isets,start=TSO):
         #Calculating Step

@@ -264,12 +264,11 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #Bridge Step
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
-
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
     larr = np.copy(sarr[SRR])
     #Swept Octahedrons and Bridges
-    for GST in range(1,2,1):#MGST):
+    for GST in range(1,4,1):#MGST):
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
@@ -288,16 +287,16 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         xarr = np.copy(sarr[YR]) #Regions are purposely switched here
         yarr = np.copy(sarr[XR])
         comm.Barrier()  #Barrier after read
-        comm.Barrier()
         #Reverse Bridge Step
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
+
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         larr = np.copy(sarr[RR])
         comm.Barrier()
         #Octahedron Step
-        Octahedron(sarr,larr,WR,BDR,oct_sets,wb+2,pargs)
+        Octahedron(sarr,larr,WR,BDR,oct_sets,wb+1,pargs)
         comm.Barrier()  #Solving Barrier
         #Write step
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
@@ -311,10 +310,13 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         yarr = np.copy(sarr[YR])
         comm.Barrier()  #Barrier after read
         #Bridge Step
-        Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+2,pargs) #THis modifies shared array
+        Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+        comm.Barrier()
+        printer("_________________________________________")
+        printer(sarr[5,0,:,:],p_iter=True)
         comm.Barrier()
         #Getting next points for the local array
-        larr = np.copy(sarr[RR])
+        larr = np.copy(sarr[SRR])
     #Last read barrier for down pyramid
     comm.Barrier()
     #--------------------------------------DOWN PYRAMID------------------------#
