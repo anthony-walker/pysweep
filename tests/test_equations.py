@@ -178,7 +178,7 @@ def test_RK2_GPU():
     assert np.isclose(f1d[2,1], num_test[0,2,4,4])
 
 
-def test_python_euler():
+def test_euler_vortex():
     """Use this function to test the python version of the euler code."""
     #Properties
     gamma = 1.4
@@ -253,5 +253,3 @@ def test_python_euler():
     frames = len(tuple(range(time_steps+1)))
     anim = animation.FuncAnimation(fig,animate,frames)
     anim.save("test.gif",writer="imagemagick")
-
-test_RK2_GPU()
