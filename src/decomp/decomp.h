@@ -114,33 +114,33 @@ void edge_comm(float * shared_state, float * state, int curr_time)
     __syncthreads();
 }
 
-/*
-    Use this function to clear the shared memory array
-*/
 __device__
-void shared_state_zero(float * shared_state)
+void shared_state_clear(float * shared_state)
 {
-    int M = (gridDim.y*blockDim.y+2*OPS); //Major y axis length
-    int tgid = getGlobalIdx_2D_2D()%(blockDim.x*blockDim.y);
-    int ntgid;
-    if (tgid < blockDim.y+TWO*OPS)
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
+    int sgid = get_sgid(tidx,tidy); //Shared global index
+    for (int i = 0; i < TWO; i++)
     {
-        int ntgid;
-        int ngid;
-        int i;
-
-        for (i = 0; i < blockDim.x+TWO*OPS; i++)
+        for (int j = 0; j < NV; j++)
         {
-            for (int j = 0; j < NV; j++) {
-                ntgid = tgid+i*(blockDim.y+TWO*OPS)+j*SGIDS;
-                shared_state[ntgid] = 0;
-            }
-
+            shared_state[sgid+j*SGIDS+STS*i] = 0;
         }
     }
-    __syncthreads();
+    tidx = threadIdx.x+2*OPS;
+    tidy = threadIdx.y+2*OPS;
+    sgid = get_sgid(tidx,tidy); //Shared global index
+    for (int i = 0; i < TWO; i++)
+    {
+        for (int j = 0; j < NV; j++)
+        {
+            shared_state[sgid+j*SGIDS+STS*i] = 0;
+        }
+    }
 }
-
+/*
+    Use this function to create and return the GPU UpPyramid
+*/
 /*
     Use this function to create and return the GPU UpPyramid
 */
@@ -150,8 +150,8 @@ Decomp(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
-    shared_state_zero(shared_state);
-
+    shared_state_clear(shared_state);
+    __syncthreads();
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;

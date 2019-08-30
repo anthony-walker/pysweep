@@ -74,33 +74,6 @@ __device__ void test_gid(int tdx,int tdy)
 }
 
 /*
-    Use this function to clear the shared memory array
-*/
-__device__
-void shared_state_zero(float * shared_state)
-{
-    int M = (gridDim.y*blockDim.y+2*OPS); //Major y axis length
-    int tgid = getGlobalIdx_2D_2D()%(blockDim.x*blockDim.y);
-    int ntgid;
-    if (tgid < blockDim.y+TWO*OPS)
-    {
-        int ntgid;
-        int ngid;
-        int i;
-
-        for (i = 0; i < blockDim.x+TWO*OPS; i++)
-        {
-            for (int j = 0; j < NV; j++) {
-                ntgid = tgid+i*(blockDim.y+TWO*OPS)+j*SGIDS;
-                shared_state[ntgid] = 0;
-            }
-
-        }
-    }
-    __syncthreads();
-}
-
-/*
     Use this function to communicate the initial swept edges.
 */
 __device__
@@ -231,7 +204,6 @@ UpPyramid(float *state, int gts)
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step to Calc stage
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
-
     for (int k = 0; k < MPSS; k++)
     {
         // Solving step function

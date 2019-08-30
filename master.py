@@ -38,17 +38,17 @@ def test(args):
     initial_args = cvics.get_args()
     X = cvics.L
     Y = cvics.L
-
+    getDeviceAttrs(0,False)
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 28
-    npy = 28
+    npx = 32
+    npy = 32
     dx = X/npx
     dy = Y/npy
 
     #Time testing arguments
     t0 = 0
-    t_b = 1
+    t_b = 10
     dt = 0.1
     targs = (t0,t_b,dt)
 
@@ -57,8 +57,8 @@ def test(args):
     flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
     tarr = np.ones(flux_vortex.shape)
     #GPU Arguments
-    gpu_source = "/home/walkanth/pysweep/src/equations/eqt.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/eqt.py"
+    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
     ops = 2 #number of atomic operations
     tso = 2 #RK2
     #File args
@@ -67,8 +67,8 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = 14
-    affinity = 0.5
+    block_size = 16
+    affinity = 1
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
     gargs = (t0,t_b,dt,dx,dy,gamma)
@@ -81,7 +81,7 @@ def test(args):
     #         ct = sweep(initial_vortex,targs,dx,dy,ops,bs,gpu_source,cpu_source,affinity=aff,filename=fname)
     #         if rank == master_rank:
     #             f.write("Swept: "+str((ct,bs,aff))+"\n")
-    #         comm.Barrier()
+            # comm.Barrier()
 
     # for i,bs in enumerate(block_sizes[:1]):
     #     for j,aff in enumerate(affinities):
@@ -91,8 +91,10 @@ def test(args):
     #             f.write("Decom: "+str((ct,bs,aff))+"\n")
     #         comm.Barrier()
     #For testing individual sweep
-    cts = sweep(tarr,gargs,swargs,filename="./results/swept",exid=[1])
+    cts = sweep(tarr,gargs,swargs,filename="./results/swept")
     # ct = decomp(flux_vortex,gargs,swargs,filename="./results/decomp")
+    # print(cts)
+    # print(ct)
     # return (cts,ct)
 
 if __name__ == "__main__":

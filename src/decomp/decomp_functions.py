@@ -237,7 +237,7 @@ def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_
         #Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("Decomp")
-        ss = np.zeros(arr[2,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
+        ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=grid_size, block=block_size,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
