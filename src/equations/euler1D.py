@@ -47,6 +47,7 @@ def fv5p(Q,P):
 def limiter(Q1,Q2,Q3,num,denom):
     """Use this method to apply the minmod limiter."""
     if (num > 0 and denom > 0) or (num < 0 and denom < 0):
+        print("here")
         Q_r = Q1+min(num/denom,1)/2*(Q2-Q3)
     else:
         Q_r = Q1
@@ -61,6 +62,7 @@ def makeFlux(QL,QR):
     FL = np.array([QL[1],QL[1]*uL+PL,(QL[2]+PL)*uL])
     PR = eqnStateQ(QR[0],QR[1],QR[2])
     FR = np.array([QR[1],QR[1]*uR+PR,(QR[2]+PR)*uR])
+    # print(PL,PR)
     return FL+FR
 
 #Step 4, spectral method

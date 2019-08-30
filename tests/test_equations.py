@@ -144,18 +144,15 @@ def test_RK2_GPU():
     TIMES = VARS*NV
     const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":ops,"TSO":TSO,"STS":STS})
     swept_constant_copy(g_mod_2D,const_dict)
-
+    #Test x direction
     for i in range(int(x/2)):
         for j in range(x):
             num_test[0,:,i,j]=leftBC[:]
     for i in range(int(x/2),x):
         for j in range(x):
             num_test[0,:,i,j]=rightBC[:]
-
-    tarr = np.copy(num_test) #Copying for 1D function
     gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(1),block=bs)
-    print(num_test[0,1,:,:])
-
+    #1D stuff
     leftBC1 = (1.0,0,2.5)
     rightBC1 = (0.125,0,.25)
     Qx = np.zeros((5,3))
@@ -168,41 +165,18 @@ def test_RK2_GPU():
     P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
     source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
-
     f1d = source_mod_1D.RK2S1(Qx,P)
-    print(f1d)
+    assert np.isclose(f1d[2,1], num_test[0,1,4,4])
+    #Test y direction
+    for i in range(x):
+        for j in range(int(x/2)):
+            num_test[0,:,i,j]=leftBC[:]
+    for i in range(x):
+        for j in range(int(x/2),x):
+            num_test[0,:,i,j]=rightBC[:]
+    gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(1),block=bs)
+    assert np.isclose(f1d[2,1], num_test[0,2,4,4])
 
-    # #Checking velocities in each direction as they should be the same
-    # assert np.isclose(f1d[2,1], num_test[1,1,2,2])
-    # assert np.isclose(f1d[2,1], num_test[1,2,2,2])
-    # f1d = source_mod_1D.RK2S2(Qx,Qx)
-    # num_test[1,:,:,:] = num_test[0,:,:,:]
-    # #Test second step
-    # num_test = source_mod_2D.step(num_test,iidx,1,2)
-    # assert np.isclose(f1d[2,1], num_test[2,1,2,2])
-    # assert np.isclose(f1d[2,1], num_test[2,2,2,2])
-
-
-    # #Get source module
-    # c_mod_2D =  build_cpu_source(".src/decomp/decomp.py")
-    #
-    # source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
-    # source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
-
-    # num_test = np.zeros((3,4,5,5))
-    # for i in range(3):
-    #     for j in range(3):
-    #         num_test[0,:,i,j]=leftBC[:]
-    # for i in range(2,5):
-    #     for j in range(2,5):
-    #         num_test[0,:,i,j]=rightBC[:]
-    #
-    # Qx = np.zeros((5,3))
-    # Qx[:,0] = num_test[0,0,:,2]
-    # Qx[:,1] = num_test[0,1,:,2]
-    # Qx[:,2] = num_test[0,3,:,2]
-    # P = np.zeros(5)
-    # P[:] = [1,1,0.1,0.1,0.1]
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
@@ -239,7 +213,7 @@ def test_python_euler():
     num_vortex[0,:,-ops:,-ops:] = num_vortex[0,:,ops:2*ops,ops:2*ops]
     #Testing
     #Setting globals
-    set_globals(**{"dx":dx,"dy":dy,"targs":targs,"gamma":gamma})
+    source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     #Get source module
     source_mod = build_cpu_source("./src/equations/euler.py")
     #Create iidx sets

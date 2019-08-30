@@ -36,7 +36,15 @@ float pressure(float *point)
   float rho = point[0];
   float rho_inv = 1/rho;
   float vss = point[1]*point[1]*rho_inv+point[2]*point[2]*rho_inv;
-  return GAM_M1*(point[3]-HALF*rho*vss);
+  return GAM_M1*(point[3]-HALF*vss);
+}
+
+__device__
+float spec_press(float *point)
+{
+  float rho = point[0];
+  float vss = point[1]*point[1]+point[2]*point[2];
+  return GAM_M1*(rho*point[3]-HALF*rho*vss);
 }
 
 /*
@@ -45,10 +53,18 @@ float pressure(float *point)
 __device__
 float  pressureRatio(float *wpoint,float *point,float *epoint)
 {
-  float Pr;
+
   float p = pressure(point);
+  float Pr=0.;
+  float den=0.;
   Pr = pressure(epoint)-p;
-  Pr /= p-pressure(wpoint);
+  den = (p-pressure(wpoint));
+  //This loop is to handle error
+  if (den<1.0e-6)
+  {
+     den = 0;
+  }
+  Pr /= den;
   return Pr;
 }
 /*
@@ -57,12 +73,9 @@ float  pressureRatio(float *wpoint,float *point,float *epoint)
 __device__
 void  flimiter(float *temp_state, float *left_point, float *right_point , float Pr)
 {
-    // printf("left_point: %f,%f,%f,%f\n", left_point[0],left_point[1],left_point[2],left_point[3]);
-    // printf("right_point: %f,%f,%f,%f\n", right_point[0],right_point[1],right_point[2],right_point[3]);
-    // printf("%f\n", Pr);
     for (int i = 0; i < NVC; i++)
     {
-        temp_state[i] += left_point[i];
+        temp_state[i] = left_point[i];
     }
 
     if (!(ISNAN(Pr)) && (Pr>1.0e-8))
@@ -70,6 +83,7 @@ void  flimiter(float *temp_state, float *left_point, float *right_point , float 
         float coef = HALF*MIN(Pr, ONE);
         for (int j = 0; j < NVC; j++)
         {
+
             temp_state[j] +=  coef*(left_point[j] - right_point[j]);
         }
     }
@@ -86,15 +100,16 @@ void espectral(float* flux,float *left_state, float *right_state, int dir, int d
   float rootrhoL = SQUAREROOT(left_state[0]);
   float rootrhoR = SQUAREROOT(right_state[0]);
   spec_state[0] = rootrhoL*rootrhoR;
-  float denom = 1/(spec_state[0]);
+  float denom = 1/(rootrhoL+rootrhoR);
+
   for (int i = 1; i < NVC; i++)
   {
     spec_state[i] += rootrhoL*left_state[i]/left_state[0];
-    spec_state[i] += rootrhoR*right_state[i]*right_state[0];
-    spec_state[i] *= spec_state[0]*denom; //Puts in flux form to find pressure
+    spec_state[i] += rootrhoR*right_state[i]/right_state[0];
+    spec_state[i] *= denom; //Puts in flux form to find pressure
   }
   //Updating flux with spectral value
-  float rs = dir*(SQUAREROOT(GAMMA*pressure(spec_state)/spec_state[0])+ABSOLUTE(spec_state[dim]/spec_state[0]));
+  float rs = dir*(SQUAREROOT(GAMMA*spec_press(spec_state)/spec_state[0])+ABSOLUTE(spec_state[dim]));
   for (int i = 0; i < NVC; i++)
   {
     flux[i] += rs*(left_state[i]-right_state[i]);
@@ -115,6 +130,7 @@ void  efluxx(float *flux, float *left_state, float *right_state, int dir)
 
   float pL = pressure(left_state);
   float pR = pressure(right_state);
+
   flux[0] += dir*(left_state[1]+right_state[1]);
   flux[1] += dir*(left_state[1]*uL+pL+right_state[1]*uR+pR);
   flux[2] += dir*(left_state[1]*vL+right_state[1]*vR);
@@ -153,13 +169,11 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
     efluxx(dfdx,temp_left,temp_right,ONE);
     espectral(dfdx,temp_left,temp_right,ONE,spi);
-
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
     efluxx(dfdx,temp_left,temp_right,-ONE);
     espectral(dfdx,temp_left,temp_right,-ONE,spi);
-
 }
 /*
 Use this function to obtain the flux for each system variable
@@ -216,7 +230,7 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
     efluxy(dfdy,temp_left,temp_right,ONE);
     espectral(dfdy,temp_left,temp_right,ONE,spi);
-    
+
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
@@ -227,27 +241,29 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
 __device__
 void step(float *shared_state, int idx, int gts)
 {
-  float dfdx[NVC]={0,0,0,0};
-  float dfdy[NVC]={0,0,0,0};
-  get_dfdy(dfdy,shared_state,idx);
-  get_dfdx(dfdx,shared_state,idx);
-  __syncthreads();
-  if (gts%2!=0)
-  {
-      for (int i = 0; i < NVC; i++)
-      {
-          shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
-      }
-  }
-  else
-  {
-      for (int i = 0; i < NVC; i++)
-      {
-          shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS-STS]+DTDX*dfdx[i]+DTDY*dfdy[i];
-      }
-  }
+    float dfdx[NVC]={0,0,0,0};
+    float dfdy[NVC]={0,0,0,0};
+    get_dfdy(dfdy,shared_state,idx);
+    get_dfdx(dfdx,shared_state,idx);
+    __syncthreads();
+    if (gts%2!=0)
+    {
+        for (int i = 0; i < NVC; i++)
+        {
+            shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+QUARTER*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < NVC; i++)
+        {
+            shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS-STS]+HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+        }
+    }
 }
-
+/*
+    This function is for testing purposes
+*/
 __global__
 void test_step(float *shared_state, int idx, int gts)
 {
@@ -256,24 +272,20 @@ void test_step(float *shared_state, int idx, int gts)
       float dfdy[NVC]={0,0,0,0};
       get_dfdy(dfdy,shared_state,idx);
       get_dfdx(dfdx,shared_state,idx);
-      printf("%f\n",DTDX );
-      printf("%f,%f,%f,%f\n", dfdx[0], dfdx[1], dfdx[2], dfdx[3]);
-      printf("%f,%f,%f,%f\n", dfdy[0], dfdy[1], dfdy[2], dfdy[3]);
       __syncthreads();
       if (gts%2!=0)
       {
           for (int i = 0; i < NVC; i++)
           {
-              shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+              shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+QUARTER*(DTDX*dfdx[i]+DTDY*dfdy[i]);
           }
       }
       else
       {
           for (int i = 0; i < NVC; i++)
           {
-              shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS-STS]+DTDX*dfdx[i]+DTDY*dfdy[i];
+              shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS-STS]+HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
           }
       }
-  }
-
+    }
 }
