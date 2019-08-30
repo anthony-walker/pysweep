@@ -203,7 +203,6 @@ def test_euler_vortex():
     analyt_vortex = vortex(cvics,X,Y,npx,npy,times=np.linspace(t0,t_b,time_steps+1))
     flux_vortex = convert_to_flux(analyt_vortex[:,:,:,:],gamma)
     #Numerical Array
-
     avs = analyt_vortex.shape
     ops = 2
     #Create flux vortex array

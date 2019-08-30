@@ -37,3 +37,47 @@ def test_reg_edge_comm():
     tarr[0,0,0:ops,ops:x-ops]-=tarr[0,0,x-2*ops:x-ops,ops:x-ops]
     assert (tarr[0,0,:,0:ops]==0).all()
     assert (tarr[0,0,0:ops,:]==0).all()
+
+def test_decomp():
+    """Use this function to test decomp"""
+    #Properties
+    gamma = 1.4
+    #Analytical properties
+    cvics = vics()
+    cvics.Shu(gamma)
+    initial_args = cvics.get_args()
+    X = cvics.L
+    Y = cvics.L
+    #Dimensions and steps
+    npx = 64
+    npy = 64
+    dx = X/npx
+    dy = Y/npy
+    #Time testing arguments
+    t0 = 0
+    t_b = 1
+    dt = 0.01
+    targs = (t0,t_b,dt)
+    # Creating initial vortex from analytical code
+    initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,1))
+    flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
+    tarr = np.ones(flux_vortex.shape)
+    #GPU Arguments
+    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    ops = 2 #number of atomic operations
+    tso = 2 #RK2
+    #File args
+    decomp_name = "./results/decomp"
+    #Changing arguments
+    block_size = 16
+    affinity = 1
+    gargs = (t0,t_b,dt,dx,dy,gamma)
+    swargs = (tso,ops,block_size,affinity,gpu_source,cpu_source)
+    ct = decomp(flux_vortex,gargs,swargs,filename="./tests/test_results/decomp")
+
+
+
+
+
+test_decomp()
