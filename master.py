@@ -41,8 +41,8 @@ def test(args):
     getDeviceAttrs(0,False)
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 32
-    npy = 32
+    npx = 64
+    npy = 64
     dx = X/npx
     dy = Y/npy
 
@@ -67,7 +67,7 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = 16
+    block_size = 32
     affinity = 1
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
