@@ -248,23 +248,35 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     wb = 1  #Counter for writing on the appropriate step
     comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
-    pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO) #Passed arguments to the swept functions
+    pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO,dType) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     UpPyramid(sarr,larr,WR,BDR,up_sets,wb,pargs) #THis modifies shared array
     comm.Barrier()
     #-------------------------------FIRST BRIDGE-------------------------------------------#
+<<<<<<< HEAD
     #Getting x and y arrays
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
     comm.Barrier()  #Barrier after read
     #Bridge Step
+=======
+    # #Getting x and y arrays
+    # xarr = np.copy(sarr[XR])
+    # yarr = np.copy(sarr[YR])
+    # comm.Barrier()  #Barrier after read
+    # #Bridge Step
+>>>>>>> 0f37405215cf34f40fa31b9efc21a0c4abee6291
     # Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     # comm.Barrier()  #Solving Bridge Barrier
     # #------------------------------SWEPT LOOP-------------------------------#
     # #Getting next points for the local array
     # larr = np.copy(sarr[SRR])
     # #Swept Octahedrons and Bridges
+<<<<<<< HEAD
     # for GST in range(1,MGST):
+=======
+    # for GST in range(1,4,1):#MGST):
+>>>>>>> 0f37405215cf34f40fa31b9efc21a0c4abee6291
     #     comm.Barrier()  #Read barrier for local array
     #     #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
     #     Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
@@ -286,6 +298,10 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #     #Reverse Bridge Step
     #     Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
     #     comm.Barrier()  #Solving Bridge Barrier
+<<<<<<< HEAD
+=======
+    #
+>>>>>>> 0f37405215cf34f40fa31b9efc21a0c4abee6291
     #     #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
     #     #Getting next points for the local array
     #     larr = np.copy(sarr[RR])
@@ -307,6 +323,12 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #     #Bridge Step
     #     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     #     comm.Barrier()
+<<<<<<< HEAD
+=======
+    #     printer("_________________________________________")
+    #     printer(sarr[5,0,:,:],p_iter=True)
+    #     comm.Barrier()
+>>>>>>> 0f37405215cf34f40fa31b9efc21a0c4abee6291
     #     #Getting next points for the local array
     #     larr = np.copy(sarr[SRR])
     # #Last read barrier for down pyramid

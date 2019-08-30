@@ -92,7 +92,7 @@ def test(args):
     #         comm.Barrier()
     #For testing individual sweep
     cts = sweep(tarr,gargs,swargs,filename="./results/swept")
-    # ct = decomp(flux_vortex,gargs,swargs,filename="./results/decomp")
+    ct = decomp(flux_vortex,gargs,swargs,filename="./results/decomp")
     # print(cts)
     # print(ct)
     # return (cts,ct)

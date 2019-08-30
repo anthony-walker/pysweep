@@ -14,13 +14,18 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
+    SM,GRB,BS,GRD,CRS,OPS,TSO,dType = pargs
     #Splitting between cpu and gpu
     if GRB:
         # Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("UpPyramid")
+<<<<<<< HEAD
         ss = np.zeros(arr[0,:,:BS[0]+2*OPS,:BS[1]+2*OPS].shape)
+=======
+        ss = np.zeros((2,arr.shape[1],BS[0]+2*OPS,BS[1]+2*OPS),dType=dType)
+        print(ss.nbytes)
+>>>>>>> 0f37405215cf34f40fa31b9efc21a0c4abee6291
         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ss.nbytes)
         cuda.Context.synchronize()
     else:   #CPUs do this
@@ -41,7 +46,7 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
 
 def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
     """Use this function to solve the bridge step."""
-    SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
+    SM,GRB,BS,GRD,CRS,OPS,TSO,dType = pargs
     #Splitting between cpu and gpu
     if GRB:
         # X-Bridge
@@ -91,7 +96,7 @@ def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
+    SM,GRB,BS,GRD,CRS,OPS,TSO,dType = pargs
     if GRB:
         #Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
@@ -114,7 +119,7 @@ def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
 
 def DownPyramid(sarr,arr,WR,isets,gts,pargs):
     """This is the ending inverted pyramid."""
-    SM,GRB,BS,GRD,CRS,OPS,TSO = pargs
+    SM,GRB,BS,GRD,CRS,OPS,TSO,dType = pargs
     if GRB:
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("DownPyramid")
