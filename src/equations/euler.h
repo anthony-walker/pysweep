@@ -57,13 +57,15 @@ float  pressureRatio(float *wpoint,float *point,float *epoint)
 __device__
 void  flimiter(float *temp_state, float *left_point, float *right_point , float Pr)
 {
-
+    // printf("left_point: %f,%f,%f,%f\n", left_point[0],left_point[1],left_point[2],left_point[3]);
+    // printf("right_point: %f,%f,%f,%f\n", right_point[0],right_point[1],right_point[2],right_point[3]);
+    // printf("%f\n", Pr);
     for (int i = 0; i < NVC; i++)
     {
         temp_state[i] += left_point[i];
     }
 
-    if (!(ISNAN(Pr)) || !(Pr<1.0e-8))
+    if (!(ISNAN(Pr)) && (Pr>1.0e-8))
     {
         float coef = HALF*MIN(Pr, ONE);
         for (int j = 0; j < NVC; j++)
@@ -82,7 +84,7 @@ void espectral(float* flux,float *left_state, float *right_state, int dir, int d
   //Initializing values and determining spectral state
   float spec_state[NVC]={0};
   float rootrhoL = SQUAREROOT(left_state[0]);
-  float rootrhoR = SQUAREROOT(left_state[1]);
+  float rootrhoR = SQUAREROOT(right_state[0]);
   spec_state[0] = rootrhoL*rootrhoR;
   float denom = 1/(spec_state[0]);
   for (int i = 1; i < NVC; i++)
@@ -156,7 +158,8 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
     efluxx(dfdx,temp_left,temp_right,-ONE);
-    espectral(dfdx,temp_left,temp_right,ONE,spi);
+    espectral(dfdx,temp_left,temp_right,-ONE,spi);
+
 }
 /*
 Use this function to obtain the flux for each system variable
@@ -197,6 +200,7 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     getPoint(eepoint,shared_state,idx+2);
     float wwpoint[NVC];
     getPoint(wwpoint,shared_state,idx-2);
+
     float Pr[3]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
@@ -212,12 +216,12 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
     efluxy(dfdy,temp_left,temp_right,ONE);
     espectral(dfdy,temp_left,temp_right,ONE,spi);
-
+    
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
     efluxy(dfdy,temp_left,temp_right,-ONE);
-    espectral(dfdy,temp_left,temp_right,ONE,spi);
+    espectral(dfdy,temp_left,temp_right,-ONE,spi);
 }
 
 __device__
@@ -225,7 +229,7 @@ void step(float *shared_state, int idx, int gts)
 {
   float dfdx[NVC]={0,0,0,0};
   float dfdy[NVC]={0,0,0,0};
-  get_dfdy(dfdx,shared_state,idx);
+  get_dfdy(dfdy,shared_state,idx);
   get_dfdx(dfdx,shared_state,idx);
   __syncthreads();
   if (gts%2!=0)
@@ -244,9 +248,32 @@ void step(float *shared_state, int idx, int gts)
   }
 }
 
-// __global__
-// void test_gpu_euler(float *state, int idx, int gts)
-// {
-//   extern shared_state
-//   step(state,idx,gts)
-// }
+__global__
+void test_step(float *shared_state, int idx, int gts)
+{
+  if (threadIdx.x == 0 && threadIdx.y==0) {
+      float dfdx[NVC]={0,0,0,0};
+      float dfdy[NVC]={0,0,0,0};
+      get_dfdy(dfdy,shared_state,idx);
+      get_dfdx(dfdx,shared_state,idx);
+      printf("%f\n",DTDX );
+      printf("%f,%f,%f,%f\n", dfdx[0], dfdx[1], dfdx[2], dfdx[3]);
+      printf("%f,%f,%f,%f\n", dfdy[0], dfdy[1], dfdy[2], dfdy[3]);
+      __syncthreads();
+      if (gts%2!=0)
+      {
+          for (int i = 0; i < NVC; i++)
+          {
+              shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+          }
+      }
+      else
+      {
+          for (int i = 0; i < NVC; i++)
+          {
+              shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS-STS]+DTDX*dfdx[i]+DTDY*dfdy[i];
+          }
+      }
+  }
+
+}

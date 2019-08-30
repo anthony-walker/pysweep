@@ -16,6 +16,11 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
+#Cuda
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
+#C
+from ctypes import *
 
 def test_flux():
     """Use this function to test the python version of the euler code.
@@ -114,19 +119,75 @@ def test_RK2_GPU():
     """
     #Sod Shock BC's
     t0 = 0
-    tf = 0.03
+    tf = 1
     dt = 0.01
     dx = 0.1
     dy = 0.1
     gamma = 1.4
     leftBC = (1.0,0,0,2.5)
     rightBC = (0.125,0,0,.25)
+    x = 8
+    v = 4
+    bs = (x,x,1)
+    ops = 2
+    TSO = 2
+    num_test = np.zeros((3,v,x,x),dtype=np.float32)
+
+    g_mod_2D = build_gpu_source("./src/equations/euler.h")
+    c_mod_2D = build_cpu_source("./src/equations/euler.py")
+    c_mod_2D.set_globals(True,g_mod_2D,*(t0,tf,dt,dx,dy,gamma))
+    gpu_fcn = g_mod_2D.get_function("test_step")
+    NV = v
+    SGIDS = (bs[0])*(bs[0])
+    STS = SGIDS*NV #Shared time shift
+    VARS =  x*x
+    TIMES = VARS*NV
+    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":ops,"TSO":TSO,"STS":STS})
+    swept_constant_copy(g_mod_2D,const_dict)
+
+    for i in range(int(x/2)):
+        for j in range(x):
+            num_test[0,:,i,j]=leftBC[:]
+    for i in range(int(x/2),x):
+        for j in range(x):
+            num_test[0,:,i,j]=rightBC[:]
+
+    tarr = np.copy(num_test) #Copying for 1D function
+    gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(1),block=bs)
+    print(num_test[0,1,:,:])
+
+    leftBC1 = (1.0,0,2.5)
+    rightBC1 = (0.125,0,.25)
+    Qx = np.zeros((5,3))
+    Qx[0,:] = leftBC1[:]
+    Qx[1,:] = leftBC1[:]
+    Qx[2,:] = rightBC1[:]
+    Qx[3,:] = rightBC1[:]
+    Qx[4,:] = rightBC1[:]
+    P = np.zeros(5)
+    P[:] = [1,1,0.1,0.1,0.1]
+    # #Get source module
+    source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
+
+    f1d = source_mod_1D.RK2S1(Qx,P)
+    print(f1d)
+
+    # #Checking velocities in each direction as they should be the same
+    # assert np.isclose(f1d[2,1], num_test[1,1,2,2])
+    # assert np.isclose(f1d[2,1], num_test[1,2,2,2])
+    # f1d = source_mod_1D.RK2S2(Qx,Qx)
+    # num_test[1,:,:,:] = num_test[0,:,:,:]
+    # #Test second step
+    # num_test = source_mod_2D.step(num_test,iidx,1,2)
+    # assert np.isclose(f1d[2,1], num_test[2,1,2,2])
+    # assert np.isclose(f1d[2,1], num_test[2,2,2,2])
+
 
     # #Get source module
-    c_mod_2D =  build_cpu_source(".src/decomp/decomp.py")
-
-    source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
-    source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
+    # c_mod_2D =  build_cpu_source(".src/decomp/decomp.py")
+    #
+    # source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
+    # source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
 
     # num_test = np.zeros((3,4,5,5))
     # for i in range(3):
@@ -142,10 +203,6 @@ def test_RK2_GPU():
     # Qx[:,2] = num_test[0,3,:,2]
     # P = np.zeros(5)
     # P[:] = [1,1,0.1,0.1,0.1]
-
-def test_decomp():
-    """Use this function to test decomp."""
-
 
 def test_python_euler():
     """Use this function to test the python version of the euler code."""
@@ -222,3 +279,5 @@ def test_python_euler():
     frames = len(tuple(range(time_steps+1)))
     anim = animation.FuncAnimation(fig,animate,frames)
     anim.save("test.gif",writer="imagemagick")
+
+test_RK2_GPU()

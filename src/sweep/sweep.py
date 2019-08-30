@@ -37,7 +37,6 @@ from .pysweep_decomposition import *
 from .pysweep_block import *
 from .pysweep_regions import *
 from .pysweep_source import *
-from .pysweep_printer import *
 import importlib.util
 #Testing and Debugging
 import warnings

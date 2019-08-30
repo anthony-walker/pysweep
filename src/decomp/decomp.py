@@ -133,6 +133,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (3,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
     shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
         shared_arr[0,:,OPS:shared_shape[2]-OPS,OPS:shared_shape[3]-OPS] = arr0[:,:,:] #Filling array
@@ -154,7 +155,6 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     comm.Barrier()
     #--------------------------------CREATING LOCAL ARRAY-----------------------------------------#
     local_array = create_local_array(shared_arr,regions[ZERO],dType)
-    #Communicating array edges
 
     #---------------------_REMOVING UNWANTED RANKS---------------------------#
     #Checking if rank is useful
@@ -225,7 +225,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     for i in range(1,TSO*(time_steps+1)):
         local_array[:,:,:,:] = shared_arr[regions[0]]
         comm.Barrier()
-        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS,i,TSO)
+        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],cpu_regions,shared_arr,OPS,i,TSO,ssb)
         comm.Barrier()
         reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
         comm.Barrier()

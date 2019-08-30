@@ -41,14 +41,14 @@ def test(args):
     getDeviceAttrs(0,False)
     #Dimensions and steps
     opt_grid_size = int(4*5*6*7)
-    npx = 64
-    npy = 64
+    npx = 16
+    npy = 16
     dx = X/npx
     dy = Y/npy
 
     #Time testing arguments
     t0 = 0
-    t_b = 10
+    t_b = 1
     dt = 0.1
     targs = (t0,t_b,dt)
 
@@ -57,8 +57,8 @@ def test(args):
     flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
     tarr = np.ones(flux_vortex.shape)
     #GPU Arguments
-    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
+    gpu_source = "/home/walkanth/pysweep/src/equations/eqt.h"
+    cpu_source = "/home/walkanth/pysweep/src/equations/eqt.py"
     ops = 2 #number of atomic operations
     tso = 2 #RK2
     #File args
@@ -67,8 +67,8 @@ def test(args):
     #Changing arguments
     affinities = np.linspace(1/2,1,mp.cpu_count()/2)
     block_sizes = create_block_sizes()
-    block_size = 32
-    affinity = 1
+    block_size = 8
+    affinity = 0.5
     if rank == master_rank:
         f =  open("./results/time_data.txt",'w')
     gargs = (t0,t_b,dt,dx,dy,gamma)
@@ -93,13 +93,11 @@ def test(args):
     #For testing individual sweep
     cts = sweep(tarr,gargs,swargs,filename="./results/swept")
     ct = decomp(flux_vortex,gargs,swargs,filename="./results/decomp")
-    # print(cts)
-    # print(ct)
-    # return (cts,ct)
+    return cts,ct
 
 if __name__ == "__main__":
     args = tuple()
-    # sm = "Hi,\nYour function run is complete.\n"
-    # notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
-    # notifier.run()
-    test(args)
+    sm = "Hi,\nYour function run is complete.\n"
+    notifier = NotiPy(test,args,sm,"asw42695@gmail.com",rank=rank,timeout=None)
+    notifier.run()
+    # test(args)

@@ -226,7 +226,7 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
     else:
         return blocks[0]
 
-def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,ops,gts,tso):
+def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,ops,gts,tso,ssb):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -237,8 +237,7 @@ def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_
         #Getting GPU Function
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = source_mod.get_function("Decomp")
-        ss = np.zeros(arr[0,:,:block_size[0]+2*ops,:block_size[1]+2*ops].shape)
-        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=grid_size, block=block_size,shared=ss.nbytes)
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=grid_size, block=block_size,shared=ssb)
         cuda.Context.synchronize()
     else:   #CPUs do this
         blocks = []

@@ -13,4 +13,4 @@ import numpy as np
 
 def test_edge_comm():
     """Use this function to test the GPU edge communication."""
-    
+    pass

@@ -36,8 +36,8 @@ def set_globals(gpu,source_mod,*args):
     """Use this function to set cpu global variables"""
     t0,tf,dt,dx,dy,gam = args
     if gpu:
-        keys = "DT","DX","DY","GAMMA","GAM_M1"
-        nargs = args[2:]+(gam-1,)
+        keys = "DT","DX","DY","GAMMA","GAM_M1","DTDX","DTDY"
+        nargs = args[2:]+(gam-1,dt/dx,dt/dy)
         fc = lambda x:np.float32(x)
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
