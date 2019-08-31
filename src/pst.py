@@ -54,7 +54,6 @@ def SweptTestPattern(args):
     #Dimensions and steps
     dx = X/args.nx
     dy = Y/args.ny
-    
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
