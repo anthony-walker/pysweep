@@ -54,9 +54,7 @@ def SweptTestPattern(args):
     #Dimensions and steps
     dx = X/args.nx
     dy = Y/args.ny
-    #Creating initial vortex from analytical code
-    initial_vortex = vortex(cvics,X,Y,args.nx,args.nx,times=(0,))
-    flux_vortex = convert_to_flux(initial_vortex,args.gamma)[0]
+    
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
