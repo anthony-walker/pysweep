@@ -5,6 +5,7 @@ from analytical import *
 from equations import *
 from decomp import *
 import argparse
+import numpy as np
 
 def SweptVortex(args):
     #Analytical properties
@@ -42,9 +43,47 @@ def StandardVortex(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     decomp(flux_vortex,gargs,swargs,filename=args.hdf5)
 
+def SweptTestPattern(args):
+    arr = np.zeros((4,args.nx,args.ny))
+    patt = np.zeros((args.ny+1))
+    for i in range(1,args.ny,2):
+        patt[i] = 1
+    print(patt)
+    X = 1
+    Y = 1
+    #Dimensions and steps
+    dx = X/args.nx
+    dy = Y/args.ny
+    #Creating initial vortex from analytical code
+    initial_vortex = vortex(cvics,X,Y,args.nx,args.nx,times=(0,))
+    flux_vortex = convert_to_flux(initial_vortex,args.gamma)[0]
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    # sweep(flux_vortex,gargs,swargs,filename=args.hdf5)
+
+def DecompTestPattern(args):
+    #Analytical properties
+    cvics = vics()
+    cvics.Shu(args.gamma)
+    initial_args = cvics.get_args()
+    X = cvics.L
+    Y = cvics.L
+    #Dimensions and steps
+    dx = X/args.nx
+    dy = Y/args.ny
+    #Creating initial vortex from analytical code
+    initial_vortex = vortex(cvics,X,Y,args.nx,args.nx,times=(0,))
+    flux_vortex = convert_to_flux(initial_vortex,args.gamma)[0]
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    sweep(flux_vortex,gargs,swargs,filename=args.hdf5)
+
+
 parser = argparse.ArgumentParser()
 fmap = {'swept' : SweptVortex,
-                'standard' : StandardVortex}
+                'standard' : StandardVortex, "stest":SweptTestPattern, "stest":SweptTestPattern, "dtest":DecompTestPattern}
 parser.add_argument('fcn', choices=fmap.keys())
 parser.add_argument("-b","--block",nargs="?",default=8,type=int)
 parser.add_argument("-o","--ops",nargs="?",default=2,type=int)
