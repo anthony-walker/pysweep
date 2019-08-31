@@ -83,7 +83,7 @@ def DecompTestPattern(args):
 
 parser = argparse.ArgumentParser()
 fmap = {'swept' : SweptVortex,
-                'standard' : StandardVortex, "stest":SweptTestPattern, "stest":SweptTestPattern, "dtest":DecompTestPattern}
+                'standard' : StandardVortex, "stest":SweptTestPattern, "dtest":DecompTestPattern}
 parser.add_argument('fcn', choices=fmap.keys())
 parser.add_argument("-b","--block",nargs="?",default=8,type=int)
 parser.add_argument("-o","--ops",nargs="?",default=2,type=int)
