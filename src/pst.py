@@ -49,7 +49,7 @@ def SweptTestPattern(args):
     printer = pysweep_printer(0,0)
     for i in range(1,args.ny,2):
         patt[i] = 1
-    printer(patt,p_iter=True)
+    printer((patt,),p_iter=True)
     X = 1
     Y = 1
     #Dimensions and steps
