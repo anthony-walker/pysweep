@@ -46,9 +46,10 @@ def StandardVortex(args):
 def SweptTestPattern(args):
     arr = np.zeros((4,args.nx,args.ny))
     patt = np.zeros((args.ny+1))
+    printer = pysweep_printer(0,0)
     for i in range(1,args.ny,2):
         patt[i] = 1
-    print(patt)
+    printer(patt,p_iter=True)
     X = 1
     Y = 1
     #Dimensions and steps
