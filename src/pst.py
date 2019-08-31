@@ -1,6 +1,6 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
-from sweep.sweep import *
+from sweep import *
 from analytical import *
 from equations import *
 from decomp import *
