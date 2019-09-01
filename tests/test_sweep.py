@@ -14,7 +14,7 @@ import numpy as np
 def test_edge_comm():
     """Use this function to test the GPU edge communication."""
     estr = "colorcode mpiexec -n 4 python ./src/pst.py stest "
-    estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
+    estr += "-b 10 -o 1 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
     estr += "--hdf5 \"./results/stest\" -nx 40 -ny 40"
     os.system(estr)
 

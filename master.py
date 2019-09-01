@@ -14,6 +14,7 @@ class controller(object):
 
     def __call__(self,args):
         """Use this to execute the cases"""
+
         self.cstr = self.ssm+self.swept
         os.system(self.cstr)
 
