@@ -44,12 +44,22 @@ def StandardVortex(args):
     decomp(flux_vortex,gargs,swargs,filename=args.hdf5)
 
 def SweptTestPattern(args):
+    comm = MPI.COMM_WORLD
+    master_rank = 0
+    rank = comm.Get_rank()  #current rank
     arr = np.zeros((4,args.nx,args.ny))
     patt = np.zeros((args.ny+1))
-    printer = pysweep_printer(0,0)
+    printer = pysweep_printer(rank,master_rank)
     for i in range(1,args.ny+1,2):
         patt[i] = 1
-    printer((patt,),p_iter=True)
+    sb = True
+    for i in range(4):
+        for j in range(args.nx):
+            if sb:
+                arr[i,j,:] = patt[0:-1]
+            else:
+                arr[i,j,:] = patt[1:]
+            sb = not sb
     X = 1
     Y = 1
     #Dimensions and steps
@@ -58,7 +68,7 @@ def SweptTestPattern(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    # sweep(flux_vortex,gargs,swargs,filename=args.hdf5)
+    sweep(arr,gargs,swargs,filename=args.hdf5)
 
 def DecompTestPattern(args):
     #Analytical properties
