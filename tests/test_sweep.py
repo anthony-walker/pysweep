@@ -88,4 +88,3 @@ def test_UpPyramid():
             for idx in set:
                 tsum+=carr[ts,i,idx[0],idx[1]]
             assert 2*tsum==len(set)
-    

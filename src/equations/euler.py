@@ -20,16 +20,14 @@ def step(state,iidx,ts,gts):
     gts - a step counter that allows implementation of the scheme
     """
     half = 0.5
-    vSlice = slice(0,state.shape[1],1)
-    for idx in iidx:
-        nidx = (ts+1,vSlice)+idx  #next step index
-        pidx = (ts-1,vSlice)+idx  #previous step index
-        cidx = (ts,vSlice)+idx  #current step index
+    vs = slice(0,state.shape[1],1)
+    for ct, bidx in enumerate(iidx,start=ts):
+        idx,idy = bidx
         dfdx,dfdy = dfdxy(state,cidx)
         if gts%2!=0:
-            state[nidx] = state[cidx]+half*dtdx*dfdx+half*dtdy*dfdy
+            state[ct+1,vs,idx,idy] = state[ct,vs,idx,idy]+half*dtdx*dfdx+half*dtdy*dfdy
         else:
-            state[nidx] = state[pidx]+dtdx*dfdx+dtdy*dfdy
+            state[ct+1,vs,idx,idy] = state[ct-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
     return state
 
 def set_globals(gpu,source_mod,*args):
