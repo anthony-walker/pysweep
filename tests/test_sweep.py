@@ -117,10 +117,42 @@ def test_UpPyramid(GRB):
                 tsum+=larr[ts,i,idx[0],idx[1]]
             assert 2*tsum==len(set)
     # Shifting Data Step
-    # edge_shift(sarr,ERS,1)
-    # cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-    print(ERS)
-    # pm(sarr,10)
+    edge_shift(sarr,ERS,1)
+    cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    boundary_update(sarr,OPS,SPLITX,SPLITY)
+    #Reverse bridge
+    xarr = np.copy(sarr[YR]) #Regions are purposely switched here
+    yarr = np.copy(sarr[XR])
+    Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
+    #Next octahedron
+    larr = np.copy(sarr[RR])
+    Octahedron(sarr,larr,WR,BDR,oct_sets,wb+1,pargs)
+    for i in range(v):
+        for ts, set in enumerate(oct_sets,start=1):
+            tsum = 0
+            for idx in set:
+                tsum+=larr[ts,i,idx[0],idx[1]]
+            assert 2*tsum==len(set)
+    cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+    #Next bridge
+    xarr = np.copy(sarr[XR])
+    yarr = np.copy(sarr[YR])
+    Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+    #Down Pyramid
+    larr = np.copy(sarr[SRR])
+    DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
+    edge_shift(sarr,ERS,1)
+    for i in range(v):
+        for ts, set in enumerate(down_sets,start=1):
+            tsum = 0
+            for idx in set:
+                tsum+=larr[ts,i,idx[0],idx[1]]
+            assert 2*tsum==len(set)
+    hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+
+
 
 def test_pst():
     estr = "mpiexec -n 4 python ./src/pst.py stest "
@@ -129,4 +161,4 @@ def test_pst():
     os.system(estr)
 
 # test_pst()
-test_UpPyramid(False)
+test_UpPyramid(True)
