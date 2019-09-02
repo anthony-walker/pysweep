@@ -54,7 +54,6 @@ def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
         gpu_fcn = SM.get_function("BridgeY")
         gpu_fcn(cuda.InOut(yarr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
-        # print(xarr[4,0,:,:])
     else:   #CPUs do this
         blocks_x = []
         blocks_y = []

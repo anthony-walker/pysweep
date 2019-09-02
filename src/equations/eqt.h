@@ -23,7 +23,6 @@ void getPoint(float * curr_point,float *shared_state, int idx)
 __device__
 void step(float *shared_state, int idx, int gts)
 {
-
   float tval[NVC]={0,0,0,0};
   float cpoint[NVC];
   getPoint(cpoint,shared_state,idx);
@@ -36,6 +35,7 @@ void step(float *shared_state, int idx, int gts)
   float spoint[NVC];
   getPoint(spoint,shared_state,idx-1);
   // printf("%f,%f,%f,%f\n",wpoint[0],wpoint[0],wpoint[0],wpoint[0]);
+  __syncthreads();
   // printf("%f,%f,%f,%f\n",npoint[0],spoint[0],epoint[0],wpoint[0]);
   if (gts%TSO!=0)
   {
@@ -52,8 +52,6 @@ void step(float *shared_state, int idx, int gts)
       }
   }
 
-  __syncthreads();
-  // printf("%lf\n",tval[0]);
   __syncthreads();
   for (int i = 0; i < NVC; i++)
   {

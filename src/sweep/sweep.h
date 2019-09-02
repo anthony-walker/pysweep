@@ -272,7 +272,7 @@ BridgeX(float *state, int gts)
     int uy = ly+blockDim.y-2*OPS; //upper y
 
     //Communicating edge values to shared array
-    edge_comm(shared_state, state,ZERO,ONE);
+    edge_comm(shared_state, state,TSO,ONE);
     __syncthreads();
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
@@ -340,6 +340,7 @@ BridgeY(float *state, int gts)
     extern __shared__ float shared_state[];    //Shared state specified externally
     shared_state_clear(shared_state);
     __syncthreads();
+    printf("%s\n", "BRIDGE_Y");
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
@@ -353,7 +354,7 @@ BridgeY(float *state, int gts)
     int uy = ly+2*OPS; //upper x
 
     //Communicating edge values to shared array
-    edge_comm(shared_state, state,ZERO,ONE);
+    edge_comm(shared_state, state,TSO,ONE);
     __syncthreads();
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
@@ -377,6 +378,7 @@ BridgeY(float *state, int gts)
                 state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
             }
         }
+
         __syncthreads();
         //Necessary communication step
         if (gts%TSO==0)
@@ -399,7 +401,6 @@ BridgeY(float *state, int gts)
         }
         gts += 1;   //Update gts
         __syncthreads(); //Sync threads here to ensure all initial values are copied
-
         //Update swept bounds
         ly-=OPS;
         uy+=OPS;
