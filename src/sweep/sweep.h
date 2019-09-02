@@ -122,23 +122,29 @@ void edge_comm(float * shared_state, float * state, int curr_time, int mod_sts)
     Use this function to communicate edges more effectively
 */
 __device__
-void state_edge_comm(float * shared_state, float * state, int smod,int tmod)
+void state_edge_comm(float * shared_state, float * state,int tmod, int smod)
 {
     int tidx = threadIdx.x;
     int tidy = threadIdx.y;
-    int sgid = get_sgid(tidx,tidy); //Shared global index
-    int gid = get_gid_ftid(tidx,tidy); //Global index
-
-    for (int j = 0; j < NV; j++)
+    int sgid = get_sgid(tidx,tidy)+smod*STS; //Shared global index
+    int gid = get_gid_ftid(tidx,tidy)+tmod*TIMES; //Global index
+    if (tidx<OPS || tidx<blockDim.y+OPS)
     {
-        shared_state[sgid+j*VARS+smod*STS] = state[gid+j*VARS+tmod*TIMES];
+        for (int j = 0; j < NV; j++)
+        {
+            shared_state[sgid+j*SGIDS] = state[gid+j*VARS];
+        }
     }
     tidx = threadIdx.x+2*OPS;
     tidy = threadIdx.y+2*OPS;
-    sgid = get_sgid(tidx,tidy); //Shared global index
-    for (int j = 0; j < NV; j++)
+    sgid = get_sgid(tidx,tidy)+smod*STS; //Shared global index
+    gid = get_gid_ftid(tidx,tidy)+tmod*TIMES; //Global index
+    if (tidx>=blockDim.x+OPS || tidy>=blockDim.y+OPS)
     {
-        shared_state[sgid+j*VARS+smod*STS] = state[gid+j*VARS+tmod*TIMES];
+        for (int j = 0; j < NV; j++)
+        {
+            shared_state[sgid+j*SGIDS] = state[gid+j*VARS];
+        }
     }
 }
 /*
@@ -193,7 +199,7 @@ UpPyramid(float *state, int gts)
     int uy = blockDim.y+OPS; //upper y
 
     //Communicating edge values to shared array for the calculation point (ONE)
-    edge_comm(shared_state, state,ZERO,ONE);
+    edge_comm(shared_state, state,TSO-ONE,ONE);
     __syncthreads();
 
     //Communicating interior points for TSO data and calculation data

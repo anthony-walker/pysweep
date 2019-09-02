@@ -24,31 +24,39 @@ __device__
 void step(float *shared_state, int idx, int gts)
 {
 
+  float tval[NVC]={0,0,0,0};
   float cpoint[NVC];
   getPoint(cpoint,shared_state,idx);
   float epoint[NVC];
-  getPoint(epoint,shared_state,idx+blockDim.y);
+  getPoint(epoint,shared_state,idx+blockDim.y+2*OPS);
   float wpoint[NVC];
-  getPoint(wpoint,shared_state,idx-blockDim.y);
+  getPoint(wpoint,shared_state,idx-blockDim.y-2*OPS);
   float npoint[NVC];
   getPoint(npoint,shared_state,idx+1);
   float spoint[NVC];
   getPoint(spoint,shared_state,idx-1);
-  __syncthreads();
-
+  // printf("%f,%f,%f,%f\n",wpoint[0],wpoint[0],wpoint[0],wpoint[0]);
+  // printf("%f,%f,%f,%f\n",npoint[0],spoint[0],epoint[0],wpoint[0]);
   if (gts%TSO!=0)
   {
       for (int i = 0; i < NVC; i++)
       {
-          shared_state[idx+i*SGIDS] = (epoint[i]+wpoint[i]+npoint[i]+spoint[i])/4;
+          tval[i] = (epoint[i]+wpoint[i]+npoint[i]+spoint[i])/4;
       }
   }
   else
   {
       for (int i = 0; i < NVC; i++)
       {
-          // shared_state[idx+i*SGIDS]=7;
-          shared_state[idx+i*SGIDS]+=1;
+          tval[i] = (epoint[i]+wpoint[i]+npoint[i]+spoint[i])/4;
       }
+  }
+
+  __syncthreads();
+  // printf("%lf\n",tval[0]);
+  __syncthreads();
+  for (int i = 0; i < NVC; i++)
+  {
+      shared_state[idx+i*SGIDS]=tval[i];
   }
 }

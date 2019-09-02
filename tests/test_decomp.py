@@ -75,8 +75,7 @@ def test_decomp():
     gargs = (t0,t_b,dt,dx,dy,gamma)
     swargs = (tso,ops,block_size,affinity,gpu_source,cpu_source)
     ct = decomp(flux_vortex,gargs,swargs,filename="./tests/test_results/decomp")
-
-
+    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
 
 
 

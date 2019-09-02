@@ -34,6 +34,7 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
         cpu_fcn = sweep_lambda((CPU_UpPyramid,SM,isets,gts,TSO))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,CRS,OPS)
+
     sarr[WR] = arr[:,:,OPS:-OPS,OPS:-OPS]
     for br in BDR:
         sarr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]

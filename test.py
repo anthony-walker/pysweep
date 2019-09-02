@@ -10,6 +10,12 @@ def pm(arr,i):
             sys.stdout.write("%.0f"%si+", ")
         sys.stdout.write("]\n")
 
+def ec(arr,t):
+    arr[t,0,0,1:-1] = arr[t,0,-2,1:-1]
+    arr[t,0,-1,1:-1] = arr[t,0,1,1:-1]
+    arr[t,0,:,0] = arr[t,0,:,-2]
+    arr[t,0,:,-1] = arr[t,0,:,1]
+
 v = 4*5*6*8
 # for i in range(6,34,2):
 #     print(i,v,(v)%i)
@@ -29,12 +35,22 @@ for i in range(4):
             arr[0,i,j,:] = patt[1:]
         sb = not sb
 
-
-pm(arr,0)
+# pm(arr,0)
 iidx = tuple()
 for i in range(1,x-1):
     for j in range(1,x-1):
         iidx+=(i,j),
 
 step(arr,iidx,0,1)
+
+ec(arr,1)
+
 pm(arr,1)
+
+step(arr,iidx,1,1)
+
+print("------------------")
+
+ec(arr,2)
+
+pm(arr,2)
