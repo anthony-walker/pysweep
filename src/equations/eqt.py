@@ -25,7 +25,7 @@ def step(state,iidx,ts,gts):
         if gts%2!=0:
             state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4
         else:
-            state[ntidx] = state[cidx]+1
+            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4
     return state
 
 def set_globals(gpu,source_mod,*args):
