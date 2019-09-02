@@ -340,7 +340,7 @@ BridgeY(float *state, int gts)
     extern __shared__ float shared_state[];    //Shared state specified externally
     shared_state_clear(shared_state);
     __syncthreads();
-    printf("%s\n", "BRIDGE_Y");
+    // printf("%s\n", "BRIDGE_Y");
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
@@ -357,10 +357,13 @@ BridgeY(float *state, int gts)
     edge_comm(shared_state, state,TSO,ONE);
     __syncthreads();
     //Communicating interior points for TSO data and calculation data
-    for (int i = 0; i < NV; i++)
+    if (gts%TSO==0) //FIX ME
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-TIMES]; //Initial time step
-        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+        for (int i = 0; i < NV; i++)
+        {
+            shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-TIMES]; //Initial time step
+            shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+        }
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
