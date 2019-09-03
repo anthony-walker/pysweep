@@ -109,19 +109,20 @@ def test_UpPyramid(GRB):
     #Bridge
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
-    cts = 5
-    pm(yarr,cts-1)
-    print("---------------------------------------")
-    pm(yarr,cts)
+    cts = 4
+    # pm(xarr,cts)
+    # print("---------------------------------------")
+    # pm(yarr,cts)
+
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     # First Octahedron test
     # pm(xarr,cts-1)
     # print("---------------------------------------")
     # pm(xarr,cts)
     # print("---------------------------------------")
-    pm(yarr,cts-1)
-    print("---------------------------------------")
-    pm(yarr,cts)
+    # pm(xarr,cts)
+    # print("---------------------------------------")
+    # pm(yarr,cts)
     # pm(sarr,cts)
     # larr = np.copy(sarr[SRR])
     # Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
@@ -137,6 +138,8 @@ def test_UpPyramid(GRB):
     # boundary_update(sarr,OPS,SPLITX,SPLITY)
     # #Reverse bridge
     # xarr = np.copy(sarr[YR]) #Regions are purposely switched here
+    # print("---------------------------------------")
+    # pm(yarr,cts)
     # yarr = np.copy(sarr[XR])
     # Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
     # #Next octahedron
