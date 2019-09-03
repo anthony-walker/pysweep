@@ -104,6 +104,7 @@ void print_sarr(float * shared_state,bool test_bool)
     __syncthreads();
     if (test_bool)
     {
+      printf("%s\n", "---------------------------------------");
         for (int i = -OPS; i < bdx; i++)
         {   printf("%s","[" );
             for (int j = -OPS; j < bdy; j++)
@@ -113,6 +114,7 @@ void print_sarr(float * shared_state,bool test_bool)
             }
             printf("%s\n","]" );
         }
+        printf("%s\n", "---------------------------------------");
     }
     __syncthreads();
 }
@@ -231,24 +233,30 @@ BridgeX(float *state, int gts)
     int ly = 2*OPS; // Lower y swept bound
     int ux = lx+2*OPS; //upper x
     int uy = ly+blockDim.y-2*OPS; //upper y
-
-    //Communicating edge values to shared array
-    // edge_comm(shared_state, state,TSO,ONE);
-    __syncthreads();
+    bool testbool = threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==1 && blockIdx.y==1;
     //Communicating interior points for TSO data and calculation data
-    for (int i = 0; i < NV; i++)
+    if (gts%TSO==0)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-TIMES]; //Initial time step
-        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+      shared_state_fill(shared_state,state,ZERO,(ZERO));
+      shared_state_fill(shared_state,state,ONE,(TSO));
+    }
+    else
+    {
+      shared_state_fill(shared_state,state,ZERO,(TSO-gts%TSO));
+      shared_state_fill(shared_state,state,ONE,(TSO));
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
 
     for (int k = 0; k < MPSS-ONE; k++)
     {
+      shared_state_clear(shared_state);
+      __syncthreads();
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid,gts);
+
+            shared_state[sgid] = 3;
+            // step(shared_state,sgid,gts);
             //Ensures steps are done prior to communication
             __syncthreads();
             for (int j = 0; j < NV; j++)
@@ -258,6 +266,7 @@ BridgeX(float *state, int gts)
             }
         }
         __syncthreads();
+        print_sarr(shared_state,testbool);
         //Necessary communication step
         if (gts%TSO==0)
         {
@@ -310,22 +319,37 @@ BridgeY(float *state, int gts)
     int ly = blockDim.y/2; //Lower x swept bound
     int ux = lx+blockDim.x-2*OPS; //upper y
     int uy = ly+2*OPS; //upper x
-    //Communicating edge values to shared array
-    // edge_comm(shared_state, state,TSO,ONE);
-    __syncthreads();
+    bool testbool = threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==1 && blockIdx.y==1;
     //Communicating interior points for TSO data and calculation data
-    for (int i = 0; i < NV; i++)
+    if (gts%TSO==0)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-TIMES]; //Initial time step
-        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+      shared_state_fill(shared_state,state,ZERO,(ZERO));
+      shared_state_fill(shared_state,state,ONE,(TSO));
     }
+    else
+    {
+      shared_state_fill(shared_state,state,ZERO,(TSO-gts%TSO));
+      shared_state_fill(shared_state,state,ONE,(TSO));
+    }
+
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     for (int k = 0; k < MPSS-ONE; k++)
     {
+
+      __syncthreads();
+
+      shared_state_clear(shared_state);
+      __syncthreads();
         // Solving step function
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-            step(shared_state,sgid,gts);
+            // printf("%d,%d,%d,%d\n", tidx,tidy,sgid,STS);
+
+              printf("%d,%d,%d\n",tidx,tidy,sgid );
+            
+
+            // step(shared_state,sgid,gts);
+            shared_state[sgid] = 3;
             //Ensures steps are done prior to communication
             __syncthreads();
             for (int j = 0; j < NV; j++)
@@ -335,25 +359,27 @@ BridgeY(float *state, int gts)
             }
         }
         __syncthreads();
+        print_sarr(shared_state,testbool);
+        __syncthreads();
         //Necessary communication step
-        if (gts%TSO==0)
-        {
-            for (int j = 0; j < NV; j++)
-            {
-                //Copy latest step
-                shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
-                //Copy TSO Step Down
-                shared_state[sgid+j*SGIDS-STS] = shared_state[sgid+j*SGIDS];
-            }
-        }
-        else
-        {
-            for (int j = 0; j < NV; j++)
-            {
-                //Copy latest step
-                shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
-            }
-        }
+        // if (gts%TSO==0)
+        // {
+        //     for (int j = 0; j < NV; j++)
+        //     {
+        //         //Copy latest step
+        //         shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
+        //         //Copy TSO Step Downprint_sarr(shared_state,testbool);
+        //         shared_state[sgid+j*SGIDS-STS] = shared_state[sgid+j*SGIDS];
+        //     }
+        // }
+        // else
+        // {
+        //     for (int j = 0; j < NV; j++)
+        //     {
+        //         //Copy latest step
+        //         shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
+        //     }
+        // }
         gts += 1;   //Update gts
         __syncthreads(); //Sync threads here to ensure all initial values are copied
         //Update swept bounds
@@ -361,9 +387,7 @@ BridgeY(float *state, int gts)
         uy+=OPS;
         lx+=OPS;
         ux-=OPS;
-
     }
-
 }
 
 __global__ void

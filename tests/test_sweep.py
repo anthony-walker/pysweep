@@ -109,10 +109,14 @@ def test_UpPyramid(GRB):
     #Bridge
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
-    cts = 4
+    cts = 5
 
-    # Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
-    # # First Octahedron test
+    Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+    # First Octahedron test
+    # pm(xarr,cts-1)
+    # print("---------------------------------------")
+    # pm(xarr,cts)
+    # print("---------------------------------------")
     # pm(yarr,cts-1)
     # print("---------------------------------------")
     # pm(yarr,cts)
