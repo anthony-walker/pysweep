@@ -84,7 +84,7 @@ def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,TSO):
             hdf_set[cwt,hr[0],hr[1],hr[2]]=carr[reg[1],reg[2],reg[3]]
             cwt+=1
         wb += 1
-
+    #Data is shifted and TSO steps are kept at the begining
     nte = shared_arr.shape[0]-(MPSS)
     shared_arr[:nte,reg[1],reg[2],reg[3]] = shared_arr[MPSS:,reg[1],reg[2],reg[3]]
     shared_arr[nte:,reg[1],reg[2],reg[3]] = 0

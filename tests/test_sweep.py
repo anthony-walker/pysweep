@@ -96,7 +96,7 @@ def test_UpPyramid(GRB):
     #Getting function
     mods = {True:g_mod_2D,False:c_mod_2D}
     pargs = (mods[GRB],GRB,BS,GRD,CRS,OPS,TSO,ssb)
-    wb = 1
+    wb = 0
     cwt = 1
     UpPyramid(sarr,carr,WR,BDR,up_sets,wb,pargs)
     #Testing Up Pyramid
@@ -110,16 +110,18 @@ def test_UpPyramid(GRB):
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
     cts = 5
-
+    pm(yarr,cts-1)
+    print("---------------------------------------")
+    pm(yarr,cts)
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     # First Octahedron test
     # pm(xarr,cts-1)
     # print("---------------------------------------")
     # pm(xarr,cts)
     # print("---------------------------------------")
-    # pm(yarr,cts-1)
-    # print("---------------------------------------")
-    # pm(yarr,cts)
+    pm(yarr,cts-1)
+    print("---------------------------------------")
+    pm(yarr,cts)
     # pm(sarr,cts)
     # larr = np.copy(sarr[SRR])
     # Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
