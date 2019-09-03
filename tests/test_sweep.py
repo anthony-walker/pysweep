@@ -10,6 +10,9 @@ from analytical import *
 from equations import *
 from sweep import *
 import numpy as np
+#Cuda imports
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 
 def pm(arr,i):
     for item in arr[i,0,:,:]:
@@ -107,69 +110,121 @@ def test_UpPyramid(GRB):
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
     cts = 4
-    # pm(sarr,cts)
-    # print("----------------------------------------")
-    # for set in bridge_sets[1]:
-    #     print(set)
 
-    Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
-    #First Octahedron test
-    pm(yarr,cts-1)
-    print("---------------------------------------")
-    pm(yarr,cts)
+    # Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+    # # First Octahedron test
+    # pm(yarr,cts-1)
+    # print("---------------------------------------")
+    # pm(yarr,cts)
     # pm(sarr,cts)
     # larr = np.copy(sarr[SRR])
     # Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
+    # for i in range(v):
+    #     for ts, set in enumerate(oct_sets,start=1):
+    #         tsum = 0
+    #         for idx in set:
+    #             tsum+=larr[ts,i,idx[0],idx[1]]
+    #         assert 2*tsum==len(set)
+    # # Shifting Data Step
+    # edge_shift(sarr,ERS,1)
+    # cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    # boundary_update(sarr,OPS,SPLITX,SPLITY)
+    # #Reverse bridge
+    # xarr = np.copy(sarr[YR]) #Regions are purposely switched here
+    # yarr = np.copy(sarr[XR])
+    # Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
+    # #Next octahedron
+    # larr = np.copy(sarr[RR])
+    # Octahedron(sarr,larr,WR,BDR,oct_sets,wb+1,pargs)
+    # for i in range(v):
+    #     for ts, set in enumerate(oct_sets,start=1):
+    #         tsum = 0
+    #         for idx in set:
+    #             tsum+=larr[ts,i,idx[0],idx[1]]
+    #         assert 2*tsum==len(set)
+    # cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    # boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+    # #Next bridge
+    # xarr = np.copy(sarr[XR])
+    # yarr = np.copy(sarr[YR])
+    # Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+    # #Down Pyramid
+    # larr = np.copy(sarr[SRR])
+    # DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
+    # edge_shift(sarr,ERS,1)
+    # for i in range(v):
+    #     for ts, set in enumerate(down_sets,start=1):
+    #         tsum = 0
+    #         for idx in set:
+    #             tsum+=larr[ts,i,idx[0],idx[1]]
+    #         assert 2*tsum==len(set)
+    # hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    # boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
 
-#     for i in range(v):
-#         for ts, set in enumerate(oct_sets,start=1):
-#             tsum = 0
-#             for idx in set:
-#                 tsum+=larr[ts,i,idx[0],idx[1]]
-#             assert 2*tsum==len(set)
-#     # Shifting Data Step
-#     edge_shift(sarr,ERS,1)
-#     cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-#     boundary_update(sarr,OPS,SPLITX,SPLITY)
-#     #Reverse bridge
-#     xarr = np.copy(sarr[YR]) #Regions are purposely switched here
-#     yarr = np.copy(sarr[XR])
-#     Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
-#     #Next octahedron
-#     larr = np.copy(sarr[RR])
-#     Octahedron(sarr,larr,WR,BDR,oct_sets,wb+1,pargs)
-#     for i in range(v):
-#         for ts, set in enumerate(oct_sets,start=1):
-#             tsum = 0
-#             for idx in set:
-#                 tsum+=larr[ts,i,idx[0],idx[1]]
-#             assert 2*tsum==len(set)
-#     cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-#     boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-#     #Next bridge
-#     xarr = np.copy(sarr[XR])
-#     yarr = np.copy(sarr[YR])
-#     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
-#     #Down Pyramid
-#     larr = np.copy(sarr[SRR])
-#     DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
-#     edge_shift(sarr,ERS,1)
-#     for i in range(v):
-#         for ts, set in enumerate(down_sets,start=1):
-#             tsum = 0
-#             for idx in set:
-#                 tsum+=larr[ts,i,idx[0],idx[1]]
-#             assert 2*tsum==len(set)
-#     hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-#     boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-#
-#
-#
-# def test_pst():
-#     estr = "mpiexec -n 4 python ./src/pst.py stest "
-#     estr += "-b 10 -o 1 --tso 2 -a 1 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
-#     estr += "--hdf5 \"./results/stest\" -nx 40 -ny 40"
-#     os.system(estr)
+
+
+def test_pst():
+    estr = "mpiexec -n 4 python ./src/pst.py stest "
+    estr += "-b 10 -o 1 --tso 2 -a 1 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
+    estr += "--hdf5 \"./results/stest\" -nx 40 -ny 40"
+    os.system(estr)
 
 # test_pst()
+# test_UpPyramid(True)
+
+def test_gpu_ec():
+    """Use this function to test the gpu edge communication"""
+    t0 = 0
+    tf = 1
+    dt = 0.01
+    dx = 0.1
+    dy = 0.1
+    gamma = 1.4
+    x = 10
+    v = 4
+    ts = 20
+    BS = (x,x,1)
+    OPS = 1
+    TSO = 2
+    GRD = (2,2)
+    dType = np.float32
+    up_sets = create_up_sets(BS,OPS)
+    down_sets = create_down_sets(BS,OPS)
+    oct_sets = down_sets+up_sets[1:]
+    MPSS = len(up_sets)
+    MOSS = len(oct_sets)
+    SPLITX = int(BS[0]/2)   #Split computation shift - add OPS
+    SPLITY = int(BS[1]/2)   #Split computation shift
+    #Shared arr
+    tarr = np.zeros((2,v,2*x+2*OPS,2*x+2*OPS),dtype=dType)
+    ssb = np.zeros((2,v,2*x+2*OPS,2*x+2*OPS),dtype=dType).nbytes
+    patt = np.zeros((2*x+2*OPS+1),dtype=dType)
+    for i in range(1,2*x+2*OPS+1,2):
+        patt[i] = 1.0
+    sb = True
+    for i in range(4):
+        for j in range(0,2*x+2*OPS,1):
+            if sb:
+                tarr[TSO-1,i,j,:] = patt[0:-1]
+            else:
+                tarr[TSO-1,i,j,:] = patt[1:]
+            sb = not sb
+    tarr [TSO-1,:,:OPS,:] = 2
+    tarr [TSO-1,:,:,:OPS] = 3
+    tarr [TSO-1,:,x+OPS:x+2*OPS,:] = 4
+    tarr [TSO-1,:,:,x+OPS:x+2*OPS] = 5
+    #Source mods
+    g_mod_2D = SourceModule(source_code_read("./tests/tests.h"))
+    gpu_fcn = g_mod_2D.get_function("tec")
+    #Swept globals
+    NV = tarr.shape[1]
+    SGIDS = (BS[0]+2*OPS)*(BS[1]+2*OPS)
+    STS = SGIDS*NV #Shared time shift
+    VARS =  tarr.shape[2]*tarr.shape[3]
+    TIMES = VARS*NV
+    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+    swept_constant_copy(g_mod_2D,const_dict)
+    gpu_fcn(cuda.InOut(tarr),grid=GRD, block=BS,shared=ssb)
+
+
 test_UpPyramid(True)
