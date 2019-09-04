@@ -109,7 +109,7 @@ def test_UpPyramid(GRB):
     #Bridge
     xarr = np.copy(sarr[XR])
     yarr = np.copy(sarr[YR])
-    cts = 4
+    cts = 5
     # pm(xarr,cts)
     # print("---------------------------------------")
     # pm(yarr,cts)
@@ -123,7 +123,7 @@ def test_UpPyramid(GRB):
     # pm(xarr,cts)
     # print("---------------------------------------")
     # pm(yarr,cts)
-    # pm(sarr,cts)
+    pm(sarr,cts)
     # larr = np.copy(sarr[SRR])
     # Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
     # for i in range(v):
