@@ -80,7 +80,7 @@ def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,TSO):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
     for carr in shared_arr[TSO:MPSS+TSO]:
-        if wb%TSO==0:
+        if (wb+1)%TSO==0:
             hdf_set[cwt,hr[0],hr[1],hr[2]]=carr[reg[1],reg[2],reg[3]]
             cwt+=1
         wb += 1

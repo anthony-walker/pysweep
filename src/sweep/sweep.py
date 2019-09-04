@@ -147,7 +147,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)  #Number of time steps
     #Global swept step
-    GST = ZERO #This is a variable to track which swept step the simulation is on
     MGST = int(np.ceil(TSO*(time_steps+1)/(2*MOSS)))    #THIS ASSUMES THAT time_steps > MOSS
     time_steps = int(np.ceil((MGST*2*MOSS+1)/TSO)) #Updating time steps
 
