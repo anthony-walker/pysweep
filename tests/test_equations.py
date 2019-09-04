@@ -87,7 +87,6 @@ def test_RK2_CPU():
     for i in range(2,5):
         for j in range(2,5):
             num_test[0,:,i,j]=rightBC[:]
-
     Qx = np.zeros((5,3))
     Qx[:,0] = num_test[0,0,:,2]
     Qx[:,1] = num_test[0,1,:,2]
@@ -101,14 +100,14 @@ def test_RK2_CPU():
     iidx = (2,2),
     #Testing RK2 step 1
     f1d = source_mod_1D.RK2S1(Qx,P)
-    num_test = source_mod_2D.step(num_test,iidx,0,1)
+    num_test = source_mod_2D.step(num_test,iidx,0,0)
     #Checking velocities in each direction as they should be the same
     assert np.isclose(f1d[2,1], num_test[1,1,2,2])
     assert np.isclose(f1d[2,1], num_test[1,2,2,2])
     f1d = source_mod_1D.RK2S2(Qx,Qx)
     num_test[1,:,:,:] = num_test[0,:,:,:]
     #Test second step
-    num_test = source_mod_2D.step(num_test,iidx,1,2)
+    num_test = source_mod_2D.step(num_test,iidx,1,1)
     assert np.isclose(f1d[2,1], num_test[2,1,2,2])
     assert np.isclose(f1d[2,1], num_test[2,2,2,2])
 
@@ -151,7 +150,7 @@ def test_RK2_GPU():
     for i in range(int(x/2),x):
         for j in range(x):
             num_test[0,:,i,j]=rightBC[:]
-    gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(1),block=bs)
+    gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(0),block=bs)
     #1D stuff
     leftBC1 = (1.0,0,2.5)
     rightBC1 = (0.125,0,.25)
@@ -174,81 +173,5 @@ def test_RK2_GPU():
     for i in range(x):
         for j in range(int(x/2),x):
             num_test[0,:,i,j]=rightBC[:]
-    gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(1),block=bs)
+    gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(0),block=bs)
     assert np.isclose(f1d[2,1], num_test[0,2,4,4])
-
-
-def test_euler_vortex():
-    """Use this function to test the python version of the euler code."""
-    #Properties
-    gamma = 1.4
-    #Analytical properties
-    cvics = vics()
-    cvics.Shu(gamma)
-    initial_args = cvics.get_args()
-    X = cvics.L
-    Y = cvics.L
-    #Dimensions and steps
-    npx = 96
-    npy = 96
-    dx = (2*X)/npx
-    dy = (2*Y)/npy
-    #Time testing arguments
-    t0 = 0
-    t_b = 0.1
-    dt = 0.01
-    targs = (t0,t_b,dt)
-    time_steps = int((t_b-t0)/dt)   #number of time steps
-    #Analytical Array
-    analyt_vortex = vortex(cvics,X,Y,npx,npy,times=np.linspace(t0,t_b,time_steps+1))
-    flux_vortex = convert_to_flux(analyt_vortex[:,:,:,:],gamma)
-    #Numerical Array
-    avs = analyt_vortex.shape
-    ops = 2
-    #Create flux vortex array
-    num_vortex = np.zeros((time_steps+1,avs[1],avs[2]+2*ops,avs[3]+2*ops))
-    num_vortex[0,:,ops:-ops,ops:-ops] = flux_vortex[0,:,:,:]
-    num_vortex[0,:,:ops,:ops] = num_vortex[0,:,-2*ops:-ops,-2*ops:-ops]
-    num_vortex[0,:,-ops:,-ops:] = num_vortex[0,:,ops:2*ops,ops:2*ops]
-    #Testing
-    #Setting globals
-    source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
-    #Get source module
-    source_mod = build_cpu_source("./src/equations/euler.py")
-    #Create iidx sets
-    iidx = tuple()
-    for i in range(npx):
-        for j in range(npy):
-            iidx+=(i+ops,j+ops),
-
-    # Solve sets
-    for ts in range(time_steps):
-        num_vortex = step(num_vortex,iidx,ts)
-        #Periodic bc
-        num_vortex[ts+1,:,:ops,:ops] = num_vortex[ts+1,:,-2*ops:-ops,-2*ops:-ops]
-        num_vortex[ts+1,:,-ops:,-ops:] = num_vortex[ts+1,:,ops:2*ops,ops:2*ops]
-
-    # for ts in range:
-    # #Testing if close
-    for i in range(0,time_steps+1):
-        # res = np.isclose(flux_vortex[i,:,:,:],num_vortex[i,:,ops:-ops,ops:-ops],rtol=1.e-4,atol=1.e-4)
-        print(flux_vortex[i,0,30,30],num_vortex[i,0,30,30])
-
-        # assert res.all() == True
-
-    xpts = np.linspace(-X,X,npx,dtype=np.float64)
-    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
-    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-
-    fig, ax =plt.subplots()
-    ax.set_ylim(-Y, Y)
-    ax.set_xlim(-X, X)
-    ax.set_title("Test")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax)
-    animate = lambda i: ax.contourf(xgrid,ygrid,num_vortex[i,0,ops:-ops,ops:-ops],levels=20,cmap=cm.inferno)
-    frames = len(tuple(range(time_steps+1)))
-    anim = animation.FuncAnimation(fig,animate,frames)
-    anim.save("test.gif",writer="imagemagick")

@@ -38,45 +38,38 @@ def test_reg_edge_comm():
     assert (tarr[0,0,:,0:ops]==0).all()
     assert (tarr[0,0,0:ops,:]==0).all()
 
-def test_decomp():
-    """Use this function to test decomp"""
-    #Properties
-    gamma = 1.4
-    #Analytical properties
-    cvics = vics()
-    cvics.Shu(gamma)
-    initial_args = cvics.get_args()
-    X = cvics.L
-    Y = cvics.L
-    #Dimensions and steps
-    npx = 64
-    npy = 64
-    dx = X/npx
-    dy = Y/npy
-    #Time testing arguments
-    t0 = 0
-    t_b = 1
-    dt = 0.01
-    targs = (t0,t_b,dt)
-    # Creating initial vortex from analytical code
-    initial_vortex = vortex(cvics,X,Y,npx,npy,times=(0,1))
-    flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
-    tarr = np.ones(flux_vortex.shape)
-    #GPU Arguments
-    gpu_source = "/home/walkanth/pysweep/src/equations/euler.h"
-    cpu_source = "/home/walkanth/pysweep/src/equations/euler.py"
-    ops = 2 #number of atomic operations
-    tso = 2 #RK2
-    #File args
-    decomp_name = "./results/decomp"
-    #Changing arguments
-    block_size = 16
-    affinity = 1
-    gargs = (t0,t_b,dt,dx,dy,gamma)
-    swargs = (tso,ops,block_size,affinity,gpu_source,cpu_source)
-    ct = decomp(flux_vortex,gargs,swargs,filename="./tests/test_results/decomp")
-    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
+def test_decomp_vortex():
+    pass
+    # estr = "mpiexec -n 4 python ./src/pst.py dtest "
+    # estr += "-b 10 -o 1 --tso 2 -a 1 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
+    # estr += "--hdf5 \"./dtest\" -nx 40 -ny 40"
+    # os.system(estr)
+    # test_file = "./dtest.hdf5"
+    # hdf5_file = h5py.File(test_file, 'r')
+    # hdf5_data_set = hdf5_file['data']
+    # for element in hdf5_data_set[1:10]: #Last couple steps arent hit
+    #     assert sum(element[0,:,:]-hdf5_data_set[0,0,:,:]).all() == 0
+    # hdf5_file.close()
+    # os.system("rm "+test_file)
 
 
-
-test_decomp()
+def test_decomp_pst():
+    """Test both affinity of 1 and 0"""
+    GRB = True
+    for i in range(2):
+        GRB = not GRB
+        if GRB:
+            aff = 1
+        else:
+            aff = 0
+        estr = "mpiexec -n 4 python ./src/pst.py dtest "
+        estr += "-b 10 -o 1 --tso 2 -a " +str(aff)+ " -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
+        estr += "--hdf5 \"./dtest\" -nx 40 -ny 40"
+        os.system(estr)
+        test_file = "./dtest.hdf5"
+        hdf5_file = h5py.File(test_file, 'r')
+        hdf5_data_set = hdf5_file['data']
+        for element in hdf5_data_set[1:10]: #Last couple steps arent hit
+            assert sum(element[0,:,:]-hdf5_data_set[0,0,:,:]).all() == 0
+        hdf5_file.close()
+        os.system("rm "+test_file)

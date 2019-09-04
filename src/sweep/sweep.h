@@ -240,7 +240,6 @@ UpPyramid(float *state, int gts)
         __syncthreads(); //Sync threads here to ensure all initial values are copied
     }
 }
-
 /*
     Use this function to create and return the GPU X-Bridge
 */

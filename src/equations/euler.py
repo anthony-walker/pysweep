@@ -23,8 +23,8 @@ def step(state,iidx,ts,gts):
     vs = slice(0,state.shape[1],1)
     for ct, bidx in enumerate(iidx,start=ts):
         idx,idy = bidx
-        dfdx,dfdy = dfdxy(state,cidx)
-        if (gts+1)%TSO=0:   #Corrector step
+        dfdx,dfdy = dfdxy(state,(ct,vs,idx,idy))
+        if (gts+1)%2==0:   #Corrector step
             state[ct+1,vs,idx,idy] = state[ct-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
         else: #Predictor step
             state[ct+1,vs,idx,idy] = state[ct,vs,idx,idy]+half*dtdx*dfdx+half*dtdy*dfdy

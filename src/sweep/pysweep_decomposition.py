@@ -75,7 +75,6 @@ def edge_shift(shared_arr,eregions, dir):
         for bt,bv,x1,y1,x2,y2 in eregions:  #Front to Back
             shared_arr[bt,bv,x2,y2] = shared_arr[bt,bv,x1,y1]
 
-
 def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,TSO):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""

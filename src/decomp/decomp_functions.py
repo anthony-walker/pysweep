@@ -202,17 +202,13 @@ def decomp_constant_copy(source_mod,const_dict):
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
 
-def create_blocks_list(arr_shape,block_size,ops):
+def create_decomp_sets(block,ops):
     """Use this function to create a list of blocks from the array."""
-    bsx = int((arr_shape[2]-2*ops)/block_size[0])
-    bsy =  int((arr_shape[3]-2*ops)/block_size[1])
-    slices = []
-    c_slice = (slice(0,arr_shape[0],1),slice(0,arr_shape[1],1),)
-    for i in range(ops+block_size[0],arr_shape[2],block_size[0]):
-        for j in range(ops+block_size[1],arr_shape[3],block_size[1]):
-            t_slice = c_slice+(slice(i-block_size[0]-ops,i+ops,1),slice(j-block_size[1]-ops,j+ops,1))
-            slices.append(t_slice)
-    return slices
+    iidx = tuple(np.ndindex((block[2],block[3])))
+    iidx = iidx[block[3]*ops:-block[3]*ops]
+    iidx = [(x,y) for x,y in iidx if y >= ops and y < block[3]-ops]
+    return iidx;
+
 
 def rebuild_blocks(arr,blocks,local_regions,ops):
     """Use this funciton to rebuild the blocks."""
@@ -226,7 +222,7 @@ def rebuild_blocks(arr,blocks,local_regions,ops):
     else:
         return blocks[0]
 
-def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_regions,shared_arr,ops,gts,tso,ssb):
+def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,decomp_set,shared_arr,ops,gts,tso,ssb):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -240,25 +236,14 @@ def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,local_cpu_
         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=grid_size, block=block_size,shared=ssb)
         cuda.Context.synchronize()
     else:   #CPUs do this
-        blocks = []
-        for local_region in local_cpu_regions:
-            block = np.zeros(arr[local_region].shape)
-            block += arr[local_region]
-            blocks.append(block)
-        cpu_fcn = decomp_lambda((CPU_Decomp,source_mod,ops,gts))
-        blocks = list(map(cpu_fcn,blocks))
-        arr = rebuild_blocks(arr,blocks,local_cpu_regions,ops)
+        arr = CPU_Decomp((arr,source_mod,decomp_set,ops,gts))
     #Writing to shared array
     shared_arr[1,region[1],region[2],region[3]] = arr[2,:,ops:-ops,ops:-ops]
 
 #--------------------------------CPU Specific Swept Functions------------------
 def CPU_Decomp(args):
     """Use this function to build the Up Pyramid."""
-    block,source_mod,ops,gts = args
-    #Removing elements for swept step
-    iidx = tuple(np.ndindex((block.shape[2],block.shape[3])))
-    iidx = iidx[block.shape[3]*ops:-block.shape[3]*ops]
-    iidx = [(x,y) for x,y in iidx if y >= ops and y < block.shape[3]-ops]
+    block,source_mod,iidx,ops,gts = args
     ts = 1
     block = source_mod.step(block,iidx,ts,gts)
     return block

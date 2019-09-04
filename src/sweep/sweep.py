@@ -244,7 +244,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
     hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
     cwt = 1 #Current write time
-    wb = 1  #Counter for writing on the appropriate step
+    wb = 0  #Counter for writing on the appropriate step
     comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
     pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO,ssb) #Passed arguments to the swept functions

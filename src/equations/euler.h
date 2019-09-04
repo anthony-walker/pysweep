@@ -246,18 +246,18 @@ void step(float *shared_state, int idx, int gts)
     get_dfdy(dfdy,shared_state,idx);
     get_dfdx(dfdx,shared_state,idx);
     __syncthreads();
-    if (gts%2!=0)
-    {
-        for (int i = 0; i < NVC; i++)
-        {
-            shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+QUARTER*(DTDX*dfdx[i]+DTDY*dfdy[i]);
-        }
-    }
-    else
+    if ((gts+1)%TSO==0) //Corrector step
     {
         for (int i = 0; i < NVC; i++)
         {
             shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS-STS]+HALF*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+        }
+    }
+    else //Predictor step
+    {
+        for (int i = 0; i < NVC; i++)
+        {
+            shared_state[idx+i*SGIDS]=shared_state[idx+i*SGIDS]+QUARTER*(DTDX*dfdx[i]+DTDY*dfdy[i]);
         }
     }
 }

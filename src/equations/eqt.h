@@ -51,6 +51,7 @@ void step(float * shared_state, int idx, int gts)
   {
       for (int i = 0; i < NVC; i++)
       {
+
           tval[i] = (epoint[i]+wpoint[i]+npoint[i]+spoint[i])/4;
           // tval[i]=1+shared_state[idx];
       }
