@@ -7,6 +7,21 @@ from decomp import *
 import argparse
 import numpy as np
 
+
+def AnalyticalVortex(args):
+    """Use this function to create analytical vortex data."""
+    cvics = vics()
+    cvics.Shu(args.gamma)
+    initial_args = cvics.get_args()
+    X = cvics.L
+    Y = cvics.L
+    #Dimensions and steps
+    dx = X/args.nx
+    dy = Y/args.ny
+    #Creating initial vortex from analytical code
+    create_vortex_data(cvics,X,Y,args.nx,args.nx,times=np.arange(args.t0,args.tf,args.dt),filepath="./",filename=args.hdf5)
+
+
 def SweptVortex(args):
     #Analytical properties
     cvics = vics()
@@ -100,7 +115,7 @@ def DecompTestPattern(args):
 
 parser = argparse.ArgumentParser()
 fmap = {'swept' : SweptVortex,
-                'standard' : StandardVortex, "stest":SweptTestPattern, "dtest":DecompTestPattern}
+                'standard' : StandardVortex, "stest":SweptTestPattern, "dtest":DecompTestPattern, "analytical":AnalyticalVortex}
 parser.add_argument('fcn', choices=fmap.keys())
 parser.add_argument("-b","--block",nargs="?",default=8,type=int)
 parser.add_argument("-o","--ops",nargs="?",default=2,type=int)

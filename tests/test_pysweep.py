@@ -177,3 +177,30 @@ def test_sweep_pst():
     for element in hdf5_data_set[1:10]: #Last couple steps arent hit
         assert sum(element[0,:,:]-hdf5_data_set[0,0,:,:]).all() == 0
     os.system("rm "+test_file)
+
+
+def test_sweep_vortex():
+
+    swept_file = "\"./swept\""
+    analyt_file = "\"./analyt\""
+    tf = 5
+    dt = 0.01
+    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
+    pts = " -nx 64 -ny 64 "
+    
+    #Create analytical data
+    astr = "python ./src/pst.py analytical "+time_str
+    astr += "--hdf5 " + analyt_file+pts
+    os.system(astr)
+
+    #Create data using solver
+    estr = "mpiexec -n 8 python ./src/pst.py swept "
+    estr += "-b 16 -o 1 --tso 2 -a 0.75 -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+    estr += "--hdf5 " + swept_file + pts +time_str
+    os.system(estr)
+
+    # hdf5_file = h5py.File(test_file, 'r')
+    # hdf5_data_set = hdf5_file['data']
+    # for element in hdf5_data_set[1:10]: #Last couple steps arent hit
+    #     assert sum(element[0,:,:]-hdf5_data_set[0,0,:,:]).all() == 0
+    # os.system("rm "+test_file)
