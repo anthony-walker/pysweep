@@ -13,8 +13,8 @@ def AnalyticalVortex(args):
     cvics = vics()
     cvics.Shu(args.gamma)
     initial_args = cvics.get_args()
-    X = cvics.L
-    Y = cvics.L
+    X = args.X
+    Y = args.Y
     #Dimensions and steps
     dx = X/args.nx
     dy = Y/args.ny
@@ -27,8 +27,8 @@ def SweptVortex(args):
     cvics = vics()
     cvics.Shu(args.gamma)
     initial_args = cvics.get_args()
-    X = cvics.L
-    Y = cvics.L
+    X = args.X
+    Y = args.Y
     #Dimensions and steps
     dx = X/args.nx
     dy = Y/args.ny
@@ -45,8 +45,8 @@ def StandardVortex(args):
     cvics = vics()
     cvics.Shu(args.gamma)
     initial_args = cvics.get_args()
-    X = cvics.L
-    Y = cvics.L
+    X = args.X
+    Y = args.Y
     #Dimensions and steps
     dx = X/args.nx
     dy = Y/args.ny
@@ -126,6 +126,8 @@ parser.add_argument("-c","--cpu",nargs="?",default="./src/equations/euler.py",ty
 parser.add_argument("--hdf5",nargs="?",default="./results/result",type=str)
 parser.add_argument("-nx",nargs="?",default=32,type=int)
 parser.add_argument("-ny",nargs="?",default=32,type=int)
+parser.add_argument("-X",nargs="?",default=1,type=int)
+parser.add_argument("-Y",nargs="?",default=1,type=int)
 parser.add_argument("--gamma",nargs="?",default=1.4,type=float)
 parser.add_argument("-t0",nargs="?",default=0,type=float)
 parser.add_argument("-tf",nargs="?",default=1,type=float)
