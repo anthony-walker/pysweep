@@ -181,26 +181,34 @@ def test_sweep_pst():
 
 def test_sweep_vortex():
 
-    swept_file = "\"./swept\""
-    analyt_file = "\"./analyt\""
+    swept_file = "\"./data/swept\""
+    analyt_file = "\"./data/analyt\""
     tf = 5
     dt = 0.01
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx 64 -ny 64 "
-    
-    #Create analytical data
-    astr = "python ./src/pst.py analytical "+time_str
-    astr += "--hdf5 " + analyt_file+pts
-    os.system(astr)
 
-    #Create data using solver
-    estr = "mpiexec -n 8 python ./src/pst.py swept "
-    estr += "-b 16 -o 1 --tso 2 -a 0.75 -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
-    estr += "--hdf5 " + swept_file + pts +time_str
-    os.system(estr)
+    if not os.path.isfile("./tests/data/analyt0.hdf5"):
+        #Create analytical data
+        astr = "python ./src/pst.py analytical "+time_str
+        astr += "--hdf5 " + analyt_file+pts
+        os.system(astr)
 
-    # hdf5_file = h5py.File(test_file, 'r')
-    # hdf5_data_set = hdf5_file['data']
+    if not os.path.isfile("./tests/data/swept.hdf5"):
+        #Create data using solver
+        estr = "mpiexec -n 8 python ./src/pst.py swept "
+        estr += "-b 16 -o 2 --tso 2 -a 0.75 -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr += "--hdf5 " + swept_file + pts +time_str
+        os.system(estr)
+
+    #Opening the data files
+    swept_hdf5 = h5py.File(swept_file, 'r')
+    swept_data = swept_hdf5['data']
+    analyt_hdf5 = h5py.File(analyt_file, 'r')
+    analyt_data = analyt_hdf5['data']
+    print(swept_data[10,0,10:20,10:20]-analyt_data[10,0,10:20,10:20])
     # for element in hdf5_data_set[1:10]: #Last couple steps arent hit
     #     assert sum(element[0,:,:]-hdf5_data_set[0,0,:,:]).all() == 0
-    # os.system("rm "+test_file)
+    #Closing files
+    swept_hdf5.close()
+    analyt_hdf5.close()
