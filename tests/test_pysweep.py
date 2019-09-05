@@ -178,7 +178,7 @@ def test_sweep(GRB = True):
     gamma = 1.4
     x = 10
     v = 4
-    ts = 20
+    ts = 30
     BS = (x,x,1)
     OPS = 2
     TSO = 2
@@ -186,7 +186,7 @@ def test_sweep(GRB = True):
     dType = np.float32
     up_sets = create_up_sets(BS,OPS)
     down_sets = create_down_sets(BS,OPS)
-    oct_sets = down_sets+up_sets[1:]
+    oct_sets = down_sets+up_sets
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
     SPLITX = int(BS[0]/2)   #Split computation shift - add OPS
@@ -243,9 +243,27 @@ def test_sweep(GRB = True):
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     # First Octahedron test
     larr = np.copy(sarr[SRR])
+
+    # for sset in oct_sets:
+    #     maxx = 0
+    #     maxy = 0
+    #     minx = 1000
+    #     miny = 1000
+    #     for x,y in sset:
+    #         if x > maxx:
+    #             maxx = x
+    #         if y > maxy:
+    #             maxy = y
+    #         if x < minx:
+    #             minx = x
+    #         if y < miny:
+    #             miny = y
+    #     print(minx,miny)
+    #     # print(maxx,maxy)
+
     # pm(sarr,4)
-    print(MPSS)
-    for GST in range(1,4):
+    # print(MPSS)
+    for GST in range(1,5):
 
         Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
         print(sarr[0:,0,10,10])
@@ -281,12 +299,13 @@ def test_sweep(GRB = True):
 
     DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
     edge_shift(sarr,ERS,1)
-    # for i in range(TSO,MPSS+TSO-1):
-    #     for j in range(NV):
-    #         assert (sarr[i,j,SWR[2],SWR[3]]-sarr[i-1,j,SWR[2],SWR[3]]==1).all()
-    # cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-    # hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-    # boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+    for i in range(TSO,MPSS+TSO-1):
+        for j in range(NV):
+            pass
+            # assert (sarr[i,j,SWR[2],SWR[3]]-sarr[i-1,j,SWR[2],SWR[3]]==1).all()
+    cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
 
     #Testing Writing
     # for element in hdf5_data_set[1:-3]: #Last couple steps arent hit

@@ -140,7 +140,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     # SPLITY = SPLITY if SPLITY%2==0 else SPLITY-1
     up_sets = create_up_sets(BS,OPS)
     down_sets = create_down_sets(BS,OPS)
-    oct_sets = down_sets+up_sets[1:]
+    oct_sets = down_sets+up_sets
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
     bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
