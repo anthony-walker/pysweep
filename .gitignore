@@ -3,6 +3,7 @@ former/
 *.pyc
 *__pycache__/
 *.m
+*.hdf5
 vcluster
 testfile.py
 sources/

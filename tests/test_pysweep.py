@@ -181,8 +181,8 @@ def test_sweep_pst():
 
 def test_sweep_vortex():
 
-    swept_file = "\"./data/swept\""
-    analyt_file = "\"./data/analyt\""
+    swept_file = "\"./tests/data/swept\""
+    analyt_file = "\"./tests/data/analyt\""
     tf = 5
     dt = 0.01
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
