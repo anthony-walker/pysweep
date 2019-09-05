@@ -147,13 +147,13 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     float cpoint[NVC];
     getPoint(cpoint,shared_state,idx);
     float epoint[NVC];
-    getPoint(epoint,shared_state,idx+blockDim.y);
+    getPoint(epoint,shared_state,idx+(2*OPS+blockDim.y));
     float wpoint[NVC];
-    getPoint(wpoint,shared_state,idx-blockDim.y);
+    getPoint(wpoint,shared_state,idx-(2*OPS+blockDim.y));
     float eepoint[NVC];
-    getPoint(eepoint,shared_state,idx+2*blockDim.y);
+    getPoint(eepoint,shared_state,idx+2*(2*OPS+blockDim.y));
     float wwpoint[NVC];
-    getPoint(wwpoint,shared_state,idx-2*blockDim.y);
+    getPoint(wwpoint,shared_state,idx-2*(2*OPS+blockDim.y));
     float Pr[3]={0};
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};

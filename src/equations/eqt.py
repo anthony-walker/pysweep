@@ -21,11 +21,15 @@ def step(state,iidx,ts,gts):
         widx = (ts,vSlice,idx[0]-1,idx[1])
         nidx = (ts,vSlice,idx[0],idx[1]+1)
         sidx = (ts,vSlice,idx[0],idx[1]-1)
+        eeidx = (ts,vSlice,idx[0]+2,idx[1])
+        wwidx = (ts,vSlice,idx[0]-2,idx[1])
+        nnidx = (ts,vSlice,idx[0],idx[1]+2)
+        ssidx = (ts,vSlice,idx[0],idx[1]-2)
         pidx = (ts-1,vSlice)+idx  #next step index
         if gts%2!=0:
-            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4
+            state[ntidx] = (state[pidx])+2
         else:
-            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4
+            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx]+state[nnidx]+state[ssidx]+state[eeidx]+state[wwidx])/8+1
     return state
 
 def set_globals(gpu,source_mod,*args):

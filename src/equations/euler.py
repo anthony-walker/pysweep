@@ -21,13 +21,12 @@ def step(state,iidx,ts,gts):
     """
     half = 0.5
     vs = slice(0,state.shape[1],1)
-    for ct, bidx in enumerate(iidx,start=ts):
-        idx,idy = bidx
-        dfdx,dfdy = dfdxy(state,(ct,vs,idx,idy))
+    for idx,idy in iidx:
+        dfdx,dfdy = dfdxy(state,(ts,vs,idx,idy))
         if (gts+1)%2==0:   #Corrector step
-            state[ct+1,vs,idx,idy] = state[ct-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
+            state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
         else: #Predictor step
-            state[ct+1,vs,idx,idy] = state[ct,vs,idx,idy]+half*dtdx*dfdx+half*dtdy*dfdy
+            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*dtdx*dfdx+half*dtdy*dfdy
     return state
 
 def set_globals(gpu,source_mod,*args):

@@ -88,11 +88,11 @@ void print_sarr(float * shared_state,bool test_bool,int smod)
     if (test_bool)
     {
       printf("%s\n", "---------------------------------------");
-        for (int i = 0; i < blockDim.x; i++)
+        for (int i = 0; i < blockDim.x+2*OPS; i++)
         {   printf("%s","[" );
-            for (int j = 0; j < blockDim.y; j++)
+            for (int j = 0; j < blockDim.y+2*OPS; j++)
             {
-                id = sgid+i*(bdx+OPS)+j;
+                id = sgid+(i-OPS)*(bdx+OPS)+j-OPS;
                 printf("%0.1f, ",shared_state[id],id);
             }
             printf("%s\n","]" );
@@ -199,7 +199,6 @@ UpPyramid(float *state, int gts)
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
     int gid = get_gid()+(TSO-ONE)*TIMES; //global index
-
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ly = OPS; // Lower y swept bound
@@ -213,11 +212,13 @@ UpPyramid(float *state, int gts)
     //Swept loop
     for (int k = 0; k < MPSS; k++)
     {
+        // print_sarr(shared_state,test_bool,ONE);
         // Solving step function
         step(shared_state,sgid,gts);
         //Putting sweep values into next time step
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
+            // printf("%d,%d\n",tidx,tidy );
             for (int j = 0; j < NV; j++)
             {
                 state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
@@ -303,6 +304,7 @@ BridgeX(float *state, int gts)
 /*
     Use this function to create and return the GPU X-Bridge
 */
+
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 BridgeY(float *state, int gts)
@@ -321,6 +323,7 @@ BridgeY(float *state, int gts)
     int ly = blockDim.y/2; //Lower x swept bound
     int ux = lx+blockDim.x-2*OPS; //upper y
     int uy = ly+2*OPS; //upper x
+    // bool test_bool = threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x==0 && blockIdx.y==0;
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
@@ -429,7 +432,6 @@ Octahedron(float *state, int gts)
     ux = blockDim.x+OPS; //upper x
     uy = blockDim.y+OPS; //upper y
     //Communicating edge values to shared array
-    // edge_comm(shared_state, state,MDSS+ONE,ONE);
     shared_state_fill(shared_state,state,ONE,MDSS);
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     for (int k = MDSS; k < MOSS; k++)
