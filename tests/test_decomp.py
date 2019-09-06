@@ -10,8 +10,9 @@ from analytical import *
 from equations import *
 from decomp import *
 import numpy as np
+sys.path.insert(1,cwd+"/notipy")
+from notipy import NotiPy
 
-from notipy.notipy import NotiPy
 sm = "Hi,\nYour function run is complete.\n"
 notifier = NotiPy(None,tuple(),sm,"asw42695@gmail.com",timeout=None)
 
@@ -165,7 +166,7 @@ def test_decomp_vortex(args=None):
     analyt_hdf5 = h5py.File(afp, 'r')
     data = decomp_hdf5['data'][:,0,:,:]
     ndata = np.zeros((int(tf/dt),data.shape[1],data.shape[2]))
-    for i in range(1,int(tf/dt)+1,5):
+    for i in range(0,int(tf/dt),5):
         ndata[i,:,:] = data[i,:,:]
     time = np.arange(0,tf,dt)[:len(data)]
 
@@ -173,7 +174,6 @@ def test_decomp_vortex(args=None):
     xpts = np.linspace(-X,X,npx,dtype=np.float64)
     ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-
     fig, ax =plt.subplots()
     ax.set_ylim(-Y, Y)
     ax.set_xlim(-X, X)
@@ -182,12 +182,12 @@ def test_decomp_vortex(args=None):
     ax.set_ylabel("Y")
 
     fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
-    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
+    animate = lambda i: ax.contourf(xgrid,ygrid,ndata[i,:,:],levels=10,cmap=cm.inferno)
 
     if isinstance(time,Iterable):
         frames = int(tf/dt/5)
-        frames = len(time)
-        anim = animation.FuncAnimation(fig,animate,frames,interval=20)
+        # frames = len(time)
+        anim = animation.FuncAnimation(fig,animate,frames)
         anim.save(savepath+".gif",writer="imagemagick")
     else:
         animate(time)
