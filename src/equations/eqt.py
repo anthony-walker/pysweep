@@ -14,18 +14,18 @@ def step(state,iidx,ts,gts):
     """
     half = 0.5
     vSlice = slice(0,state.shape[1],1)
-    for idx in iidx:
-        ntidx = (ts+1,vSlice,idx[0],idx[1])  #next step index
-        cidx = (ts,vSlice)+idx
-        eidx = (ts,vSlice,idx[0]+1,idx[1])
-        widx = (ts,vSlice,idx[0]-1,idx[1])
-        nidx = (ts,vSlice,idx[0],idx[1]+1)
-        sidx = (ts,vSlice,idx[0],idx[1]-1)
-        eeidx = (ts,vSlice,idx[0]+2,idx[1])
-        wwidx = (ts,vSlice,idx[0]-2,idx[1])
-        nnidx = (ts,vSlice,idx[0],idx[1]+2)
-        ssidx = (ts,vSlice,idx[0],idx[1]-2)
-        pidx = (ts-1,vSlice)+idx  #next step index
+    for idx,idy in iidx:
+        ntidx = (ts+1,vSlice,idx,idy)  #next step index
+        cidx = (ts,vSlice,idx,idy)
+        eidx = (ts,vSlice,idx+1,idy)
+        widx = (ts,vSlice,idx-1,idy)
+        nidx = (ts,vSlice,idx,idy+1)
+        sidx = (ts,vSlice,idx,idy-1)
+        eeidx = (ts,vSlice,idx+2,idy)
+        wwidx = (ts,vSlice,idx-2,idy)
+        nnidx = (ts,vSlice,idx,idy+2)
+        ssidx = (ts,vSlice,idx,idy-2)
+        pidx = (ts-1,vSlice,idx,idy) #next step index
         if gts%2!=0:
             state[ntidx] = (state[pidx])+2
         else:

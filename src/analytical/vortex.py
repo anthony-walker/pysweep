@@ -170,8 +170,6 @@ def vortex_plot(filename,property,time,xs=None,ys=None,levels=10,savepath = "./v
         fig.savefig(savepath+".png")
         plt.show()
 
-# def animate(ax,xgrid,ygrid,data,levels):
-#     ax.contourf(xgrid,ygrid,zgrid,levels=levels,cmap=cm.inferno)
 
 
 class vics(object):

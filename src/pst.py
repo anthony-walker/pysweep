@@ -62,19 +62,8 @@ def SweptTestPattern(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
-    arr = np.zeros((4,args.nx,args.ny))
-    patt = np.zeros((args.ny+1))
+    arr = np.ones((4,args.nx,args.ny))
     printer = pysweep_printer(rank,master_rank)
-    for i in range(1,args.ny+1,2):
-        patt[i] = 1
-    sb = True
-    for i in range(4):
-        for j in range(args.nx):
-            if sb:
-                arr[i,j,:] = patt[0:-1]
-            else:
-                arr[i,j,:] = patt[1:]
-            sb = not sb
     X = 1
     Y = 1
     #Dimensions and steps
@@ -89,19 +78,8 @@ def DecompTestPattern(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
-    arr = np.zeros((4,args.nx,args.ny))
-    patt = np.zeros((args.ny+1))
+    arr = np.ones((4,args.nx,args.ny))
     printer = pysweep_printer(rank,master_rank)
-    for i in range(1,args.ny+1,2):
-        patt[i] = 1
-    sb = True
-    for i in range(4):
-        for j in range(args.nx):
-            if sb:
-                arr[i,j,:] = patt[0:-1]
-            else:
-                arr[i,j,:] = patt[1:]
-            sb = not sb
     X = 1
     Y = 1
     #Dimensions and steps

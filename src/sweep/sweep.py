@@ -139,16 +139,17 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     SPLITY = int(BS[ONE]/TWO)   #Split computation shift
     # SPLITY = SPLITY if SPLITY%2==0 else SPLITY-1
     up_sets = create_up_sets(BS,OPS)
-    down_sets = create_down_sets(BS,OPS)
+    down_sets = create_down_sets(BS,OPS)[:-1]
     oct_sets = down_sets+up_sets[1:]
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
     bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
+    IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)  #Number of time steps
     #Global swept step
     MGST = int(np.ceil(TSO*(time_steps+1)/(2*MOSS)))    #THIS ASSUMES THAT time_steps > MOSS
-    time_steps = int(np.ceil((MGST*2*MOSS+1)/TSO)) #Updating time steps
+    time_steps = int(np.ceil(((MGST-1+IEP)*2*MPSS/TSO))) #Updating time steps
 
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
@@ -250,6 +251,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     UpPyramid(sarr,larr,WR,BDR,up_sets,wb,pargs) #THis modifies shared array
+    wb+=1
     comm.Barrier()
     #-------------------------------FIRST BRIDGE-------------------------------------------#
     #Getting x and y arrays
@@ -257,22 +259,22 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     yarr = np.copy(sarr[YR])
     comm.Barrier()  #Barrier after read
     # Bridge Step
-    Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+    Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
     larr = np.copy(sarr[SRR])
     #Swept Octahedrons and Bridges
-    for GST in range(1,MGST):
+    for GST in range(MGST):
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
-        Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
+        Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
         # Shifting Data Step
         edge_shift(sarr,ERS,ONE)
         comm.Barrier()  #Communication Barrier
         #Writing Step
-        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()  #Write Barrier
         #Updating Boundary Conditions Step
         boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
@@ -283,7 +285,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         yarr = np.copy(sarr[XR])
         comm.Barrier()  #Barrier after read
         #Reverse Bridge Step
-        Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
+        Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
 
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
@@ -291,10 +293,10 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         larr = np.copy(sarr[RR])
         comm.Barrier()
         #Octahedron Step
-        Octahedron(sarr,larr,WR,BDR,oct_sets,wb+1,pargs)
+        Octahedron(sarr,larr,WR,BDR,oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
         #Write step
-        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+        cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()
         #Updating Boundary Conditions Step
         boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
@@ -305,20 +307,20 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         yarr = np.copy(sarr[YR])
         comm.Barrier()  #Barrier after read
         #Bridge Step
-        Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
+        Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()
         #Getting next points for the local array
         larr = np.copy(sarr[SRR])
     #Last read barrier for down pyramid
     comm.Barrier()
     #--------------------------------------DOWN PYRAMID------------------------#
-    DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
+    DownPyramid(sarr,larr,SWR,down_sets,wb,pargs)
     comm.Barrier()
     #Shifting Data Step
     edge_shift(sarr,ERS,ONE)
     comm.Barrier()  #Communication Barrier
     #Writing Step
-    hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
     comm.Barrier()  #Write Barrier
     # CUDA clean up - One of the last steps
     if GRB:
