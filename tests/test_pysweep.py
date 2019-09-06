@@ -186,7 +186,7 @@ def test_sweep(GRB = True):
     dType = np.float32
     up_sets = create_up_sets(BS,OPS)
     down_sets = create_down_sets(BS,OPS)
-    oct_sets = down_sets+up_sets
+    oct_sets = down_sets+up_sets[1:]
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
     SPLITX = int(BS[0]/2)   #Split computation shift - add OPS
@@ -243,7 +243,6 @@ def test_sweep(GRB = True):
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb+1,pargs) #THis modifies shared array
     # First Octahedron test
     larr = np.copy(sarr[SRR])
-
     # for sset in oct_sets:
     #     maxx = 0
     #     maxy = 0
@@ -261,16 +260,18 @@ def test_sweep(GRB = True):
     #     print(minx,miny)
     #     # print(maxx,maxy)
 
+
     # pm(sarr,4)
     # print(MPSS)
-    for GST in range(1,5):
-
+    for GST in range(1,3):
         Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb+1,pargs)
-        print(sarr[0:,0,10,10])
-        for i in range(TSO,MPSS+TSO):
-            for j in range(NV):
-                # assert (sarr[i,j,SWR[2],SWR[3]]-sarr[i-1,j,SWR[2],SWR[3]]==1).all()
-                pass
+        # print(sarr[0:,0,10,10])
+        # for i in range(TSO-1,MPSS+TSO+1):
+        # #     # for j in range(NV):
+        # #     #     assert (sarr[i,j,SWR[2],SWR[3]]-sarr[i-1,j,SWR[2],SWR[3]]==1).all()
+        # #
+        #     pm(sarr[:,:,:,:],i)
+        #     print("1------------------------")
         # Shifting Data Step
         edge_shift(sarr,ERS,1)
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
@@ -279,15 +280,19 @@ def test_sweep(GRB = True):
         xarr = np.copy(sarr[YR]) #Regions are purposely switched here
         yarr = np.copy(sarr[XR])
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb+1,pargs) #THis modifies shared array
+        # boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
         # Next octahedron
-        larr = np.copy(sarr[RR])
 
+        larr = np.copy(sarr[RR])
         Octahedron(sarr,larr,WR,BDR,oct_sets,wb+1,pargs)
-        print(sarr[0:,0,10,10])
-        for i in range(TSO,MPSS+TSO):
-            for j in range(NV):
-                pass
-                # assert (sarr[i,j,WR[2],WR[3]]-sarr[i-1,j,WR[2],WR[3]]==1).all()
+        pm(sarr,4)
+        # print(sarr[0:,0,15,15])
+        # for i in range(TSO-1,MPSS+TSO+1):
+        #     # for j in range(NV):
+        #     #     pass
+        #         # assert (sarr[i,j,WR[2],WR[3]]-sarr[i-1,j,WR[2],WR[3]]==1).all()
+        #     pm(sarr[:,:,:,:],i)
+        #     print("2------------------------")
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
         boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
         #Next bridge
@@ -297,15 +302,15 @@ def test_sweep(GRB = True):
         #Down Pyramid
         larr = np.copy(sarr[SRR])
 
-    DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
-    edge_shift(sarr,ERS,1)
-    for i in range(TSO,MPSS+TSO-1):
-        for j in range(NV):
-            pass
-            # assert (sarr[i,j,SWR[2],SWR[3]]-sarr[i-1,j,SWR[2],SWR[3]]==1).all()
-    cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-    hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
-    boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
+    # DownPyramid(sarr,larr,SWR,down_sets,wb+1,pargs)
+    # edge_shift(sarr,ERS,1)
+    # for i in range(TSO,MPSS+TSO-1):
+    #     for j in range(NV):
+    #         pass
+    #         # assert (sarr[i,j,SWR[2],SWR[3]]-sarr[i-1,j,SWR[2],SWR[3]]==1).all()
+    # cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    # hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO)
+    # boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
 
     #Testing Writing
     # for element in hdf5_data_set[1:-3]: #Last couple steps arent hit
