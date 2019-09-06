@@ -5,6 +5,7 @@ import sys
 import os
 cwd = os.getcwd()
 sys.path.insert(1,cwd+"/src")
+sys.path.insert(1,cwd+"/notipy")
 import matplotlib
 from analytical import *
 from equations import *
@@ -19,6 +20,11 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
+from notipy import NotiPy
+
+sm = "Hi,\nYour function run is complete.\n"
+notifier = NotiPy(None,tuple(),sm,"asw42695@gmail.com",timeout=None)
+
 
 def pm(arr,i):
     for item in arr[i,0,:,:]:
@@ -27,8 +33,9 @@ def pm(arr,i):
             sys.stdout.write("%.1f"%si+", ")
         sys.stdout.write("]\n")
 
-def test_sweep(GRB = True):
+def test_sweep(args=None):
     """Use this function to test the UpPyramid communication."""
+    GRB=True
     for x in (10,16):
         for i in range(2):
             GRB = not GRB
@@ -146,7 +153,7 @@ def test_sweep(GRB = True):
             os.system("rm "+test_file) #Deleting testfile
 
 
-def test_sweep_write():
+def test_sweep_write(args=None):
     estr = "mpiexec -n 8 python ./src/pst.py stest "
     estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
     estr += "--hdf5 \"./stest\" -nx 40 -ny 40"
@@ -159,7 +166,7 @@ def test_sweep_write():
             assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
     os.system("rm "+test_file)
 
-def test_sweep_vortex():
+def test_sweep_vortex(args=None):
     savepath = "./swept_vortex_plot"
     swept_file = "\"./tests/data/swept\""
     sfp = "./tests/data/swept.hdf5"
@@ -221,6 +228,9 @@ def test_sweep_vortex():
     swept_hdf5.close()
     analyt_hdf5.close()
 
-test_sweep_vortex()
-test_sweep_write()
-test_sweep()
+# test_sweep_vortex()
+# test_sweep_write()
+# test_sweep()
+
+notifier.fcn = test_sweep_write
+notifier.run()

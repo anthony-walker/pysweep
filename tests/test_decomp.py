@@ -11,6 +11,11 @@ from equations import *
 from decomp import *
 import numpy as np
 
+from notipy.notipy import NotiPy
+sm = "Hi,\nYour function run is complete.\n"
+notifier = NotiPy(None,tuple(),sm,"asw42695@gmail.com",timeout=None)
+
+
 def pm(arr,i):
     for item in arr[i,0,:,:]:
         sys.stdout.write("[ ")
@@ -18,7 +23,7 @@ def pm(arr,i):
             sys.stdout.write("%.1f"%si+", ")
         sys.stdout.write("]\n")
 
-def test_reg_edge_comm():
+def test_reg_edge_comm(args=None):
     """Use this function to test the communication"""
     t = 3
     v = 2
@@ -46,7 +51,8 @@ def test_reg_edge_comm():
     assert (tarr[0,0,0:ops,:]==0).all()
 
 
-def test_decomp(GRB = True):
+def test_decomp(args=None):
+    GRB=True
     for x in (10,16):
         for i in range(2):
             GRB = not GRB
@@ -115,7 +121,7 @@ def test_decomp(GRB = True):
                     ct+=1
             hdf5_file.close()
 
-def test_decomp_write():
+def test_decomp_write(args=None):
     estr = "mpiexec -n 4 python ./src/pst.py dtest "
     estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
     estr += "--hdf5 \"./dtest\" -nx 40 -ny 40"
@@ -127,7 +133,7 @@ def test_decomp_write():
         assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
     os.system("rm "+test_file)
 
-def test_decomp_vortex():
+def test_decomp_vortex(args=None):
     savepath = "./decomp_vortex_plot"
     swept_file = "\"./tests/data/decomp\""
     sfp = "./tests/data/decomp.hdf5"
@@ -176,7 +182,7 @@ def test_decomp_vortex():
     ax.set_title("Density")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
-    
+
     fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
     animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
 
