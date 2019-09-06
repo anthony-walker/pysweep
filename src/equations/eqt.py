@@ -26,7 +26,7 @@ def step(state,iidx,ts,gts):
         nnidx = (ts,vSlice,idx,idy+2)
         ssidx = (ts,vSlice,idx,idy-2)
         pidx = (ts-1,vSlice,idx,idy) #next step index
-        if gts%2!=0:
+        if (gts+1)%2==0: #Corrector
             state[ntidx] = (state[pidx])+2
         else:
             state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx]+state[nnidx]+state[ssidx]+state[eeidx]+state[wwidx])/8+1

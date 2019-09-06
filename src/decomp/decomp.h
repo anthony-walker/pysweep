@@ -158,12 +158,16 @@ Decomp(float *state, int gts)
     int gid = get_gid()+TIMES; //global index
     bool tb = threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0;
     //Communicating edge values to shared array
-    shared_state_fill(shared_state,state,ZERO,(gts%TSO));
-    shared_state_fill(shared_state,state,ONE,(TSO-ONE));
+    shared_state_fill(shared_state,state,ONE,ONE);
+    for (int i = 0; i < NV; i++)
+    {
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+    }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     // Solving step function
     step(shared_state,sgid,gts);
     // Place values back in original matrix
+    __syncthreads();
     for (int j = 0; j < NV; j++)
     {
     state[gid+j*VARS+TIMES]=shared_state[sgid+j*SGIDS];

@@ -155,11 +155,12 @@ def test_sweep_write():
     hdf5_file = h5py.File(test_file, 'r')
     hdf5_data_set = hdf5_file['data']
     for i in range(1,len(hdf5_data_set[:,0,:,:])):
-        assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
+        if not (hdf5_data_set[i,0,:,:]==0).all():
+            assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
     os.system("rm "+test_file)
 
 def test_sweep_vortex():
-    savepath = "./vortex_plot"
+    savepath = "./swept_vortex_plot"
     swept_file = "\"./tests/data/swept\""
     sfp = "./tests/data/swept.hdf5"
     afp = "./tests/data/analyt0.hdf5"
@@ -221,5 +222,5 @@ def test_sweep_vortex():
     analyt_hdf5.close()
 
 test_sweep_vortex()
-# test_sweep_write()
-# test_sweep()
+test_sweep_write()
+test_sweep()
