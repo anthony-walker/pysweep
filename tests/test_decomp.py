@@ -141,10 +141,8 @@ def test_decomp_vortex(args=None):
     analyt_file = "\"./tests/data/analyt\""
     tf = 5.0
     dt = 0.01
-
     npx=npy= 64
     X=Y= 64/10
-
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)
     pts += " -X "+str(X)+ " -Y "+str(X)
@@ -202,4 +200,5 @@ def test_decomp_vortex(args=None):
 
 # test_decomp()
 # test_decomp_write()
-test_decomp_vortex()
+notifier.fcn = test_decomp_vortex
+notifier.run()
