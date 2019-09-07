@@ -144,6 +144,7 @@ def test_decomp_vortex(args=None):
     dt = 0.01
     npx=npy= 64
     X=Y= 64/10
+    aff = 0
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)
     pts += " -X "+str(X)+ " -Y "+str(X)
@@ -157,13 +158,21 @@ def test_decomp_vortex(args=None):
     if not os.path.isfile(sfp):
         #Create data using solver
         estr = "mpiexec -n 16 python ./src/pst.py standard "
-        estr += "-b 16 -o 2 --tso 2 -a 0 -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr += "-b 16 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-    #Opening the data files
     decomp_hdf5= h5py.File(sfp, 'r')
     analyt_hdf5 = h5py.File(afp, 'r')
+    decomp_data = decomp_hdf5['data']
+    analyt_data = analyt_hdf5['data']
+
+    assert np.isclose(decomp_data,analyt_data).all()
+
+
+def make_vortex_gif(file):
+    #Opening the data files
+    decomp_hdf5= h5py.File(file, 'r')
     data = decomp_hdf5['data'][:,0,:,:]
     ndata = np.zeros((int(tf/dt),data.shape[1],data.shape[2]))
     for i in range(0,int(tf/dt),5):
@@ -183,7 +192,6 @@ def test_decomp_vortex(args=None):
 
     fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
     animate = lambda i: ax.contourf(xgrid,ygrid,ndata[i,:,:],levels=10,cmap=cm.inferno)
-
     if isinstance(time,Iterable):
         frames = int(tf/dt/5)
         # frames = len(time)

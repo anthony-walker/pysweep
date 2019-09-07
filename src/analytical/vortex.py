@@ -80,7 +80,7 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     return state
 
 
-def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex"):
+def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex",fdb=True):
     """Use this function to create vortex data from the vortex funciton.
     Note, this function will create a directory called "vortex#" unless otherwise specified.
     An hdf5 file will be created with the groups pressure, density, x-velocity, and y-velocity.
@@ -102,10 +102,14 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./
         tpath+=str(ctr+1)
         ctr+=1
     file = h5py.File(tpath+".hdf5","w")
-    pressure = file.create_dataset("pressure",(len(times),1,npx,npy))
-    density = file.create_dataset("density",(len(times),1,npx,npy))
-    x_velocity = file.create_dataset("x-velocity",(len(times),1,npx,npy))
-    y_velocity = file.create_dataset("y-velocity",(len(times),1,npx,npy))
+    if not fdb:
+        pressure = file.create_dataset("pressure",(len(times),1,npx,npy))
+        density = file.create_dataset("density",(len(times),1,npx,npy))
+        x_velocity = file.create_dataset("x-velocity",(len(times),1,npx,npy))
+        y_velocity = file.create_dataset("y-velocity",(len(times),1,npx,npy))
+    else:
+        data = file.create_dataset("data",(len(times),4,npx,npy))
+
     cvic_args = [item  if item is not None else 1e-32 for item in cvics.get_args()]
     ic_data = file.create_dataset("ic",np.shape(cvic_args))
     ic_data[:]=cvic_args[:]
@@ -113,13 +117,19 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./
     origin_data[:] = (x0,y0)
     dim_data = file.create_dataset("dimensions",(4,))
     dim_data[:] = (X,Y,npx,npy)
-
     #Creating state data
     state = vortex(cvics,X,Y,npx,npy, times, x0=x0, y0=y0)
-    pressure[:,0,:,:] = state[:,pid,:,:]
-    density[:,0,:,:] = state[:,did,:,:]
-    x_velocity[:,0,:,:] =state[:,uid,:,:]
-    y_velocity[:,0,:,:] =state[:,vid,:,:]
+    if not fdb:
+        pressure[:,0,:,:] = state[:,pid,:,:]
+        density[:,0,:,:] = state[:,did,:,:]
+        x_velocity[:,0,:,:] =state[:,uid,:,:]
+        y_velocity[:,0,:,:] =state[:,vid,:,:]
+    else:
+        flux = convert_to_flux(state,cvics.gamma)
+        data[:,pid,:,:] = flux[:,pid,:,:]
+        data[:,did,:,:] = flux[:,did,:,:]
+        data[:,uid,:,:] =flux[:,uid,:,:]
+        data[:,vid,:,:] =flux[:,vid,:,:]
     return state,args
 
 def convert_to_flux(vortex_data,gamma):
