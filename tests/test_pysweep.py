@@ -172,13 +172,15 @@ def test_sweep_vortex(args=None):
     sfp = "./tests/data/swept.hdf5"
     afp = "./tests/data/analyt0.hdf5"
     analyt_file = "\"./tests/data/analyt\""
-    tf = 5.0
-    dt = 0.01
+    os.system("rm "+sfp)
+    tf = 0.5
+    dt = 0.001
     npx=npy= 64
-    X=Y= 64/10
+    aff = 1
+    X=10
+    Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)
-    pts += " -X "+str(X)+ " -Y "+str(X)
 
     if not os.path.isfile(afp):
         #Create analytical data
@@ -189,7 +191,7 @@ def test_sweep_vortex(args=None):
     if not os.path.isfile(sfp):
         #Create data using solver
         estr = "mpiexec -n 16 python ./src/pst.py swept "
-        estr += "-b 16 -o 2 --tso 2 -a 0 -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr += "-b 16 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
@@ -197,6 +199,7 @@ def test_sweep_vortex(args=None):
     swept_hdf5 = h5py.File(sfp, 'r')
     analyt_hdf5 = h5py.File(afp, 'r')
     data = swept_hdf5['data'][:,0,:,:]
+    analyt_data = analyt_hdf5['data']
     time = np.arange(0,tf,dt)[:len(data)]
 
     #Meshgrid
@@ -227,9 +230,9 @@ def test_sweep_vortex(args=None):
     swept_hdf5.close()
     analyt_hdf5.close()
 
-# test_sweep_vortex()
+test_sweep_vortex()
 # test_sweep_write()
 # test_sweep()
 
-notifier.fcn = test_sweep_vortex
-notifier.run()
+# notifier.fcn = test_sweep_vortex
+# notifier.run()

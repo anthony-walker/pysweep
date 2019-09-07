@@ -12,29 +12,18 @@ def AnalyticalVortex(args):
     """Use this function to create analytical vortex data."""
     cvics = vics()
     cvics.Shu(args.gamma)
-    initial_args = cvics.get_args()
-    X = args.X
-    Y = args.Y
-    #Dimensions and steps
-    dx = X/args.nx
-    dy = Y/args.ny
     #Creating initial vortex from analytical code
-    create_vortex_data(cvics,X,Y,args.nx,args.nx,times=np.arange(args.t0,args.tf,args.dt),filepath="./",filename=args.hdf5)
-
+    create_vortex_data(cvics,args.nx,args.nx,times=np.arange(args.t0,args.tf,args.dt),filepath="./",filename=args.hdf5)
 
 def SweptVortex(args):
     #Analytical properties
     cvics = vics()
     cvics.Shu(args.gamma)
-    initial_args = cvics.get_args()
-    X = args.X
-    Y = args.Y
     #Dimensions and steps
-    dx = X/args.nx
-    dy = Y/args.ny
+    dx = cvics.L/args.nx
+    dy = cvics.L/args.ny
     #Creating initial vortex from analytical code
-    initial_vortex = vortex(cvics,X,Y,args.nx,args.nx,times=(0,))
-    flux_vortex = convert_to_flux(initial_vortex,args.gamma)[0]
+    flux_vortex = cvics.Shu(gamma,args.nx).flux[0]
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
@@ -44,15 +33,11 @@ def StandardVortex(args):
     #Analytical properties
     cvics = vics()
     cvics.Shu(args.gamma)
-    initial_args = cvics.get_args()
-    X = args.X
-    Y = args.Y
     #Dimensions and steps
-    dx = X/args.nx
-    dy = Y/args.ny
+    dx = cvics.L/args.nx
+    dy = cvics.L/args.ny
     #Creating initial vortex from analytical code
-    initial_vortex = vortex(cvics,X,Y,args.nx,args.nx,times=(0,))
-    flux_vortex = convert_to_flux(initial_vortex,args.gamma)[0]
+    flux_vortex = cvics.Shu(gamma,args.nx).flux[0]
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)

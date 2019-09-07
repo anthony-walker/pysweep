@@ -1,5 +1,6 @@
 import numpy as np
 from src.equations import euler
+from src.equations import euler1D
 from src.analytical import *
 import sys
 
@@ -27,11 +28,9 @@ ops = 2
 X=Y=1
 arr0 = np.zeros((t,v,x,x))
 cvics = vics()
-cvics.Shu(gamma)
-cvics.X = X
-cvics.Y = Y
-cvics.gamma = gamma
-initial_args = cvics.get_args()
+print(cvics.Shu(gamma,10).state)
+
+
 #Dimensions and steps
 dx = X/(x-2*ops)
 dy = Y/(x-2*ops)
@@ -40,16 +39,16 @@ for i in range(ops,x-ops):
     for j in range(ops,x-ops):
         iidx += (i,j),
 #Creating initial vortex from analytical code
-initial_vortex = vortex(cvics,X,Y,x-2*ops,x-2*ops,times=(0,))
-av = vortex(cvics,X,Y,x-2*ops,x-2*ops,times=np.arange(t0,tf,dt))
-av = convert_to_flux(av,gamma)
-flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
-arr0[0,:,ops:-ops,ops:-ops] = flux_vortex[:,:,:]
-arr_update(0,arr0,ops)
-euler.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
-#Changing arguments
-for i in range(t-1):
-    euler.step(arr0,iidx,i,i)
-    arr_update(i+1,arr0,ops)
-    print(np.amax(arr0[i+1,:,ops:x-2,ops:x-2]-av[i+1,:,:,:]))
-    input()
+
+# av = vortex(cvics,X,Y,x-2*ops,x-2*ops,times=np.arange(t0,tf,dt))
+# av = convert_to_flux(av,gamma)
+# flux_vortex = convert_to_flux(initial_vortex,gamma)[0]
+# arr0[0,:,ops:-ops,ops:-ops] = flux_vortex[:,:,:]
+# arr_update(0,arr0,ops)
+# euler.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
+# #Changing arguments
+# for i in range(t-1):
+#     euler.step(arr0,iidx,i,i)
+#     arr_update(i+1,arr0,ops)
+#     print(np.amax(arr0[i+1,:,ops:x-2,ops:x-2]-av[i+1,:,:,:]))
+#     input()

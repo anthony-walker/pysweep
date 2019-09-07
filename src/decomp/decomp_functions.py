@@ -238,7 +238,7 @@ def decomposition(source_mod,arr,gpu_rank,block_size,grid_size,region,decomp_set
     else:   #CPUs do this
         arr = CPU_Decomp((arr,source_mod,decomp_set,ops,gts))
     #Writing to shared array
-    shared_arr[1,region[1],region[2],region[3]] = arr[2,:,ops:-ops,ops:-ops]
+    shared_arr[2,region[1],region[2],region[3]] = arr[2,:,ops:-ops,ops:-ops]
 
 #--------------------------------CPU Specific Swept Functions------------------
 def CPU_Decomp(args):
@@ -246,6 +246,7 @@ def CPU_Decomp(args):
     block,source_mod,iidx,ops,gts = args
     ts = 1
     block = source_mod.step(block,iidx,ts,gts)
+
     return block
 
 def nan_to_zero(arr,zero=0.):

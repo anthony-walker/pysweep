@@ -201,6 +201,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     else:
         source_mod = build_cpu_source(CS) #Building Python source code
         decomp_set = create_decomp_sets(shared_arr[regions[0]].shape,OPS)
+        source_mod.set_globals(gpu_rank[0],source_mod,*gargs)
         grid_size = None
     #------------------------------HDF5 File------------------------------------------#
     filename+=".hdf5"
@@ -218,19 +219,20 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     wr = regions[1]
     #Solution
     ct = 1
-    for i in range(0,TSO*(time_steps)):
+    for i in range(0, TSO*(time_steps)):
         local_array = np.copy(shared_arr[regions[0]])
-        comm.Barrier()
         decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],decomp_set,shared_arr,OPS,i,TSO,ssb)
-        comm.Barrier()
-        reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
         comm.Barrier()
         #Writing Data after it has been shifted
         if (i+1)%TSO==0:
-            shared_arr[0,wr[1],wr[2],wr[3]] = shared_arr[1,wr[1],wr[2],wr[3]]
-            hdf5_data_set[ct,hregion[0],hregion[1],hregion[2]] = shared_arr[0,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
+            hdf5_data_set[ct,hregion[0],hregion[1],hregion[2]] = shared_arr[2,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
+            comm.Barrier()
+            shared_arr[0,wr[1],wr[2],wr[3]] = shared_arr[2,wr[1],wr[2],wr[3]]
             ct+=1
-
+        shared_arr[1,wr[1],wr[2],wr[3]] = shared_arr[2,wr[1],wr[2],wr[3]]
+        shared_arr[2,wr[1],wr[2],wr[3]] = 0
+        reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
+        comm.Barrier()
     #Final barrier
     comm.Barrier()
     #CUDA clean up - One of the last steps

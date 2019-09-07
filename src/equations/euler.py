@@ -3,8 +3,8 @@
 #the swept rule or in a standard way
 
 import numpy as np
-# import pycuda.driver as cuda
-# from pycuda.compiler import SourceModule
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 #----------------------------------Globals-------------------------------------#
 gamma = 0
 dtdx = 0
@@ -89,11 +89,10 @@ def pressure(q):
     q[3] = rho*e
     P = (GAMMA-1)*(rho*e-rho/2*(rho*u^2+rho*v^2))
     """
-    GAMMA = 1.4
     HALF = 0.5
     rho_1_inv = 1/q[0]
-    vss = (q[1]*rho_1_inv)*(q[1]*rho_1_inv)+(q[2]*rho_1_inv)*(q[2]*rho_1_inv)
-    return (GAMMA - 1)*(q[3]-HALF*q[0]*vss)
+    vss = (rho_1_inv*q[1]*q[1])+(rho_1_inv*q[2]*q[2])
+    return (gamma - 1)*(q[3]-HALF*vss)
 
 def direction_flux(state,Pr,xy):
     """Use this method to determine the flux in a particular direction."""
@@ -101,18 +100,21 @@ def direction_flux(state,Pr,xy):
     idx = 2     #This is the index of the point in state (stencil data)
     #Initializing Flux
     flux = np.zeros(len(state[:,idx]))
+
     #Atomic Operation 1
     tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
     tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
 
     flux += eflux(tsl,tsr,xy)
     flux += espectral(tsl,tsr,xy)
+
     #Atomic Operation 2
     tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
     tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
 
-    flux -= eflux(tsl,tsr,xy)
-    flux -= espectral(tsl,tsr,xy)
+    flux += eflux(tsl,tsr,xy)
+    flux += espectral(tsl,tsr,xy)
+
     return flux
 
 def flimiter(qL,qR,Pr):

@@ -19,8 +19,9 @@ pid = 0
 did = 1
 uid = 2
 vid = 3
+epsilon = 2e-20
 
-def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
+def vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
     properties are obtained from the vics object, cvics.
        The center can be changed with x0 and y0.
@@ -36,6 +37,9 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     """
     alpha, M_inf, P_inf, rho_inf, T_inf, gamma, R_gas, c, sigma, beta, r_c, L = cvics.get_args()
     PI = np.pi
+    assert epsilon >= L/r_c*np.exp(-L*L/(2*r_c*r_c*sigma*sigma))
+    X = L
+    Y = L
     #Universal gas Constant
     R_univ = 8.314 #J/molK
     if rho_inf is None:
@@ -45,14 +49,12 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     #Getting velocity components
     u_bar = V_inf*np.cos(alpha)
     v_bar = V_inf*np.sin(alpha)
-
     #Creating grid
     xpts = np.linspace(-X,X,npx,dtype=np.float64)
     ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
     state = np.zeros(np.shape(times)+(4,)+xgrid.shape,dtype=np.float64) #Initialization of state
     idxs = tuple(np.ndindex(xgrid.shape))  #Indicies of the array
-
     #Solving times
     for i in range(len(times)):
         for idx in idxs:
@@ -81,7 +83,7 @@ def vortex(cvics,X,Y,npx,npy,times=(0,),x0=0,y0=0):
     return state
 
 
-def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex",fdb=True):
+def create_vortex_data(cvics,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex",fdb=True):
     """Use this function to create vortex data from the vortex funciton.
     Note, this function will create a directory called "vortex#" unless otherwise specified.
     An hdf5 file will be created with the groups pressure, density, x-velocity, and y-velocity.
@@ -89,7 +91,7 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./
     the time will be stored in each file as well.
     """
     #Args tuple
-    args = (cvics,X,Y,npx,npy,times,x0,y0)
+    state = vortex(cvics,npx,npy, times, x0=x0, y0=y0)
     #Making directories
     if filepath == "./vortex/":
         if not os.path.isdir(filepath):
@@ -117,9 +119,9 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./
     origin_data = file.create_dataset("origin",(2,))
     origin_data[:] = (x0,y0)
     dim_data = file.create_dataset("dimensions",(4,))
-    dim_data[:] = (X,Y,npx,npy)
+    dim_data[:] = (cvics.L,cvics.L,npx,npy)
     #Creating state data
-    state = vortex(cvics,X,Y,npx,npy, times, x0=x0, y0=y0)
+
     if not fdb:
         pressure[:,0,:,:] = state[:,pid,:,:]
         density[:,0,:,:] = state[:,did,:,:]
@@ -131,7 +133,7 @@ def create_vortex_data(cvics,X,Y,npx,npy, times=(0,), x0=0, y0=0, filepath = "./
         data[:,did,:,:] = flux[:,did,:,:]
         data[:,uid,:,:] =flux[:,uid,:,:]
         data[:,vid,:,:] =flux[:,vid,:,:]
-    return state,args
+    return state
 
 def convert_to_flux(vortex_data,gamma):
     """Use this function to convert a vortex to flux data."""
@@ -210,28 +212,26 @@ class vics(object):
         User must specify: gamma
         """
         #Dimensions
-        self.L = 5   #Half of the computational domain length and height
+        self.L = 10   #Half of the computational domain length and height
         self.r_c = 1  #Vortex Radius
-
         #Gas properties
         self.gamma = gamma
         self.R_gas = None  #J/kgK
-
         #Freestream variables
         self.rho_inf = 1    #Denisty
         self.alpha = np.pi/4  #Angle of attack
         self.M_inf = np.sqrt(2/self.gamma)    #Mach number
         self.P_inf = 1  #pressure kPa
         self.T_inf = 1 #Temperature K
-
         #Gaussian Variables
         self.sigma = 1  #Standard deviation
         self.beta = self.M_inf*5*np.sqrt(2)/(4*np.pi)*np.exp(0.5) #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
     def Vincent(self,gamma,npts = None):
         """ Initializer function that uses initial conditions from
@@ -261,9 +261,10 @@ class vics(object):
         self.beta = self.M_inf*27/(4*np.pi)*np.exp(2/9) #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
     def HestWar(self,gamma,npts = None):
         """ Initializer function that uses initial conditions from
@@ -293,9 +294,10 @@ class vics(object):
         self.beta = self.M_inf*5/(2*np.pi)*np.exp(1) #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
     def HOWF(self,gamma,npts = None):
         """ Initializer function that uses initial conditions from (FAST)
@@ -326,9 +328,10 @@ class vics(object):
         self.beta = 1/5 #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
     def HOWS(self,gamma,npts = None):
         """ Initializer function that uses initial conditions from (SLOW)
@@ -359,9 +362,10 @@ class vics(object):
         self.beta = 1/50 #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
     def Spiegel(self,gamma,npts = None):
         """ Initializer function that uses initial conditions from
@@ -392,9 +396,10 @@ class vics(object):
         self.beta = 5/(2*np.pi*np.sqrt(self.gamma))*np.exp(0.5) #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
     def set(args,npts = None):
         """Use this function to set an alternate condition.
@@ -442,9 +447,10 @@ class vics(object):
         self.beta = beta #Maximum perturbation strength
         self.speed_of_sound()
         self.args = (self.alpha, self.M_inf, self.P_inf, self.rho_inf, self.T_inf, self.gamma, self.R_gas, self.c, self.sigma, self.beta, self.r_c, self.L)
-        npts = 2*self.L/self.r_c
-        self.vortex_args = self.L,self.L,npts,npts
-        self.state = vortex(self,self.L,self.L,npts,npts)
+        npts = 2*self.L/self.r_c if npts is None else npts
+        self.state = vortex(self,npts,npts)
+        self.flux = convert_to_flux(self.state,self.gamma)
+        return self
 
 
 
@@ -530,16 +536,3 @@ class vics(object):
                 return self.state
         except Exception as e:
             print(e)
-
-
-if __name__ == "__main__":
-    #HighOrder Workshop Fast
-    gamma = 1.4
-    cvics = vics()  #Creating vortex ics object
-    cvics.Shu(gamma) #Initializing with Shu parameters
-    cvics.vortex_args = cvics.vortex_args[:2]+(50,50)
-    X,Y,npx,npy = cvics.vortex_args
-    #Calling analytical solution
-    num_times = 100
-    create_vortex_data(cvics,X,Y,npx,npy,times=np.linspace(0,10,num_times))
-    vortex_plot("./vortex/vortex0.hdf5",'density',range(0,num_times,1))
