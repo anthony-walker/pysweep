@@ -3,8 +3,8 @@
 #the swept rule or in a standard way
 
 import numpy as np
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+# import pycuda.driver as cuda
+# from pycuda.compiler import SourceModule
 #----------------------------------Globals-------------------------------------#
 gamma = 0
 dtdx = 0
@@ -26,7 +26,7 @@ def step(state,iidx,ts,gts):
         if (gts+1)%2==0:   #Corrector step
             state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
         else: #Predictor step
-            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*dtdx*dfdx+half*dtdy*dfdy
+            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*(dtdx*dfdx+dtdy*dfdy)
     return state
 
 def set_globals(gpu,source_mod,*args):

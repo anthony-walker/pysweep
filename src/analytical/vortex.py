@@ -7,12 +7,13 @@ import numpy as np
 import os
 import h5py
 #Plottign
-import matplotlib as mpl
-mpl.use("Tkagg")
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from collections.abc import Iterable
-import matplotlib.animation as animation
+# import matplotlib as mpl
+# mpl.use("Tkagg")
+# import matplotlib.pyplot as plt
+# from matplotlib import cm
+# from collections.abc import Iterable
+# import matplotlib.animation as animation
+
 #Indicies
 pid = 0
 did = 1
