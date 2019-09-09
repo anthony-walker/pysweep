@@ -226,8 +226,8 @@ def test_sweep_vortex(args=None):
     os.system("rm "+sfp)
     tf = 0.5
     dt = 0.01
-    npx=npy= 64
-    aff = 0.5
+    npx=npy= 40
+    aff = 1
     X=10
     Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
@@ -241,8 +241,8 @@ def test_sweep_vortex(args=None):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n 16 python ./src/pst.py swept "
-        estr += "-b 16 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr = "mpiexec -n 4 python ./src/pst.py swept "
+        estr += "-b 10 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
