@@ -148,8 +148,8 @@ def test_decomp_vortex(args=None):
     os.system("rm "+sfp)
     tf = 0.5
     dt = 0.01
-    npx=npy= 64
-    aff = 0.5
+    npx=npy= 40
+    aff = 1
     X=10
     Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
@@ -163,42 +163,42 @@ def test_decomp_vortex(args=None):
 
     if not os.path.isfile(sfp):
     #Create data using solver
-        estr = "mpiexec -n 16 python ./src/pst.py standard "
-        estr += "-b 16 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr = "mpiexec -n 4 python ./src/pst.py standard "
+        estr += "-b 10 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-    # decomp_hdf5= h5py.File(sfp, 'r')
-    # analyt_hdf5 = h5py.File(afp, 'r')
-    # decomp_data = decomp_hdf5['data'][:-2,:,:,:]
-    # analyt_data = analyt_hdf5['data']
-    # #Opening the data files
-    # data = decomp_hdf5['data'][:,0,:,:]
-    # time = np.arange(0,tf,dt)[:len(data)]
-    # #Meshgrid
-    # xpts = np.linspace(-X,X,npx,dtype=np.float64)
-    # ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
-    # xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-    # fig, ax =plt.subplots()
-    # ax.set_ylim(-Y, Y)
-    # ax.set_xlim(-X, X)
-    # ax.set_title("Density")
-    # ax.set_xlabel("X")
-    # ax.set_ylabel("Y")
-    # # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    # fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
-    # animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
-    #
-    # if isinstance(time,Iterable):
-    #     frames = len(tuple(time))
-    #     anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
-    #     anim.save(savepath+".gif",writer="imagemagick")
-    # else:
-    #     animate(time)
-    #     fig.savefig(savepath+".png")
-    #     plt.show()
-    # decomp_hdf5.close()
-    # analyt_hdf5.close()
+    decomp_hdf5= h5py.File(sfp, 'r')
+    analyt_hdf5 = h5py.File(afp, 'r')
+    decomp_data = decomp_hdf5['data'][:-2,:,:,:]
+    analyt_data = analyt_hdf5['data']
+    #Opening the data files
+    data = decomp_hdf5['data'][:,0,:,:]
+    time = np.arange(0,tf,dt)[:len(data)]
+    #Meshgrid
+    xpts = np.linspace(-X,X,npx,dtype=np.float64)
+    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+    fig, ax =plt.subplots()
+    ax.set_ylim(-Y, Y)
+    ax.set_xlim(-X, X)
+    ax.set_title("Density")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
+    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
+
+    if isinstance(time,Iterable):
+        frames = len(tuple(time))
+        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
+        anim.save(savepath+".gif",writer="imagemagick")
+    else:
+        animate(time)
+        fig.savefig(savepath+".png")
+        plt.show()
+    decomp_hdf5.close()
+    analyt_hdf5.close()
 # test_decomp()
 # test_decomp_write()
 test_decomp_vortex()

@@ -93,7 +93,7 @@ void  flimiter(float *temp_state, float *left_point, float *right_point , float 
   Use this function to apply the roe average and obtain the spectral radius
 */
 __device__
-void espectral(float* flux,float *left_state, float *right_state, int dim)
+void espectral(float* flux,float *left_state, float *right_state, int dim,int dir)
 {
   //Initializing values and determining spectral state
   float spec_state[NVC]={0};
@@ -112,14 +112,14 @@ void espectral(float* flux,float *left_state, float *right_state, int dim)
   float rs = (SQUAREROOT(GAMMA*spec_press(spec_state)/spec_state[0])+ABSOLUTE(spec_state[dim]));
   for (int i = 0; i < NVC; i++)
   {
-    flux[i] += rs*(left_state[i]-right_state[i]);
+    flux[i] += dir*rs*(left_state[i]-right_state[i]);
   }
 }
 /*
 Use this function to obtain the flux for each system variable
 */
 __device__
-void  efluxx(float *flux, float *left_state, float *right_state)
+void  efluxx(float *flux, float *left_state, float *right_state,int dir)
 {
   float rhoL = left_state[0];
   float rhoR = right_state[0];
@@ -131,10 +131,10 @@ void  efluxx(float *flux, float *left_state, float *right_state)
   float pL = pressure(left_state);
   float pR = pressure(right_state);
 
-  flux[0] += (left_state[1]+right_state[1]);
-  flux[1] += (left_state[1]*uL+pL+right_state[1]*uR+pR);
-  flux[2] += (left_state[1]*vL+right_state[1]*vR);
-  flux[3] += ((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
+  flux[0] += dir*(left_state[1]+right_state[1]);
+  flux[1] += dir*(left_state[1]*uL+pL+right_state[1]*uR+pR);
+  flux[2] += dir*(left_state[1]*vL+right_state[1]*vR);
+  flux[3] += dir*((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
  }
 
 /*
@@ -167,19 +167,19 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     //West
     flimiter(temp_left,wpoint,cpoint,Pr[0]);
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
-    efluxx(dfdx,temp_left,temp_right);
-    espectral(dfdx,temp_left,temp_right,spi);
+    efluxx(dfdx,temp_left,temp_right,ONE);
+    espectral(dfdx,temp_left,temp_right,spi,ONE);
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
-    efluxx(dfdx,temp_left,temp_right);
-    espectral(dfdx,temp_left,temp_right,spi);
+    efluxx(dfdx,temp_left,temp_right,-1);
+    espectral(dfdx,temp_left,temp_right,spi,-1);
 }
 /*
 Use this function to obtain the flux for each system variable
 */
 __device__
-void  efluxy(float* flux,float *left_state, float *right_state)
+void  efluxy(float* flux,float *left_state, float *right_state, int dir)
 {
   //Initializing variables
   float rhoL = left_state[0];
@@ -192,10 +192,10 @@ void  efluxy(float* flux,float *left_state, float *right_state)
   float pL = pressure(left_state);
   float pR = pressure(right_state);
   //Updating fluxes
-  flux[0] += (left_state[1]+right_state[1]);
-  flux[1] += (left_state[2]*uL+right_state[2]*uR);
-  flux[2] += (left_state[2]*vL+pL+right_state[2]*vR+pR);
-  flux[3] += ((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
+  flux[0] += dir*(left_state[1]+right_state[1]);
+  flux[1] += dir*(left_state[2]*uL+right_state[2]*uR);
+  flux[2] += dir*(left_state[2]*vL+pL+right_state[2]*vR+pR);
+  flux[3] += dir*((left_state[3]+pL)*uL+(right_state[3]+pR)*uR);
  }
 /*
   Use this function to determine the flux in the x direction
@@ -228,14 +228,14 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     // West
     flimiter(temp_left,wpoint,cpoint,Pr[0]);
     flimiter(temp_right,cpoint,wpoint,ONE/Pr[1]);
-    efluxy(dfdy,temp_left,temp_right);
-    espectral(dfdy,temp_left,temp_right,spi);
+    efluxy(dfdy,temp_left,temp_right,1);
+    espectral(dfdy,temp_left,temp_right,spi,1);
 
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
-    efluxy(dfdy,temp_left,temp_right);
-    espectral(dfdy,temp_left,temp_right,spi);
+    efluxy(dfdy,temp_left,temp_right,-1);
+    espectral(dfdy,temp_left,temp_right,spi,-1);
 }
 
 __device__

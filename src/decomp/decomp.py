@@ -233,15 +233,21 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     for i in range(0, TSO*(time_steps)):
         local_array = np.copy(shared_arr[regions[0]])
         decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],decomp_set,shared_arr,OPS,i,TSO,ssb)
+        comm.Barrier()
+
         #Writing Data after it has been shifted
         if (i+1)%TSO==0:
             hdf5_data_set[ct,hregion[0],hregion[1],hregion[2]] = shared_arr[2,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
             comm.Barrier()
-            shared_arr[0,wr[1],wr[2],wr[3]] = shared_arr[2,wr[1],wr[2],wr[3]]
+            np.copyto(shared_arr[0,wr[1],wr[2],wr[3]],shared_arr[2,wr[1],wr[2],wr[3]])
             ct+=1
-        shared_arr[1,wr[1],wr[2],wr[3]] = shared_arr[2,wr[1],wr[2],wr[3]]
+        np.copyto(shared_arr[1,wr[1],wr[2],wr[3]],shared_arr[2,wr[1],wr[2],wr[3]])
         shared_arr[2,wr[1],wr[2],wr[3]] = 0
         reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
+        comm.Barrier()
+        if rank == master_rank:
+            pm(shared_arr,1)
+            input()
         comm.Barrier()
     #Final barrier
     comm.Barrier()
