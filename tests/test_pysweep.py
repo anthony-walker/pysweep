@@ -290,10 +290,10 @@ def test_sweep_hde(args=None):
     os.system("rm "+sfp)
     tf = 1
     dt = 0.01
-    npx=npy= 20
-    aff = 1
-    X=4
-    Y=4
+    npx=npy= 40
+    aff = 0.5
+    X=10
+    Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
@@ -305,9 +305,9 @@ def test_sweep_hde(args=None):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n 2 python ./src/pst.py swept_hde "
+        estr = "mpiexec -n 16 python ./src/pst.py swept_hde "
         estr += "-b 10 -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/hde.h\" -c \"./src/equations/hde.py\" "
-        estr += "--hdf5 " + swept_file + pts +time_str + "--alpha 1.11e-4 -TH 1 -TL 0"
+        estr += "--hdf5 " + swept_file + pts +time_str + "--alpha 1 -TH 373 -TL 298"
         os.system(estr)
 
     #Opening the data files
@@ -327,7 +327,7 @@ def test_sweep_hde(args=None):
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
 
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(0,1,10))
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(300,375,10))
     animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=20,cmap=cm.inferno)
     if isinstance(time,Iterable):
         frames = len(tuple(time))

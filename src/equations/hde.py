@@ -20,19 +20,19 @@ def step(state,iidx,ts,gts):
     half = 0.5
     vs = slice(0,state.shape[1],1)
     for idx,idy in iidx:
-        dTx,dTy = d2Tdxy(state,(ts,vs,idx,idy))
+        dT = d2Tdxy(state,(ts,vs,idx,idy))
         if (gts+1)%2==0:   #Corrector step
-            state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+half*dTx+half*dTy
+            state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dT
         else: #Predictor step
-            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*dTx+half*dTy
+            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*dT
     return state
 
 def set_globals(gpu,source_mod,*args):
     """Use this function to set cpu global variables"""
     t0,tf,dt,dx,dy,alp = args
     if gpu:
-        keys = "DT","DX","DY","DTDX2","DTDY2","ALPHA"
-        nargs = args[2:]+(dt/(dx*dx),dt/(dy*dy),alp)
+        keys = "DT","DX","DY","ALPHA","DTDX2","DTDY2"
+        nargs = args[2:]+(dt/(dx*dx),dt/(dy*dy))
         fc = lambda x:np.float32(x)
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
@@ -50,9 +50,7 @@ def d2Tdxy(state,idx):
     #Creating indices from given point (idx)
     ops = 1 #Stencil size on each side
     id1,id2,id3,id4 = idx
-    idxx=(id1,id2,slice(id3-ops,id3+ops+1,1),id4)
-    idxx=(id1,id2,id3,slice(id4-ops,id4+ops+1,1))
     #Finding spatial derivatives
-    dTx = alpha*dtdx2*(state[id1,id2,id3+1,id4]+state[id1,id2,id3-1,id4]-2*state[id1,id2,id3,id4])
-    dTy = alpha*dtdx2*(state[id1,id2,id3,id4+1]+state[id1,id2,id3,id4-1]-2*state[id1,id2,id3,id4])
-    return dTx, dTy
+    dT = alpha*dtdx2*(state[id1,id2,id3+ops,id4]+state[id1,id2,id3-ops,id4]-2*state[id1,id2,id3,id4])
+    dT += alpha*dtdy2*(state[id1,id2,id3,id4+ops]+state[id1,id2,id3,id4-ops]-2*state[id1,id2,id3,id4])
+    return dT

@@ -45,17 +45,17 @@ void step(float *shared_state, int idx, int gts)
 /*
     This function is for testing purposes
 */
-// __device__
-// void step(float *shared_state, int idx, int gts)
-// {
-//     float TV = (shared_state[idx-(2*OPS+blockDim.y)]+shared_state[idx+(2*OPS+blockDim.y)]+shared_state[idx-1]+shared_state[idx+1])/4;
-//       __syncthreads();
-//       if ((gts+1)%TSO==0) //Corrector step
-//       {
-//         shared_state[idx]=shared_state[idx-STS]+2*TV;
-//       }
-//       else //Predictor step
-//       {
-//         shared_state[idx]=shared_state[idx]+TV;
-//       }
-// }
+__device__
+void test_step(float *shared_state, int idx, int gts)
+{
+    float TV = (shared_state[idx-(2*OPS+blockDim.y)]+shared_state[idx+(2*OPS+blockDim.y)]+shared_state[idx-1]+shared_state[idx+1])/4;
+      __syncthreads();
+      if ((gts+1)%TSO==0) //Corrector step
+      {
+        shared_state[idx]=shared_state[idx-STS]+2*TV;
+      }
+      else //Predictor step
+      {
+        shared_state[idx]=shared_state[idx]+TV;
+      }
+}
