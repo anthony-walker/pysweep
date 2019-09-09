@@ -168,37 +168,37 @@ def test_decomp_vortex(args=None):
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-    decomp_hdf5= h5py.File(sfp, 'r')
-    analyt_hdf5 = h5py.File(afp, 'r')
-    decomp_data = decomp_hdf5['data'][:-2,:,:,:]
-    analyt_data = analyt_hdf5['data']
-    #Opening the data files
-    data = decomp_hdf5['data'][:,0,:,:]
-    time = np.arange(0,tf,dt)[:len(data)]
-    #Meshgrid
-    xpts = np.linspace(-X,X,npx,dtype=np.float64)
-    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
-    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-    fig, ax =plt.subplots()
-    ax.set_ylim(-Y, Y)
-    ax.set_xlim(-X, X)
-    ax.set_title("Density")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
-    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
-
-    if isinstance(time,Iterable):
-        frames = len(tuple(time))
-        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
-        anim.save(savepath+".gif",writer="imagemagick")
-    else:
-        animate(time)
-        fig.savefig(savepath+".png")
-        plt.show()
-    decomp_hdf5.close()
-    analyt_hdf5.close()
+    # decomp_hdf5= h5py.File(sfp, 'r')
+    # analyt_hdf5 = h5py.File(afp, 'r')
+    # decomp_data = decomp_hdf5['data'][:-2,:,:,:]
+    # analyt_data = analyt_hdf5['data']
+    # #Opening the data files
+    # data = decomp_hdf5['data'][:,0,:,:]
+    # time = np.arange(0,tf,dt)[:len(data)]
+    # #Meshgrid
+    # xpts = np.linspace(-X,X,npx,dtype=np.float64)
+    # ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
+    # xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+    # fig, ax =plt.subplots()
+    # ax.set_ylim(-Y, Y)
+    # ax.set_xlim(-X, X)
+    # ax.set_title("Density")
+    # ax.set_xlabel("X")
+    # ax.set_ylabel("Y")
+    # # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+    # fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
+    # animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
+    #
+    # if isinstance(time,Iterable):
+    #     frames = len(tuple(time))
+    #     anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
+    #     anim.save(savepath+".gif",writer="imagemagick")
+    # else:
+    #     animate(time)
+    #     fig.savefig(savepath+".png")
+    #     plt.show()
+    # decomp_hdf5.close()
+    # analyt_hdf5.close()
 # test_decomp()
 # test_decomp_write()
 test_decomp_vortex()

@@ -38,6 +38,14 @@ from .decomp_functions import *
 #Testing
 import time as timer
 
+def pm(arr,i):
+    for item in arr[i,0,:,:]:
+        sys.stdout.write("[ ")
+        for si in item:
+            sys.stdout.write("%.3f"%si+", ")
+        sys.stdout.write("]\n")
+
+
 def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform standard decomposition
     args:
@@ -151,8 +159,11 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         regions = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
     regions = (create_read_region(regions,OPS),regions) #Creating read region
     brs = create_boundary_regions(regions[1],shared_shape,OPS)
+    comm.Barrier()
+
     reg_edge_comm(shared_arr,OPS,brs,regions[1])
     comm.Barrier()
+    #Communicate edges
     local_array = np.copy(shared_arr[regions[0]])
     #---------------------_REMOVING UNWANTED RANKS---------------------------#
     #Checking if rank is useful
@@ -222,7 +233,6 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     for i in range(0, TSO*(time_steps)):
         local_array = np.copy(shared_arr[regions[0]])
         decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],decomp_set,shared_arr,OPS,i,TSO,ssb)
-        comm.Barrier()
         #Writing Data after it has been shifted
         if (i+1)%TSO==0:
             hdf5_data_set[ct,hregion[0],hregion[1],hregion[2]] = shared_arr[2,regions[ONE][1],regions[ONE][2],regions[ONE][3]]
