@@ -245,10 +245,10 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         shared_arr[2,wr[1],wr[2],wr[3]] = 0
         reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
         comm.Barrier()
-        if rank == master_rank:
-            pm(shared_arr,1)
-            input()
-        comm.Barrier()
+        # if rank == master_rank:
+        #     pm(shared_arr,1)
+        #     input()
+        # comm.Barrier()
     #Final barrier
     comm.Barrier()
     #CUDA clean up - One of the last steps
