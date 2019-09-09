@@ -279,8 +279,8 @@ def test_sweep_vortex(args=None):
     swept_hdf5.close()
     analyt_hdf5.close()
 
-# test_sweep_vortex()
-test_sweep_write()
+test_sweep_vortex()
+# test_sweep_write()
 # test_sweep()
 # test_block_management()
 
