@@ -11,4 +11,4 @@ figures/
 results/
 post_sweep/
 notipy/
-#*.gif
+*.gif
