@@ -112,8 +112,8 @@ def direction_flux(state,Pr,xy):
     tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
     tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
 
-    flux += eflux(tsl,tsr,xy)
-    flux += espectral(tsl,tsr,xy)
+    flux -= eflux(tsl,tsr,xy)
+    flux -= espectral(tsl,tsr,xy)
 
     return flux
 

@@ -227,7 +227,7 @@ def test_sweep_vortex(args=None):
     tf = 0.5
     dt = 0.01
     npx=npy= 40
-    aff = 1
+    aff = 0.5
     X=10
     Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
