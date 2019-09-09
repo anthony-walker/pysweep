@@ -147,9 +147,9 @@ def test_decomp_vortex(args=None):
     analyt_file = "\"./tests/data/analyt\""
     os.system("rm "+sfp)
     tf = 0.5
-    dt = 0.001
+    dt = 0.01
     npx=npy= 64
-    aff = 1
+    aff = 0.5
     X=10
     Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
@@ -163,7 +163,7 @@ def test_decomp_vortex(args=None):
 
     if not os.path.isfile(sfp):
     #Create data using solver
-        estr = "mpiexec -n 8 python ./src/pst.py standard "
+        estr = "mpiexec -n 16 python ./src/pst.py standard "
         estr += "-b 16 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
@@ -172,23 +172,13 @@ def test_decomp_vortex(args=None):
     analyt_hdf5 = h5py.File(afp, 'r')
     decomp_data = decomp_hdf5['data'][:-2,:,:,:]
     analyt_data = analyt_hdf5['data']
-    # assert np.isclose(decomp_data,analyt_data,atol=1e-5).all()
-    # max_err = np.amax(np.absolute(decomp_data-analyt_data))
-    # print(max_err)
-
-    # return max_err
     #Opening the data files
     data = decomp_hdf5['data'][:,0,:,:]
-    ndata = np.zeros((int(tf/dt),data.shape[1],data.shape[2]))
-    for i in range(0,int(tf/dt),5):
-        ndata[i,:,:] = data[i,:,:]
     time = np.arange(0,tf,dt)[:len(data)]
-
     #Meshgrid
     xpts = np.linspace(-X,X,npx,dtype=np.float64)
     ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-
     fig, ax =plt.subplots()
     ax.set_ylim(-Y, Y)
     ax.set_xlim(-X, X)
@@ -201,12 +191,14 @@ def test_decomp_vortex(args=None):
 
     if isinstance(time,Iterable):
         frames = len(tuple(time))
-        anim = animation.FuncAnimation(fig,animate,frames)
+        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
         anim.save(savepath+".gif",writer="imagemagick")
     else:
         animate(time)
         fig.savefig(savepath+".png")
         plt.show()
+    decomp_hdf5.close()
+    analyt_hdf5.close()
 # test_decomp()
 # test_decomp_write()
 test_decomp_vortex()

@@ -43,7 +43,6 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
-
 def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
     args:
@@ -83,7 +82,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-
     #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     if rank == master_rank:
         #Determining the split between gpu and cpu
@@ -117,7 +115,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         gpu_group  = comm.group.Incl(gpu_ranks)
         gpu_comm = comm.Create_group(gpu_group)
         gpu_master = ZERO
-
     #Destroys cpu processes if AF is one
     if AF == 1:
         comm = comm.Create_group(gpu_group)
@@ -148,9 +145,9 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)  #Number of time steps
     #Global swept step
-    MGST = int(np.ceil(TSO*(time_steps+1)/(2*MOSS)))    #THIS ASSUMES THAT time_steps > MOSS
-    time_steps = int(np.ceil(((MGST-1+IEP)*2*MPSS/TSO))) #Updating time steps
-
+    MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
+    # time_steps = int(np.ceil(((MGST-1+IEP)*2*MPSS/TSO))) #Updating time steps
+    time_steps = (MGST*(MOSS)/TSO)+MPSS #Updating time steps
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (MOSS+TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS+SPLITX,arr0.shape[TWO]+TOPS+SPLITY)
@@ -158,7 +155,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
-        sarr[TSO-ONE,:,OPS:arr0.shape[ONE]+OPS,OPS:arr0.shape[TWO]+OPS] = arr0[:,:,:]
+        np.copyto(sarr[TSO-ONE,:,OPS:arr0.shape[ONE]+OPS,OPS:arr0.shape[TWO]+OPS],arr0[:,:,:])
         boundary_update(sarr,OPS,SPLITX,SPLITY)   #communicate boundaries
     #------------------------------DECOMPOSITION BY REGION CREATION--------------#
     GRB = gpu_rank[ZERO]
@@ -202,7 +199,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     wxts = create_shifted_bridges(YR,OPS,bridge_slices[0],shared_shape,BS,rank)
     wyts = create_shifted_bridges(XR,OPS,bridge_slices[1],shared_shape,BS,rank)
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
-    larr = np.copy(sarr[SRR])
+    larr = np.copy(sarr[RR])
     #---------------Generating Source Modules----------------------------------#
     if GRB:
         # Creating cuda device and Context
@@ -287,7 +284,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Reverse Bridge Step
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
-
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         larr = np.copy(sarr[RR])

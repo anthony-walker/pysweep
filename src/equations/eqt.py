@@ -2,8 +2,8 @@
 #This file contains a test step function for debugging the swept rule
 
 import numpy as np
-# import pycuda.driver as cuda
-# from pycuda.compiler import SourceModule
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 
 def step(state,iidx,ts,gts):
     """This is the method that will be called by the swept solver.

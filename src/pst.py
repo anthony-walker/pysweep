@@ -20,8 +20,8 @@ def SweptVortex(args):
     cvics = vics()
     cvics.Shu(args.gamma)
     #Dimensions and steps
-    dx = cvics.L/args.nx
-    dy = cvics.L/args.ny
+    dx = 2*cvics.L/args.nx
+    dy = 2*cvics.L/args.ny
     #Creating initial vortex from analytical code
     flux_vortex = cvics.Shu(gamma,args.nx).flux[0]
     #Changing arguments
@@ -34,8 +34,8 @@ def StandardVortex(args):
     cvics = vics()
     cvics.Shu(args.gamma)
     #Dimensions and steps
-    dx = cvics.L/args.nx
-    dy = cvics.L/args.ny
+    dx = 2*cvics.L/args.nx
+    dy = 2*cvics.L/args.ny
     #Creating initial vortex from analytical code
     flux_vortex = cvics.Shu(gamma,args.nx).flux[0]
     #Changing arguments

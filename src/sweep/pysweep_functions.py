@@ -25,19 +25,14 @@ def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     else:   #CPUs do this
         blocks = []
         for local_region in CRS:
-            block = np.zeros(arr[local_region].shape)
-            block += arr[local_region]
-            blocks.append(block)
-            block = np.zeros(arr[local_region].shape)
-            block += arr[local_region]
+            block = np.copy(arr[local_region])
             blocks.append(block)
         cpu_fcn = sweep_lambda((CPU_UpPyramid,SM,isets,gts,TSO))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,CRS,OPS)
-
-    sarr[WR] = arr[:,:,OPS:-OPS,OPS:-OPS]
+    np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
     for br in BDR:
-        sarr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
+        np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 
 def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
     """Use this function to solve the bridge step."""
@@ -59,12 +54,10 @@ def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
         blocks_y = []
         for local_region in CRS:
             #X blocks
-            block_x = np.zeros(xarr[local_region].shape)
-            block_x += xarr[local_region]
+            block_x = np.copy(xarr[local_region])
             blocks_x.append(block_x)
             #Y_blocks
-            block_y = np.zeros(yarr[local_region].shape)
-            block_y += yarr[local_region]
+            block_y = np.copy(yarr[local_region])
             blocks_y.append(block_y)
         #Solving
         cpu_fcn = sweep_lambda((CPU_Bridge,SM,isets[0],gts,TSO))
@@ -76,11 +69,11 @@ def Bridge(sarr,xarr,yarr,XR,YR,isets,gts,pargs):
     for i, bdg in enumerate(XR,start=TSO+1):
         for cb  in bdg:
             for lcx,lcy,shx,shy in cb:
-                sarr[i,:,shx,shy] = xarr[i,:,lcx,lcy]
+                np.copyto(sarr[i,:,shx,shy],xarr[i,:,lcx,lcy])
     for i,bdg in enumerate(YR,start=TSO+1):
         for cb  in bdg:
             for lcx,lcy,shx,shy in cb:
-                sarr[i,:,shx,shy] = yarr[i,:,lcx,lcy]
+                np.copyto(sarr[i,:,shx,shy],yarr[i,:,lcx,lcy])
 
 def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
     """
@@ -99,15 +92,14 @@ def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
     else:   #CPUs do this
         blocks = []
         for local_region in CRS:
-            block = np.zeros(arr[local_region].shape)
-            block += arr[local_region]
+            block = np.copy(arr[local_region])
             blocks.append(block)
         cpu_fcn = sweep_lambda((CPU_Octahedron,SM,isets,gts,TSO))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,CRS,OPS)
-    sarr[WR] = arr[:,:,OPS:-OPS,OPS:-OPS]
+    np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
     for br in BDR:
-        sarr[br[0],br[1],br[4],br[5]] = arr[br[0],br[1],br[2],br[3]]
+        np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 
 def DownPyramid(sarr,arr,WR,isets,gts,pargs):
     """This is the ending inverted pyramid."""
@@ -120,13 +112,12 @@ def DownPyramid(sarr,arr,WR,isets,gts,pargs):
     else:   #CPUs do this
         blocks = []
         for local_region in CRS:
-            block = np.zeros(arr[local_region].shape)
-            block += arr[local_region]
+            block = np.copy(arr[local_region])
             blocks.append(block)
         cpu_fcn = sweep_lambda((CPU_DownPyramid,SM,isets,gts,TSO))
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,CRS,OPS)
-    sarr[WR] = arr[:,:,OPS:-OPS,OPS:-OPS]
+    np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
 
 #--------------------------------CPU Specific Swept Functions------------------
 def CPU_UpPyramid(args):

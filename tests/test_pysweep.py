@@ -21,6 +21,7 @@ from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
 from notipy import NotiPy
+from mpi4py import MPI
 
 sm = "Hi,\nYour function run is complete.\n"
 notifier = NotiPy(None,tuple(),sm,"asw42695@gmail.com",timeout=None)
@@ -30,12 +31,38 @@ def pm(arr,i):
     for item in arr[i,0,:,:]:
         sys.stdout.write("[ ")
         for si in item:
-            sys.stdout.write("%.1f"%si+", ")
+            sys.stdout.write("%.4f"%si+", ")
         sys.stdout.write("]\n")
 
-def test_sweep(args=None):
+def map_test_fcn(args):
+    block,tn = args
+    block[1,:,:,:] = block[0,:,:,:]
+    return block
+
+
+def test_block_management(args=None):
+    x = 20
+    BS = (int(x/2),int(x/2),1)
+    ops = 2
+    arr = np.zeros((10,4,x+2*ops,x+2*ops))
+    CRS = create_blocks_list(arr.shape,BS,ops)
+    arr[0,:,2:12,2:12] = 1
+    arr[0,:,2:12,12:22] = 2
+    arr[0,:,12:22,2:12] = 3
+    arr[0,:,12:22,12:22] = 4
+    blocks = list()
+    for local_region in CRS:
+        block = np.copy(arr[local_region])
+        blocks.append(block)
+    cpu_fcn = sweep_lambda((map_test_fcn,1))
+    blocks = list(map(cpu_fcn,blocks))
+    arr = rebuild_blocks(arr,blocks,CRS,ops)
+    assert ((arr[1,:,:,:]-arr[0,:,:,:])==0).all()
+
+def test_sweep_pattern(args=None):
     """Use this function to test the UpPyramid communication."""
     GRB=True
+    comm = MPI.COMM_WORLD
     for x in (10,16):
         for i in range(2):
             GRB = not GRB
@@ -51,7 +78,7 @@ def test_sweep(args=None):
             OPS = 2
             TSO = 2
             GRD = (2,2)
-            dType = np.float32
+            dType = np.dtype('float32')
             up_sets = create_up_sets(BS,OPS)
             down_sets = create_down_sets(BS,OPS)[:-1]
             oct_sets = down_sets+up_sets[1:]
@@ -61,13 +88,13 @@ def test_sweep(args=None):
             SPLITY = int(BS[1]/2)   #Split computation shift
             IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
             #Shared arr
-            sarr = np.zeros((MOSS+TSO+1,v,2*x+2*OPS+SPLITX,2*x+2*OPS+SPLITY),dtype=dType)
-            shared_shape = sarr.shape
+            shared_shape = (MOSS+TSO+1,v,2*x+2*OPS+SPLITX,2*x+2*OPS+SPLITY)
+            sarr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
             carr = np.zeros((MOSS+TSO+1,v,2*x+2*OPS,2*x+2*OPS),dtype=dType)
             WR = (slice(0,ts,1),slice(0,v,1),slice(OPS,OPS+2*x,1),slice(OPS,OPS+2*x,1))
             sarr[WR] = carr[:,:,OPS:-OPS,OPS:-OPS]
             ssb = np.zeros((2,v,BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
-            carr[TSO-1,:,:,:] = 1
+            carr[TSO-1,:,:,:] =1
             #File
             test_file = "testfile.hdf5"
             hdf5_file = h5py.File(test_file, 'w')
@@ -166,6 +193,30 @@ def test_sweep_write(args=None):
             assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
     os.system("rm "+test_file)
 
+def plot_step(data,t,i,npx,X):
+    npy=npx
+    Y = X
+    xpts = np.linspace(-X,X,npx,dtype=np.float64)
+    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+    fig, ax =plt.subplots()
+    ax.set_ylim(-Y, Y)
+    ax.set_xlim(-X, X)
+    ax.set_title("Density")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1.2,1.2,100))
+    ax.contourf(xgrid,ygrid,data[t,i,:,:],levels=40,cmap=cm.inferno)
+    prim_path = "./tests/data/imgs/"
+    pn = "fig0"
+    png =".png"
+    ct = 1
+    while os.path.isfile(prim_path+pn+png):
+        pn = pn[:3]+str(ct)
+        ct+=1
+    plt.savefig(prim_path+pn+png)
+
 def test_sweep_vortex(args=None):
     savepath = "./swept_vortex_plot"
     swept_file = "\"./tests/data/swept\""
@@ -174,9 +225,9 @@ def test_sweep_vortex(args=None):
     analyt_file = "\"./tests/data/analyt\""
     os.system("rm "+sfp)
     tf = 0.5
-    dt = 0.001
+    dt = 0.01
     npx=npy= 64
-    aff = 1
+    aff = 0.5
     X=10
     Y=10
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
@@ -201,7 +252,6 @@ def test_sweep_vortex(args=None):
     data = swept_hdf5['data'][:,0,:,:]
     analyt_data = analyt_hdf5['data']
     time = np.arange(0,tf,dt)[:len(data)]
-
     #Meshgrid
     xpts = np.linspace(-X,X,npx,dtype=np.float64)
     ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
@@ -216,10 +266,9 @@ def test_sweep_vortex(args=None):
     # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
     fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
     animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
-
     if isinstance(time,Iterable):
         frames = len(tuple(time))
-        anim = animation.FuncAnimation(fig,animate,frames)
+        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
         anim.save(savepath+".gif",writer="imagemagick")
     else:
         animate(time)
@@ -230,9 +279,10 @@ def test_sweep_vortex(args=None):
     swept_hdf5.close()
     analyt_hdf5.close()
 
-test_sweep_vortex()
-# test_sweep_write()
+# test_sweep_vortex()
+test_sweep_write()
 # test_sweep()
+# test_block_management()
 
 # notifier.fcn = test_sweep_vortex
 # notifier.run()
