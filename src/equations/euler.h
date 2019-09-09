@@ -172,8 +172,8 @@ void get_dfdx(float *dfdx, float *shared_state, int idx)
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
-    efluxx(dfdx,temp_left,temp_right,1);
-    espectral(dfdx,temp_left,temp_right,spi,1);
+    efluxx(dfdx,temp_left,temp_right,-1);
+    espectral(dfdx,temp_left,temp_right,spi,-1);
 }
 /*
 Use this function to obtain the flux for each system variable
@@ -234,8 +234,8 @@ void get_dfdy(float *dfdy, float *shared_state, int idx)
     //East
     flimiter(temp_left,cpoint,epoint,Pr[1]);
     flimiter(temp_right,epoint,cpoint,ONE/Pr[2]);
-    efluxy(dfdy,temp_left,temp_right,1);
-    espectral(dfdy,temp_left,temp_right,spi,1);
+    efluxy(dfdy,temp_left,temp_right,-1);
+    espectral(dfdy,temp_left,temp_right,spi,-1);
 }
 
 __device__
