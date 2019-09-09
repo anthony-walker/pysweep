@@ -22,6 +22,14 @@ from pycuda.compiler import SourceModule
 #C
 from ctypes import *
 
+
+def pm(arr,i):
+    for item in arr[i,0,:,:]:
+        sys.stdout.write("[ ")
+        for si in item:
+            sys.stdout.write("%.5f"%si+", ")
+        sys.stdout.write("]\n")
+
 def test_flux():
     """Use this function to test the python version of the euler code.
     This test uses a formerly validate 1D code and computes the fluxes in each direction
@@ -175,3 +183,27 @@ def test_RK2_GPU():
             num_test[0,:,i,j]=rightBC[:]
     gpu_fcn(cuda.InOut(num_test),np.int32(36),np.int32(0),block=bs)
     assert np.isclose(f1d[2,1], num_test[0,2,4,4])
+
+
+def test_hde_cpu():
+    tf = 0.5
+    dt = 0.1
+    t0 = 0
+    npx=npy= 20
+    aff = 0
+    ops = 1
+    X=10
+    Y=10
+    alpha = 25e-6
+    dx = X/npx
+    dy = X/npy
+    R=1
+    Th = 373
+    Tl = 298
+    lt =10
+
+    state = TIC(npx,npy,X,X,R,Th,Tl,lt)
+    SM = build_cpu_source("./src/equations/hde.py")
+    SM.set_globals(False,SM,*(t0,tf,dt,dx,dy,alpha))
+    iidx = [(i,j) for i in range(ops,npx-ops,1) for j in range(ops,npy-ops,1)]
+    state = SM.step(state,iidx,0,0)

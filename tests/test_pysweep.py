@@ -219,11 +219,11 @@ def plot_step(data,t,i,npx,X):
 
 def test_sweep_vortex(args=None):
     savepath = "./swept_vortex_plot"
-    swept_file = "\"./tests/data/swept\""
-    sfp = "./tests/data/swept.hdf5"
-    afp = "./tests/data/analyt0.hdf5"
-    analyt_file = "\"./tests/data/analyt\""
-    os.system("rm "+sfp)
+    swept_file = "\"./tests/data/swept_vortex\""
+    sfp = "./tests/data/swept_vortex.hdf5"
+    afp = "./tests/data/analyt_vortex0.hdf5"
+    analyt_file = "\"./tests/data/analyt_vortex\""
+    # os.system("rm "+sfp)
     tf = 0.5
     dt = 0.01
     npx=npy= 40
@@ -241,7 +241,7 @@ def test_sweep_vortex(args=None):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n 4 python ./src/pst.py swept "
+        estr = "mpiexec -n 4 python ./src/pst.py swept_vortex "
         estr += "-b 10 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
@@ -249,22 +249,23 @@ def test_sweep_vortex(args=None):
     #Opening the data files
     swept_hdf5 = h5py.File(sfp, 'r')
     analyt_hdf5 = h5py.File(afp, 'r')
-    data = swept_hdf5['data'][:,0,:,:]
     analyt_data = analyt_hdf5['data']
+    data = swept_hdf5['data'][:,0,:,:]
     time = np.arange(0,tf,dt)[:len(data)]
     #Meshgrid
-    xpts = np.linspace(-X,X,npx,dtype=np.float64)
-    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
+    xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
+    ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
 
     fig, ax =plt.subplots()
-    ax.set_ylim(-Y, Y)
-    ax.set_xlim(-X, X)
+    ax.set_ylim(-Y/2, Y/2)
+    ax.set_xlim(-X/2, X/2)
     ax.set_title("Density")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
+
     # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(298,373,10))
     animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
     if isinstance(time,Iterable):
         frames = len(tuple(time))
@@ -278,8 +279,70 @@ def test_sweep_vortex(args=None):
     #Closing files
     swept_hdf5.close()
     analyt_hdf5.close()
+    temp_file.close()
 
-test_sweep_vortex()
+def test_sweep_hde(args=None):
+    savepath = "./swept_hde_plot"
+    swept_file = "\"./tests/data/swept_hde\""
+    sfp = "./tests/data/swept_hde.hdf5"
+    afp = "./tests/data/analyt_hde0.hdf5"
+    analyt_file = "\"./tests/data/analyt_hde\""
+    os.system("rm "+sfp)
+    tf = 1
+    dt = 0.01
+    npx=npy= 20
+    aff = 1
+    X=4
+    Y=4
+    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
+    pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
+
+    # if not os.path.isfile(afp):
+    #     #Create analytical data
+    #     astr = "python ./src/pst.py analytical "+time_str
+    #     astr += "--hdf5 " + analyt_file+pts
+    #     os.system(astr)
+
+    if not os.path.isfile(sfp):
+        #Create data using solver
+        estr = "mpiexec -n 2 python ./src/pst.py swept_hde "
+        estr += "-b 10 -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/hde.h\" -c \"./src/equations/hde.py\" "
+        estr += "--hdf5 " + swept_file + pts +time_str + "--alpha 1.11e-4 -TH 1 -TL 0"
+        os.system(estr)
+
+    #Opening the data files
+    swept_hdf5 = h5py.File(sfp, 'r')
+    data = swept_hdf5['data'][:,0,:,:]
+    time = np.arange(0,tf,dt)[:len(data)]
+
+    # Meshgrid
+    xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
+    ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+
+    fig, ax =plt.subplots()
+    ax.set_ylim(-Y/2, Y/2)
+    ax.set_xlim(-X/2, X/2)
+    ax.set_title("Density")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(0,1,10))
+    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=20,cmap=cm.inferno)
+    if isinstance(time,Iterable):
+        frames = len(tuple(time))
+        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
+        anim.save(savepath+".gif",writer="imagemagick")
+    else:
+        animate(0)
+        fig.savefig(savepath+".png")
+        plt.show()
+
+    #Closing files
+    swept_hdf5.close()
+
+
+test_sweep_hde()
 # test_sweep_write()
 # test_sweep()
 # test_block_management()

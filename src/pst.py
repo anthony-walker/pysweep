@@ -43,6 +43,29 @@ def StandardVortex(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     decomp(flux_vortex,gargs,swargs,filename=args.hdf5)
 
+def SweptHDE(args):
+    #Analytical properties
+    arr0 = TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
+    #Dimensions and steps
+    dx = args.X/args.nx
+    dy = args.Y/args.ny
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    sweep(arr0,gargs,swargs,filename=args.hdf5)
+
+def StandardHDE(args):
+    #Analytical properties
+    arr0 = TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
+    #Dimensions and steps
+    dx = args.X/args.nx
+    dy = args.Y/args.ny
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    decomp(arr0,gargs,swargs,filename=args.hdf5)
+
+
 def SweptTestPattern(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
@@ -77,8 +100,10 @@ def DecompTestPattern(args):
 
 
 parser = argparse.ArgumentParser()
-fmap = {'swept' : SweptVortex,
-                'standard' : StandardVortex, "stest":SweptTestPattern, "dtest":DecompTestPattern, "analytical":AnalyticalVortex}
+fmap = {'swept_vortex' : SweptVortex,
+                'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
+                                'standard_hde' : StandardHDE, "stest":SweptTestPattern,
+                                "dtest":DecompTestPattern, "analytical":AnalyticalVortex}
 parser.add_argument('fcn', choices=fmap.keys())
 parser.add_argument("-b","--block",nargs="?",default=8,type=int)
 parser.add_argument("-o","--ops",nargs="?",default=2,type=int)
@@ -91,7 +116,11 @@ parser.add_argument("-nx",nargs="?",default=32,type=int)
 parser.add_argument("-ny",nargs="?",default=32,type=int)
 parser.add_argument("-X",nargs="?",default=1,type=float)
 parser.add_argument("-Y",nargs="?",default=1,type=float)
+parser.add_argument("-R",nargs="?",default=1,type=float)
+parser.add_argument("-TH",nargs="?",default=373.0,type=float)
+parser.add_argument("-TL",nargs="?",default=298.0,type=float)
 parser.add_argument("--gamma",nargs="?",default=1.4,type=float)
+parser.add_argument("--alpha",nargs="?",default=25e-6,type=float)
 parser.add_argument("-t0",nargs="?",default=0,type=float)
 parser.add_argument("-tf",nargs="?",default=1,type=float)
 parser.add_argument("-dt",nargs="?",default=0.05,type=float)

@@ -39,9 +39,9 @@ def set_globals(gpu,source_mod,*args):
             cuda.memcpy_htod(ckey,fc(nargs[i]))
     else:
         global dtdx2
-        dtdx = dt/(dx*dx)
+        dtdx2 = dt/(dx*dx)
         global dtdy2
-        dtdy = dt/(dy*dy)
+        dtdy2 = dt/(dy*dy)
         global alpha
         alpha = alp
 
@@ -53,6 +53,6 @@ def d2Tdxy(state,idx):
     idxx=(id1,id2,slice(id3-ops,id3+ops+1,1),id4)
     idxx=(id1,id2,id3,slice(id4-ops,id4+ops+1,1))
     #Finding spatial derivatives
-    dTx = alpha*dtdx2*(state[id1,id2,id3+1,id4]+state[id1,id2,id3-1,id4]+2*state[id1,id2,id3,id4])
-    dTy = alpha*dtdx2*(state[id1,id2,id3,id4+1]+state[id1,id2,id3,id4-1]+2*state[id1,id2,id3,id4])
+    dTx = alpha*dtdx2*(state[id1,id2,id3+1,id4]+state[id1,id2,id3-1,id4]-2*state[id1,id2,id3,id4])
+    dTy = alpha*dtdx2*(state[id1,id2,id3,id4+1]+state[id1,id2,id3,id4-1]-2*state[id1,id2,id3,id4])
     return dTx, dTy

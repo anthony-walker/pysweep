@@ -14,7 +14,7 @@ __device__ __constant__ float ALPHA;
 */
 
 __device__
-void d2Tdxy(float * dTx,float * dTy, float *shared_state, int idx)
+void d2Tdxy(float & dT, float * shared_state, int idx)
 {
   //Constants and Initializing
     float cpoint = shared_state[idx];
@@ -23,44 +23,39 @@ void d2Tdxy(float * dTx,float * dTy, float *shared_state, int idx)
     float epoint = shared_state[idx+(2*OPS+blockDim.y)];
     float wpoint = shared_state[idx-(2*OPS+blockDim.y)];
     //Gradients
-    dTx = ALPHA*DTDX2*(wpoint+epoint+2*cpoint);
-    dTy = ALPHA*DTDY2*(npoint+spoint+2*cpoint);
+    dT = ALPHA*DTDX2*(wpoint+epoint-2*cpoint) + ALPHA*DTDY2*(npoint+spoint-2*cpoint);
 }
 
 __device__
 void step(float *shared_state, int idx, int gts)
 {
-    float * dTx;
-    float * dTy;
-    d2Tdxy(dTx,dTy,shared_state,idx);
+    float dT;
+    d2Tdxy(dT,shared_state,idx);
     __syncthreads();
     if ((gts+1)%TSO==0) //Corrector step
     {
-      shared_state[idx]=shared_state[idx-STS]+dTx+dTy;
+      shared_state[idx]=shared_state[idx-STS]+dT;
     }
     else //Predictor step
     {
-      shared_state[idx]=shared_state[idx]+HALF*(dTx+dTy);
+      shared_state[idx]=shared_state[idx]+HALF*(dT);
     }
 }
+
 /*
     This function is for testing purposes
 */
-__global__
-void test_step(float *shared_state, int idx, int gts)
-{
-  if (threadIdx.x == 0 && threadIdx.y==0) {
-      float * dTx;
-      float * dTy;
-      d2Tdxy(dTx,dTy,shared_state,idx);
-      __syncthreads();
-      if ((gts+1)%TSO==0) //Corrector step
-      {
-        shared_state[idx]=shared_state[idx-STS]+dTx+dTy;
-      }
-      else //Predictor step
-      {
-        shared_state[idx]=shared_state[idx]+HALF*(dTx+dTy);
-      }
-    }
-}
+// __device__
+// void step(float *shared_state, int idx, int gts)
+// {
+//     float TV = (shared_state[idx-(2*OPS+blockDim.y)]+shared_state[idx+(2*OPS+blockDim.y)]+shared_state[idx-1]+shared_state[idx+1])/4;
+//       __syncthreads();
+//       if ((gts+1)%TSO==0) //Corrector step
+//       {
+//         shared_state[idx]=shared_state[idx-STS]+2*TV;
+//       }
+//       else //Predictor step
+//       {
+//         shared_state[idx]=shared_state[idx]+TV;
+//       }
+// }
