@@ -261,7 +261,7 @@ def test_decomp_hde(args=(8,40,0,10,0.24,5,10,4)):
     # decomp_hdf5.close()
 
 
-# test_decomp_hde()
+test_decomp_hde()
 # test_decomp()
 # test_decomp_write()
 # test_decomp_vortex()

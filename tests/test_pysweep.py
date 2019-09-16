@@ -340,7 +340,7 @@ def test_sweep_hde(args=(8,40,0,10,0.24,5,10,4)):
     # swept_hdf5.close()
 
 
-# test_sweep_hde()
+test_sweep_hde()
 # test_sweep_write()
 # test_sweep()
 # test_block_management()
