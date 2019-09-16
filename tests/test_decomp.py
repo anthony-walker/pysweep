@@ -210,8 +210,8 @@ def test_decomp_hde(args=(8,40,0,10,0.24,5,10,4)):
     os.system("rm "+sfp)
 
     tf,npx,aff,X,Fo,alpha,blks,nps = args
-    npx=npy
-    X=Y
+    npy=npx
+    Y=X
     dt = Fo*(X/npx)**2/alpha
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
