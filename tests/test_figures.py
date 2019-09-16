@@ -6,7 +6,7 @@ cwd = os.getcwd()
 sys.path.insert(1,cwd+"/src")
 import numpy as np
 import matplotlib as mpl
-mpl.use("Tkagg")
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gsc
 from matplotlib import cm
