@@ -6,7 +6,7 @@ import os
 cwd = os.getcwd()
 sys.path.insert(1,cwd+"/src")
 import matplotlib as mpl
-mpl.use("Tkagg")
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from collections.abc import Iterable

@@ -14,7 +14,7 @@ import numpy as np
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 import matplotlib as mpl
-mpl.use("Tkagg")
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from collections.abc import Iterable
