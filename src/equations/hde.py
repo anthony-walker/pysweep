@@ -30,6 +30,13 @@ def step(state,iidx,ts,gts):
 def set_globals(gpu,source_mod,*args):
     """Use this function to set cpu global variables"""
     t0,tf,dt,dx,dy,alp = args
+    #Scheme stability
+    Fox = alp*dt/(dx*dx)
+    Foy = alp*dt/(dy*dy)
+    criteria = 0.25
+    assert Fox <= criteria
+    assert Foy <= criteria
+    #Setting Globals
     if gpu:
         keys = "DT","DX","DY","ALPHA","DTDX2","DTDY2"
         nargs = args[2:]+(dt/(dx*dx),dt/(dy*dy))
