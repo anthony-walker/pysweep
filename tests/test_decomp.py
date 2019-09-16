@@ -207,13 +207,15 @@ def test_decomp_hde(args=None):
     sfp = "./tests/data/decomp_hde.hdf5"
     afp = "./tests/data/analyt_hde0.hdf5"
     analyt_file = "\"./tests/data/analyt_hde\""
-    os.system("rm "+sfp)
-    tf = 2
-    dt = 0.00001
-    npx=npy= 256
-    aff = 0.5
-    X=5
-    Y=5
+    # os.system("rm "+sfp)
+    tf = 8
+    npx=npy=40
+    aff = 0.75
+    X=Y=10
+    Fo = 0.24
+    dt = Fo*(X/npx)**2
+    alpha = 5
+    dt = Fo*(X/npx)**2/alpha
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
@@ -225,9 +227,9 @@ def test_decomp_hde(args=None):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n 16 python ./src/pst.py standard_hde "
-        estr += "-b 16 -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/hde.h\" -c \"./src/equations/hde.py\" "
-        estr += "--hdf5 " + decomp_file + pts +time_str + "--alpha 1 -TH 373 -TL 298"
+        estr = "mpiexec -n 4 python ./src/pst.py standard_hde "
+        estr += "-b 10 -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/hde.h\" -c \"./src/equations/hde.py\" "
+        estr += "--hdf5 " + decomp_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
     #Opening the data files
