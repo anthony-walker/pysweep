@@ -280,7 +280,7 @@ def test_sweep_vortex(args=None):
     analyt_hdf5.close()
     temp_file.close()
 
-def test_sweep_hde(args=(8,40,0,10,0.24,5,10,4)):
+def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./tests/data/swept_hde\""
     sfp = "./tests/data/swept_hde.hdf5"

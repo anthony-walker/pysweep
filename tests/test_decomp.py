@@ -201,7 +201,7 @@ def test_decomp_vortex(args=None):
     analyt_hdf5.close()
 
 
-def test_decomp_hde(args=(8,40,0,10,0.24,5,10,4)):
+def test_decomp_hde(args=(8,40,1,10,0.24,5,10,4)):
     savepath = "./decomp_hde_plot"
     decomp_file = "\"./tests/data/decomp_hde\""
     sfp = "./tests/data/decomp_hde.hdf5"
