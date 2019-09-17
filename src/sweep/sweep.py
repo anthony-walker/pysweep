@@ -43,6 +43,15 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
+
+def pm(arr,i):
+    for item in arr[i,0,:,:]:
+        sys.stdout.write("[ ")
+        for si in item:
+            sys.stdout.write("%0.3f"%si+", ")
+        sys.stdout.write("]\n")
+
+
 def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
     args:
@@ -200,6 +209,8 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     wyts = create_shifted_bridges(XR,OPS,bridge_slices[1],shared_shape,BS,rank)
     #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
     larr = np.copy(sarr[RR])
+    print(MPSS)
+
     #---------------Generating Source Modules----------------------------------#
     if GRB:
         # Creating cuda device and Context
@@ -246,10 +257,18 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
     pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO,ssb) #Passed arguments to the swept functions
+
+
+
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     UpPyramid(sarr,larr,WR,BDR,up_sets,wb,pargs) #THis modifies shared array
     wb+=1
     comm.Barrier()
+    # if rank == master_rank:
+    #     for i in range(TSO,MPSS+2):
+    #         pm(sarr,i)
+    #         input()
+    # comm.Barrier()
     #-------------------------------FIRST BRIDGE-------------------------------------------#
     #Getting x and y arrays
     xarr = np.copy(sarr[XR])
@@ -258,6 +277,12 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     # Bridge Step
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
+    # if rank == master_rank:
+    #     print("BRIDGE")
+    #     for i in range(TSO,len(sarr)):
+    #         pm(sarr,i)
+    #         input()
+    # comm.Barrier()
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
     larr = np.copy(sarr[SRR])
@@ -267,6 +292,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         Octahedron(sarr,larr,SWR,tuple(),oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
+        if rank == master_rank:
+            print("OCTAHEDRON1")
+            for i in range(TSO,len(sarr)):
+                pm(sarr,i)
+                print("----------------------------------")
+                pm(sarr[:,:,OPS+SPLITX:-OPS,OPS+SPLITX:-OPS],i)
+                input()
+        comm.Barrier()
         # Shifting Data Step
         edge_shift(sarr,ERS,ONE)
         comm.Barrier()  #Communication Barrier
@@ -284,6 +317,12 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Reverse Bridge Step
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
+        # if rank == master_rank:
+        #     print("BRIDGE1")
+        #     for i in range(TSO,len(sarr)):
+        #         pm(sarr,i)
+        #         input()
+        # comm.Barrier()
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         larr = np.copy(sarr[RR])
@@ -291,6 +330,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Octahedron Step
         Octahedron(sarr,larr,WR,BDR,oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
+        if rank == master_rank:
+            print("OCTAHEDRON2")
+            for i in range(TSO,len(sarr)):
+                pm(sarr,i)
+                print("----------------------------------")
+                pm(sarr[:,:,OPS:-SPLITX-OPS,OPS:-SPLITX-OPS],i)
+                input()
+        comm.Barrier()
         #Write step
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()
@@ -305,6 +352,12 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Bridge Step
         Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()
+        # if rank == master_rank:
+        #     print("BRIDGE2")
+        #     for i in range(TSO,len(sarr)):
+        #         pm(sarr,i)
+        #         input()
+        # comm.Barrier()
         #Getting next points for the local array
         larr = np.copy(sarr[SRR])
     #Last read barrier for down pyramid

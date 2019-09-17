@@ -65,8 +65,20 @@ def StandardHDE(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     decomp(arr0,gargs,swargs,filename=args.hdf5)
 
+def STP2(args):
 
-def SweptTestPattern(args):
+    arr0 = np.ones((1,args.nx,args.ny))
+    ct = 1
+    for i in range(args.nx):
+        for j in range(args.ny):
+            arr0[0,i,j] = ct/100
+            ct += 1
+    #Dimensions and steps
+    gargs = (args.t0,args.tf,args.dt)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    sweep(arr0,gargs,swargs,filename=args.hdf5)
+
+def STP(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
@@ -82,7 +94,7 @@ def SweptTestPattern(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     sweep(arr,gargs,swargs,filename=args.hdf5)
 
-def DecompTestPattern(args):
+def DTP(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
@@ -102,8 +114,8 @@ def DecompTestPattern(args):
 parser = argparse.ArgumentParser()
 fmap = {'swept_vortex' : SweptVortex,
                 'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
-                                'standard_hde' : StandardHDE, "stest":SweptTestPattern,
-                                "dtest":DecompTestPattern, "analytical":AnalyticalVortex}
+                                'standard_hde' : StandardHDE, "stest":STP, "stest2":STP2,
+                                "dtest":DTP, "analytical":AnalyticalVortex}
 parser.add_argument('fcn', choices=fmap.keys())
 parser.add_argument("-b","--block",nargs="?",default=8,type=int)
 parser.add_argument("-o","--ops",nargs="?",default=2,type=int)

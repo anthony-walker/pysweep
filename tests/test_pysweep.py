@@ -179,6 +179,8 @@ def test_sweep_pattern(args=None):
             os.system("rm "+test_file) #Deleting testfile
 
 
+
+
 def test_sweep_write(args=None):
     estr = "mpiexec -n 8 python ./src/pst.py stest "
     estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
@@ -280,6 +282,9 @@ def test_sweep_vortex(args=None):
     analyt_hdf5.close()
     temp_file.close()
 
+
+
+
 def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./tests/data/swept_hde\""
@@ -340,7 +345,29 @@ def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
     # swept_hdf5.close()
 
 
-test_sweep_hde()
+def test_eqt2(args=(1,12,0.5,10,5,6,4)):
+    """Use this function to troubleshoot the swept rule"""
+    swept_file = "\"./tests/data/swept_eqt2\""
+    sfp = "./tests/data/swept_eqt2.hdf5"
+    os.system("rm "+sfp)
+    tf,npx,aff,X,alpha,blks,nps = args
+    npy=npx
+    Y=X
+    dt = 0.01
+    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
+    pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
+
+    if not os.path.isfile(sfp):
+        #Create data using solver
+        estr = "ccde mpiexec -n "+str(nps)+" python ./src/pst.py stest2 "
+        estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/eqt2.h\" -c \"./src/equations/eqt2.py\" "
+        estr += "--hdf5 " + swept_file + pts +time_str
+        os.system(estr)
+
+
+
+test_eqt2()
+
 # test_sweep_write()
 # test_sweep()
 # test_block_management()
