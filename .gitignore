@@ -11,5 +11,5 @@ figures/
 results/
 post_sweep/
 notipy/
-#*.gif
-#nrg-nodes
+*.gif
+nrg-nodes
