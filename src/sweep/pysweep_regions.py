@@ -30,7 +30,6 @@ def create_write_region(comm,rank,master,total_ranks,block_size,arr_shape,slices
 def create_boundaries(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     """Use this function to create boundary write regions."""
     boundary_regions = tuple()
-    eregions = tuple()
     region_start = wr[:2]
     c1 = wr[2].start==ops
     c2 = wr[3].start==ops
@@ -42,16 +41,10 @@ def create_boundaries(wr,SPLITX,SPLITY,ops,ss,bridge_slices):
     if c1: #Top edge -  periodic x
         #Boundaries for up pyramid and octahedron
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),y_reg,slice(sx,ss[2],1),wr[3]),)
-        yer = slice(wr[3].start,ss[3],1) if wr[3].stop+SPLITY+ops == ss[3] else slice(wr[3].start,wr[3].stop,1)
-        eregions += (region_start+(slice(ops,SPLITX+ops,1),yer,slice(sx,sx+SPLITX,1),yer,),)
     if c2: #Side edge -  periodic y
         boundary_regions += (region_start+(x_reg,slice(ops,SPLITY+tops,1),wr[2],slice(sy,ss[3],1)),)
-        xer = slice(wr[2].start,ss[2],1) if wr[2].stop+SPLITY+ops == ss[2] else slice(wr[2].start,wr[2].stop,1)
-        eregions += (region_start+(xer,slice(ops,SPLITY+ops,1),xer,slice(sy,sy+SPLITY,1)),)
     if c1 and c2:
         boundary_regions += (region_start+(slice(ops,SPLITX+tops,1),slice(ops,SPLITY+tops,1),slice(sx,ss[2],1),slice(sy,ss[3],1)),)
-        eregions += (region_start+(slice(ops,SPLITX+ops,1),slice(ops,SPLITY+ops,1),slice(sx,sx+SPLITX,1),slice(sy,sy+SPLITY,1)),)
-        #A bridge can never be on a corner so there is not bridge communication here
     return boundary_regions
 
 def create_shifted_boundaries(wr,SPLITX,SPLITY,ops,ss,bs):
