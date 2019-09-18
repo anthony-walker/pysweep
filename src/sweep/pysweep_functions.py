@@ -101,7 +101,7 @@ def Octahedron(sarr,arr,WR,BDR,isets,gts,pargs):
     for br in BDR:
         np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 
-def DownPyramid(sarr,arr,WR,isets,gts,pargs):
+def DownPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     """This is the ending inverted pyramid."""
     SM,GRB,BS,GRD,CRS,OPS,TSO,ssb = pargs
     if GRB:
@@ -118,6 +118,8 @@ def DownPyramid(sarr,arr,WR,isets,gts,pargs):
         blocks = list(map(cpu_fcn,blocks))
         arr = rebuild_blocks(arr,blocks,CRS,OPS)
     np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
+    for br in BDR:
+        np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 
 #--------------------------------CPU Specific Swept Functions------------------
 def CPU_UpPyramid(args):

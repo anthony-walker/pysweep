@@ -285,7 +285,7 @@ def test_sweep_vortex(args=None):
 
 
 
-def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
+def test_sweep_hde(args=(5,40,1,10,0.24,5,10,4)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./tests/data/swept_hde\""
     sfp = "./tests/data/swept_hde.hdf5"
@@ -302,7 +302,7 @@ def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python ./src/pst.py swept_hde "
+        estr = "ccde mpiexec -n "+str(nps)+" python ./src/pst.py swept_hde "
         estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/hde.h\" -c \"./src/equations/hde.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
@@ -313,7 +313,7 @@ def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
     #     astr += "--hdf5 " + analyt_file+pts
     #     os.system(astr)
 
-    # #Opening the data files
+    # Opening the data files
     # swept_hdf5 = h5py.File(sfp, 'r')
     # data = swept_hdf5['data'][:,0,:,:]
     # time = np.arange(0,tf,dt)[:len(data)]
@@ -340,8 +340,8 @@ def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
     #     animate(0)
     #     fig.savefig(savepath+".png")
     #     plt.show()
-    #
-    # #Closing files
+
+    #Closing files
     # swept_hdf5.close()
 
 
@@ -366,8 +366,8 @@ def test_eqt2(args=(1,12,0.5,10,5,6,4)):
 
 
 
-test_eqt2()
-
+# test_eqt2()
+test_sweep_hde()
 # test_sweep_write()
 # test_sweep()
 # test_block_management()
