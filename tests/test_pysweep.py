@@ -345,7 +345,7 @@ def test_sweep_hde(args=(5,40,1,10,0.24,5,10,4)):
     # swept_hdf5.close()
 
 
-def test_eqt2(args=(1,12,0.5,10,5,6,4)):
+def test_eqt2(args=(1,40,0.5,10,5,10,4)):
     """Use this function to troubleshoot the swept rule"""
     swept_file = "\"./tests/data/swept_eqt2\""
     sfp = "./tests/data/swept_eqt2.hdf5"
@@ -366,8 +366,8 @@ def test_eqt2(args=(1,12,0.5,10,5,6,4)):
 
 
 
-# test_eqt2()
-test_sweep_hde()
+test_eqt2()
+# test_sweep_hde()
 # test_sweep_write()
 # test_sweep()
 # test_block_management()

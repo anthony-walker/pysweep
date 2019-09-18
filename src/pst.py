@@ -1,11 +1,19 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
+import sys
 from sweep import *
 from analytical import *
 from equations import *
 from decomp import *
 import argparse
 import numpy as np
+
+def pm(arr,i):
+    for item in arr[i,:,:]:
+        sys.stdout.write("[ ")
+        for si in item:
+            sys.stdout.write("%1.2f"%si+", ")
+        sys.stdout.write("]\n")
 
 
 def AnalyticalVortex(args):
@@ -69,10 +77,16 @@ def STP2(args):
 
     arr0 = np.ones((1,args.nx,args.ny))
     ct = 1
-    for i in range(args.nx):
-        for j in range(args.ny):
-            arr0[0,i,j] = ct/100
-            ct += 1
+    # for i in range(args.nx):
+    #     for j in range(args.ny):
+    #         arr0[0,i,j] = ct/100
+    #         ct += 1
+    for i in range(1,int(args.nx/args.block)+1,1):
+        for j in range(1,int(args.ny/args.block)+1,1):
+            # print(i,j)
+            arr0[0,(i-1)*args.block:i*args.block,(j-1)*args.block:j*args.block] = ct/10
+            ct+=1
+    # pm(arr0,0)
     #Dimensions and steps
     gargs = (args.t0,args.tf,args.dt)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
