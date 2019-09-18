@@ -139,66 +139,22 @@ def test_decomp_write(args=None):
         assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
     os.system("rm "+test_file)
 
-def test_decomp_vortex(args=None):
-    savepath = "./decomp_vortex_plot"
-    decomp_file = "\"./tests/data/decomp\""
-    sfp = "./tests/data/decomp.hdf5"
-    afp = "./tests/data/analyt0.hdf5"
-    analyt_file = "\"./tests/data/analyt\""
+def test_decomp_vortex(args=(1,0.01,40,1,10,10,4)):
+    decomp_file = "\"./tests/data/decomp_vortex\""
+    sfp = "./tests/data/decomp_vortex.hdf5"
     os.system("rm "+sfp)
-    tf = 0.5
-    dt = 0.01
-    npx=npy= 40
-    aff = 0.5
-    X=10
-    Y=10
+    tf,dt,npx,aff,X,blks,nps = args
+    npy=npx
+    Y=X
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)
 
-    if not os.path.isfile(afp):
-        #Create analytical data
-        astr = "python ./src/pst.py analytical "+time_str
-        astr += "--hdf5 " + analyt_file+pts
-        os.system(astr)
-
     if not os.path.isfile(sfp):
     #Create data using solver
-        estr = "mpiexec -n 4 python ./src/pst.py standard "
-        estr += "-b 10 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr = "mpiexec -n "+str(nps)+" python ./src/pst.py standard_vortex "
+        estr += "-b "+str(blks)+" -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + decomp_file + pts +time_str
         os.system(estr)
-
-    decomp_hdf5= h5py.File(sfp, 'r')
-    analyt_hdf5 = h5py.File(afp, 'r')
-    decomp_data = decomp_hdf5['data'][:-2,:,:,:]
-    analyt_data = analyt_hdf5['data']
-    #Opening the data files
-    data = decomp_hdf5['data'][:,0,:,:]
-    time = np.arange(0,tf,dt)[:len(data)]
-    #Meshgrid
-    xpts = np.linspace(-X,X,npx,dtype=np.float64)
-    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
-    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-    fig, ax =plt.subplots()
-    ax.set_ylim(-Y, Y)
-    ax.set_xlim(-X, X)
-    ax.set_title("Density")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
-    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
-
-    if isinstance(time,Iterable):
-        frames = len(tuple(time))
-        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
-        anim.save(savepath+".gif",writer="imagemagick")
-    else:
-        animate(time)
-        fig.savefig(savepath+".png")
-        plt.show()
-    decomp_hdf5.close()
-    analyt_hdf5.close()
 
 
 def test_decomp_hde(args=(8,40,0.75,10,0.24,5,10,4)):
@@ -208,7 +164,6 @@ def test_decomp_hde(args=(8,40,0.75,10,0.24,5,10,4)):
     afp = "./tests/data/analyt_hde0.hdf5"
     analyt_file = "\"./tests/data/analyt_hde\""
     os.system("rm "+sfp)
-
     tf,npx,aff,X,Fo,alpha,blks,nps = args
     npy=npx
     Y=X
@@ -225,9 +180,9 @@ def test_decomp_hde(args=(8,40,0.75,10,0.24,5,10,4)):
 
 
 
-test_decomp_hde()
+# test_decomp_hde()
 # test_decomp()
 # test_decomp_write()
-# test_decomp_vortex()
+test_decomp_vortex()
 # notifier.fcn = test_decomp_vortex
 # notifier.run()

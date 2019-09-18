@@ -170,7 +170,7 @@ Decomp(float *state, int gts)
     __syncthreads();
     for (int j = 0; j < NV; j++)
     {
-    state[gid+j*VARS+TIMES]=shared_state[sgid+j*SGIDS];
+        state[gid+j*VARS+TIMES]=shared_state[sgid+j*SGIDS];
     }
     __syncthreads();
 }

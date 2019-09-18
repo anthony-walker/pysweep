@@ -238,69 +238,23 @@ def test_eqt2(args=(1,40,0,10,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-def test_sweep_vortex(args=None):
-    savepath = "./swept_vortex_plot"
+def test_sweep_vortex(args=(1,0.01,40,1,10,10,4)):
     swept_file = "\"./tests/data/swept_vortex\""
     sfp = "./tests/data/swept_vortex.hdf5"
-    afp = "./tests/data/analyt_vortex0.hdf5"
-    analyt_file = "\"./tests/data/analyt_vortex\""
-    # os.system("rm "+sfp)
-    tf = 0.5
-    dt = 0.01
-    npx=npy= 40
-    aff = 0.5
-    X=10
-    Y=10
+    os.system("rm "+sfp)
+    tf,dt,npx,aff,X,blks,nps = args
+    npy=npx
+    Y=X
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)
 
-    if not os.path.isfile(afp):
-        #Create analytical data
-        astr = "python ./src/pst.py analytical "+time_str
-        astr += "--hdf5 " + analyt_file+pts
-        os.system(astr)
-
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n 4 python ./src/pst.py swept_vortex "
+        estr = "mpiexec -n "+str(nps)+" python ./src/pst.py swept_vortex "
         estr += "-b 10 -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-    #Opening the data files
-    swept_hdf5 = h5py.File(sfp, 'r')
-    analyt_hdf5 = h5py.File(afp, 'r')
-    analyt_data = analyt_hdf5['data']
-    data = swept_hdf5['data'][:,0,:,:]
-    time = np.arange(0,tf,dt)[:len(data)]
-    #Meshgrid
-    xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
-    ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
-    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-
-    fig, ax =plt.subplots()
-    ax.set_ylim(-Y/2, Y/2)
-    ax.set_xlim(-X/2, X/2)
-    ax.set_title("Density")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-
-    # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(298,373,10))
-    animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=10,cmap=cm.inferno)
-    if isinstance(time,Iterable):
-        frames = len(tuple(time))
-        anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
-        anim.save(savepath+".gif",writer="imagemagick")
-    else:
-        animate(time)
-        fig.savefig(savepath+".png")
-        plt.show()
-
-    #Closing files
-    swept_hdf5.close()
-    analyt_hdf5.close()
-    temp_file.close()
 
 
 def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
@@ -331,11 +285,7 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
 
 
 
-# test_eqt2()
-test_sweep_hde()
-# test_sweep_write()
-# test_sweep()
-# test_block_management()
+test_sweep_vortex()
 
 # notifier.fcn = test_sweep_vortex
 # notifier.run()
