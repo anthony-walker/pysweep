@@ -153,8 +153,6 @@ def create_shifted_bridges(XR,ops,bgs,ss,bs,rank=None):
     y_blocks = int((lars[1]-2*ops)/bs[1])
     xsh = (x_blocks-1)*bs[0]
     ysh = (y_blocks-1)*bs[1]
-
-
     #Standard bridge writes
     for x,y in bgs:
         wxt = tuple()
@@ -176,13 +174,13 @@ def create_shifted_bridges(XR,ops,bgs,ss,bs,rank=None):
         #Edge Bridge Writes
         if c1: #Top edge -  periodic x
             xtt = tuple()
-            nx = slice(x.start+xsh,x.stop+xsh,1)
-            xc = nx.start > SPX
-            nx = nx if xc else slice(SPX,x.stop,1)
+            xc = x.start > SPX
+            nx = x if xc else slice(SPX,x.stop,1)
             tfxs = 0+nx.start-SPX
             tfx = slice(tfxs,tfxs+(nx.stop-nx.start),1)
             tfys = XR[3].start+y.start
             tfy = slice(tfys,tfys+(y.stop-y.start),1)
+            nx = slice(nx.start+xsh,nx.stop+xsh,1)
             #Adjustment for multiple blocks per rank
             xtt += ((nx,y,tfx,tfy),)
             for i in range(1,y_blocks):
@@ -190,21 +188,23 @@ def create_shifted_bridges(XR,ops,bgs,ss,bs,rank=None):
                 tfy = slice(tfy.start+bs[1],tfy.stop+bs[1],1)
                 xtt += ((nx,y,tfx,tfy),)
             wxt += (xtt,)
-        # if c2: #Side edge -  periodic y
-        #     ytt = tuple()
-        #     yc = y.start > SPY
-        #     ny = y if yc else slice(SPY,y.stop,1)
-        #     tfys = 0+ny.start-SPY
-        #     tfy = slice(tfys,tfys+(ny.stop-ny.start),1)
-        #     tfxs = XR[2].start+x.start
-        #     tfx = slice(tfxs,tfxs+(x.stop-x.start),1)
-        #     ytt += ((x,ny,tfx,tfy),)
-        #     #Adjustment for multiple blocks
-        #     for i in range(1,x_blocks):
-        #         x = slice(x.start+bs[0],x.stop+bs[0],1)
-        #         tfx = slice(tfx.start+bs[0],tfx.stop+bs[0],1)
-        #         ytt += ((x,ny,tfx,tfy),)
-        #     wxt += (ytt,)
+
+        if c2: #Side edge -  periodic y
+            ytt = tuple()
+            yc = y.start > SPY
+            ny = y if yc else slice(SPY,y.stop,1)
+            tfys = 0+ny.start-SPY
+            tfy = slice(tfys,tfys+(ny.stop-ny.start),1)
+            tfxs = XR[2].start+x.start
+            tfx = slice(tfxs,tfxs+(x.stop-x.start),1)
+            ny = slice(ny.start+ysh,ny.stop+ysh,1)
+            ytt += ((x,ny,tfx,tfy),)
+            #Adjustment for multiple blocks
+            for i in range(1,x_blocks):
+                x = slice(x.start+bs[0],x.stop+bs[0],1)
+                tfx = slice(tfx.start+bs[0],tfx.stop+bs[0],1)
+                ytt += ((x,ny,tfx,tfy),)
+            wxt += (ytt,)
         if wxt:
             pwxt += wxt,
     return pwxt

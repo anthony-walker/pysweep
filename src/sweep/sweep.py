@@ -257,23 +257,9 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #-------------------------------SWEPT RULE---------------------------------------------#
     pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-
-    # if rank == 2:
-    #     print(SBDR)
-    #     input()
-    # comm.Barrier()
-
     UpPyramid(sarr,larr,WR,BDR,up_sets,wb,pargs) #THis modifies shared array
     wb+=1
     comm.Barrier()
-    # if rank == master_rank:
-    #     print("UPPYRAMID1")
-    #     for i in range(TSO,len(sarr)):
-    #         # pm(larr,i)
-    #         # print("----------------------------------")
-    #         pm(sarr,i)
-    #         input()
-    # comm.Barrier()
     #-------------------------------FIRST BRIDGE-------------------------------------------#
     #Getting x and y arrays
     xarr = np.copy(sarr[XR])
@@ -282,36 +268,16 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     # Bridge Step
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
-    # if rank == master_rank:
-    #     print("BRIDGE0")
-    #     for i in range(TSO,len(sarr)):
-    #         # pm(larr,i)
-    #         # print("----------------------------------")
-    #         pm(sarr,i)
-    #         input()
-    # comm.Barrier()
     #------------------------------SWEPT LOOP-------------------------------#
     #Getting next points for the local array
-
     larr = np.copy(sarr[SRR])
     comm.Barrier()
-    # print(rank,SBDR)
-    # pm(larr,TSO+2)
-    # print(shared_shape)
     #Swept Octahedrons and Bridges
     for GST in range(MGST):
         comm.Barrier()  #Read barrier for local array
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         Octahedron(sarr,larr,SWR,SBDR,oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
-        # if rank == master_rank:
-        #     print("OCTAHEDRON1")
-        #     for i in range(TSO,len(sarr)):
-        #         # pm(larr,i)
-        #         # print("----------------------------------")
-        #         pm(sarr,i)
-        #         input()
-        # comm.Barrier()
         # Writing Step
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()  #Write Barrier
@@ -324,23 +290,8 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         yarr = np.copy(sarr[XR])
         comm.Barrier()  #Barrier after read
         #Reverse Bridge Step
-        #,wxts,wyts
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
-
-
-        for i in range(TSO,len(sarr)):
-            if rank == master_rank:
-                input()
-            comm.Barrier()
-            if rank == 2:
-                print(wxts)
-                print("BRIDGE1")
-                # pm(yarr,i)
-                # print("----------------------------------")
-                # pm(sarr,i)
-            comm.Barrier()
-
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         larr = np.copy(sarr[RR])
@@ -348,14 +299,6 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Octahedron Step
         Octahedron(sarr,larr,WR,BDR,oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
-        # if rank == master_rank:
-        #     print("OCTAHEDRON2")
-        #     for i in range(TSO,len(sarr)):
-        #         # pm(larr,i)
-        #         # print("----------------------------------")
-        #         pm(sarr,i)
-        #         input()
-        # comm.Barrier()
         #Write step
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()

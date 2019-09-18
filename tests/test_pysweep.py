@@ -218,6 +218,26 @@ def plot_step(data,t,i,npx,X):
         ct+=1
     plt.savefig(prim_path+pn+png)
 
+
+def test_eqt2(args=(1,40,0,10,5,10,4)):
+    """Use this function to troubleshoot the swept rule"""
+    swept_file = "\"./tests/data/swept_eqt2\""
+    sfp = "./tests/data/swept_eqt2.hdf5"
+    os.system("rm "+sfp)
+    tf,npx,aff,X,alpha,blks,nps = args
+    npy=npx
+    Y=X
+    dt = 0.01
+    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
+    pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
+
+    if not os.path.isfile(sfp):
+        #Create data using solver
+        estr = "ccde mpiexec -n "+str(nps)+" python ./src/pst.py stest2 "
+        estr += "-b "+str(blks)+" -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/eqt2.h\" -c \"./src/equations/eqt2.py\" "
+        estr += "--hdf5 " + swept_file + pts +time_str
+        os.system(estr)
+
 def test_sweep_vortex(args=None):
     savepath = "./swept_vortex_plot"
     swept_file = "\"./tests/data/swept_vortex\""
@@ -283,9 +303,7 @@ def test_sweep_vortex(args=None):
     temp_file.close()
 
 
-
-
-def test_sweep_hde(args=(5,40,1,10,0.24,5,10,4)):
+def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./tests/data/swept_hde\""
     sfp = "./tests/data/swept_hde.hdf5"
@@ -307,67 +325,14 @@ def test_sweep_hde(args=(5,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-    # if not os.path.isfile(afp):
-    #     #Create analytical data
-    #     astr = "python ./src/pst.py analytical "+time_str
-    #     astr += "--hdf5 " + analyt_file+pts
-    #     os.system(astr)
-
-    # Opening the data files
-    # swept_hdf5 = h5py.File(sfp, 'r')
-    # data = swept_hdf5['data'][:,0,:,:]
-    # time = np.arange(0,tf,dt)[:len(data)]
-    #
-    # # Meshgrid
-    # xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
-    # ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
-    # xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-    #
-    # fig, ax =plt.subplots()
-    # ax.set_ylim(-Y/2, Y/2)
-    # ax.set_xlim(-X/2, X/2)
-    # ax.set_title("Density")
-    # ax.set_xlabel("X")
-    # ax.set_ylabel("Y")
-    #
-    # fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(300,375,10))
-    # animate = lambda i: ax.contourf(xgrid,ygrid,data[i,:,:],levels=20,cmap=cm.inferno)
-    # if isinstance(time,Iterable):
-    #     frames = len(tuple(time))
-    #     anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
-    #     anim.save(savepath+".gif",writer="imagemagick")
-    # else:
-    #     animate(0)
-    #     fig.savefig(savepath+".png")
-    #     plt.show()
-
-    #Closing files
-    # swept_hdf5.close()
-
-
-def test_eqt2(args=(1,40,0.5,10,5,10,4)):
-    """Use this function to troubleshoot the swept rule"""
-    swept_file = "\"./tests/data/swept_eqt2\""
-    sfp = "./tests/data/swept_eqt2.hdf5"
-    os.system("rm "+sfp)
-    tf,npx,aff,X,alpha,blks,nps = args
-    npy=npx
-    Y=X
-    dt = 0.01
-    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
-    pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
-
-    if not os.path.isfile(sfp):
-        #Create data using solver
-        estr = "ccde mpiexec -n "+str(nps)+" python ./src/pst.py stest2 "
-        estr += "-b "+str(blks)+" -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/eqt2.h\" -c \"./src/equations/eqt2.py\" "
-        estr += "--hdf5 " + swept_file + pts +time_str
-        os.system(estr)
 
 
 
-test_eqt2()
-# test_sweep_hde()
+
+
+
+# test_eqt2()
+test_sweep_hde()
 # test_sweep_write()
 # test_sweep()
 # test_block_management()
