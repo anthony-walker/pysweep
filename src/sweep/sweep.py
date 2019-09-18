@@ -202,8 +202,8 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     #--------------------------CREATING OTHER REGIONS--------------------------#
     RR = create_read_region(WR,OPS)   #Create read region
     SRR,SWR,XR,YR = create_shift_regions(RR,SPLITX,SPLITY,shared_shape,OPS)  #Create shifted read region
-    BDR = create_boundaries(WR,SPLITX,SPLITY,OPS,shared_shape,bridge_slices)
-    SBDR = create_shifted_boundaries(SWR,SPLITX,SPLITY,OPS,shared_shape,BS)
+    BDR = create_boundaries(WR,SPLITX,SPLITY,OPS,shared_shape)
+    SBDR = create_shifted_boundaries(SWR,SPLITX,SPLITY,OPS,shared_shape)
     wxt = create_standard_bridges(XR,OPS,bridge_slices[0],shared_shape,BS,rank)
     wyt = create_standard_bridges(YR,OPS,bridge_slices[1],shared_shape,BS,rank)
     wxts = create_shifted_bridges(YR,OPS,bridge_slices[0],shared_shape,BS,rank)
@@ -283,7 +283,7 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
     comm.Barrier()  #Solving Bridge Barrier
     # if rank == master_rank:
-    #     print("BRIDGE1")
+    #     print("BRIDGE0")
     #     for i in range(TSO,len(sarr)):
     #         # pm(larr,i)
     #         # print("----------------------------------")
@@ -295,8 +295,8 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
 
     larr = np.copy(sarr[SRR])
     comm.Barrier()
-    print(rank,SBDR)
-    pm(larr,TSO+2)
+    # print(rank,SBDR)
+    # pm(larr,TSO+2)
     # print(shared_shape)
     #Swept Octahedrons and Bridges
     for GST in range(MGST):
@@ -304,14 +304,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
         Octahedron(sarr,larr,SWR,SBDR,oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
-        if rank == master_rank:
-            print("OCTAHEDRON1")
-            for i in range(TSO,len(sarr)):
-                # pm(larr,i)
-                # print("----------------------------------")
-                pm(sarr,i)
-                input()
-        comm.Barrier()
+        # if rank == master_rank:
+        #     print("OCTAHEDRON1")
+        #     for i in range(TSO,len(sarr)):
+        #         # pm(larr,i)
+        #         # print("----------------------------------")
+        #         pm(sarr,i)
+        #         input()
+        # comm.Barrier()
         # Writing Step
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()  #Write Barrier
@@ -324,16 +324,23 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         yarr = np.copy(sarr[XR])
         comm.Barrier()  #Barrier after read
         #Reverse Bridge Step
+        #,wxts,wyts
         Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb,pargs) #THis modifies shared array
         comm.Barrier()  #Solving Bridge Barrier
-        if rank == master_rank:
-            print("BRIDGE1")
-            for i in range(TSO,len(sarr)):
-                # pm(larr,i)
-                # print("----------------------------------")
-                pm(sarr,i)
+
+
+        for i in range(TSO,len(sarr)):
+            if rank == master_rank:
                 input()
-        comm.Barrier()
+            comm.Barrier()
+            if rank == 2:
+                print(wxts)
+                print("BRIDGE1")
+                # pm(yarr,i)
+                # print("----------------------------------")
+                # pm(sarr,i)
+            comm.Barrier()
+
         #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
         #Getting next points for the local array
         larr = np.copy(sarr[RR])
@@ -341,14 +348,14 @@ def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[
         #Octahedron Step
         Octahedron(sarr,larr,WR,BDR,oct_sets,wb,pargs)
         comm.Barrier()  #Solving Barrier
-        if rank == master_rank:
-            print("OCTAHEDRON2")
-            for i in range(TSO,len(sarr)):
-                # pm(larr,i)
-                # print("----------------------------------")
-                pm(sarr,i)
-                input()
-        comm.Barrier()
+        # if rank == master_rank:
+        #     print("OCTAHEDRON2")
+        #     for i in range(TSO,len(sarr)):
+        #         # pm(larr,i)
+        #         # print("----------------------------------")
+        #         pm(sarr,i)
+        #         input()
+        # comm.Barrier()
         #Write step
         cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
         comm.Barrier()

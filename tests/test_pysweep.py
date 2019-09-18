@@ -360,7 +360,7 @@ def test_eqt2(args=(1,40,0.5,10,5,10,4)):
     if not os.path.isfile(sfp):
         #Create data using solver
         estr = "ccde mpiexec -n "+str(nps)+" python ./src/pst.py stest2 "
-        estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/eqt2.h\" -c \"./src/equations/eqt2.py\" "
+        estr += "-b "+str(blks)+" -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/eqt2.h\" -c \"./src/equations/eqt2.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
