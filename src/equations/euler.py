@@ -145,8 +145,8 @@ def eflux(left_state,right_state,xy):
         flux+=[left_state[1],left_state[1]*uL+PL,left_state[1]*vL,(left_state[3]+PL)*uL]
         flux+=[right_state[1],right_state[1]*uR+PR,right_state[1]*vR,(right_state[3]+PR)*uR]
     else: #Y flux
-        flux+=[left_state[2],left_state[2]*uL,left_state[2]*vL+PL,(left_state[3]+PL)*vL]
-        flux+=[right_state[2],right_state[2]*uR,right_state[2]*vR+PR,(right_state[3]+PR)*vR]
+        flux-=[left_state[2],left_state[2]*uL,left_state[2]*vL+PL,(left_state[3]+PL)*vL]
+        flux-=[right_state[2],right_state[2]*uR,right_state[2]*vR+PR,(right_state[3]+PR)*vR]
     return flux
 
 def espectral(left_state,right_state,xy):

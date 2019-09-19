@@ -8,6 +8,9 @@ dependencies:
   - blas=1.0=mkl
   - ca-certificates=2019.5.15=1
   - certifi=2019.6.16=py37_1
+  - fastcache=1.1.0=py37h7b6447c_0
+  - gmp=6.1.2=hb3b607b_0
+  - gmpy2=2.0.8=py37h10f8cd9_2
   - importlib_metadata=0.19=py37_0
   - intel-openmp=2019.4=243
   - libedit=3.1.20181209=hc058e9b_0
@@ -19,6 +22,9 @@ dependencies:
   - mkl_fft=1.0.12=py37ha843d7b_0
   - mkl_random=1.0.2=py37hd81dba3_0
   - more-itertools=7.2.0=py37_0
+  - mpc=1.1.0=h10f8cd9_1
+  - mpfr=4.0.1=hdf1c602_3
+  - mpmath=1.1.0=py37_0
   - ncurses=6.1=he6710b0_1
   - numpy=1.16.4=py37h7e9f1db_0
   - numpy-base=1.16.4=py37hde5b4d6_0
@@ -30,6 +36,7 @@ dependencies:
   - readline=7.0=h7b6447c_5
   - setuptools=41.0.1=py37_0
   - sqlite=3.29.0=h7b6447c_0
+  - sympy=1.4=py37_0
   - tk=8.6.8=hbc83047_0
   - wheel=0.33.4=py37_0
   - xz=5.2.4=h14c3975_4

@@ -35,7 +35,7 @@ def set_lims(fig,axes):
         ax.set_ylabel("Y")
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(lim1[i],lim2[i],10))
 
-def comp_gif(filename="vsdc.gif"):
+def comp_gif(filename="vsdc0.gif"):
     dpath = "./decomp_hde_plot.gif"
     spath = "./swept_hde_plot.gif"
     decomp_file = "/home/walkanth/pysweep/tests/data/decomp_vortex.hdf5"

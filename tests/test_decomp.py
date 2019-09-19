@@ -139,7 +139,7 @@ def test_decomp_write(args=None):
         assert (hdf5_data_set[i,0,:,:]-hdf5_data_set[i-1,0,:,:]==2).all()
     os.system("rm "+test_file)
 
-def test_decomp_vortex(args=(1,0.01,40,1,10,10,4)):
+def test_decomp_vortex(args=(2,0.01,40,0,10,10,4)):
     decomp_file = "\"./tests/data/decomp_vortex\""
     sfp = "./tests/data/decomp_vortex.hdf5"
     os.system("rm "+sfp)
