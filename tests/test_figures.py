@@ -36,8 +36,6 @@ def set_lims(fig,axes):
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(lim1[i],lim2[i],10))
 
 def comp_gif(filename="vsdc0.gif"):
-    dpath = "./decomp_hde_plot.gif"
-    spath = "./swept_hde_plot.gif"
     decomp_file = "/home/walkanth/pysweep/tests/data/decomp_vortex.hdf5"
     swept_file =  "/home/walkanth/pysweep/tests/data/swept_vortex.hdf5"
     #Opening the data files
@@ -51,6 +49,34 @@ def comp_gif(filename="vsdc0.gif"):
     for i,si in enumerate(range(0,len(tsdata)-adj,adj)):
         sdata[i,:,:] = tsdata[si,:,:]
         ddata[i,:,:] = tddata[si,:,:]
+    X=Y=10
+    # # Meshgrid
+    xpts = np.linspace(-X/2,X/2,len(sdata[0]),dtype=np.float64)
+    ypts = np.linspace(-Y/2,Y/2,len(ddata[0]),dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+    gs = gsc.GridSpec(2, 2)
+    fig = plt.figure()
+
+    ax1 = plt.subplot(gs[0,0])
+    ax2 = plt.subplot(gs[0,1])
+    ax3 = plt.subplot(gs[1,:])
+    set_lims(fig,(ax1,ax2,ax3))
+
+    animate = sweep_lambda((myContour,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata))
+    frames = len(ddata[0])
+    anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
+    anim.save(filename,writer="imagemagick")
+    #Closing files
+    swept_hdf5.close()
+
+def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="vsdc.gif",idx=0):
+    #Opening the data files
+    swept_hdf5 = h5py.File(swept_file, 'r')
+    tsdata = swept_hdf5['data'][:,idx,:,:]
+    adj = 10
+    sdata = np.zeros((int(len(tsdata)/adj),tsdata.shape[1],tsdata.shape[2]))
+    for i,si in enumerate(range(0,len(tsdata)-adj,adj)):
+        sdata[i,:,:] = tsdata[si,:,:]
     X=Y=10
     # # Meshgrid
     xpts = np.linspace(-X/2,X/2,len(sdata[0]),dtype=np.float64)

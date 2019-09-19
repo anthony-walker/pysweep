@@ -279,12 +279,6 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-
-
-
-
-
-
 test_sweep_vortex()
 
 # notifier.fcn = test_sweep_vortex
