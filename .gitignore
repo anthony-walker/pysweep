@@ -10,7 +10,7 @@ sources/
 figures/
 results/
 post_sweep/
-notipy/
+#notipy/
 *.gif
 nrg-nodes
 vortex/
