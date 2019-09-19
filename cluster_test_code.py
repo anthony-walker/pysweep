@@ -10,10 +10,11 @@ rank = comm.Get_rank()  #current rank
 print(rank,processor)
 comm.Barrier()
 #Test shared array creation
-dT = np.float32
+dT = np.dtype('float32')
+itemsize = int(dT.itemsize)
 arr = np.zeros((10,10),dtype=dT)
 ashape = arr.shape
-win = MPI.Win.Allocate_shared(arr.nbytes, dT.itemsize, comm=comm)
+win = MPI.Win.Allocate_shared(arr.nbytes, itemsize, comm=comm)
 shared_buf, itemsize = win.Shared_query(0)
 sarr = np.ndarray(buffer=shared_buf, dtype=dT.type, shape=ashape)
 comm.Barrier()
