@@ -63,13 +63,13 @@ def comp_gif(filename="vsdc0.gif"):
     set_lims(fig,(ax1,ax2,ax3))
 
     animate = sweep_lambda((myContour,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata))
-    frames = len(ddata[0])
+    frames = len(ddata)
     anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
     anim.save(filename,writer="imagemagick")
     #Closing files
     swept_hdf5.close()
 
-def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="vsdc.gif",idx=0):
+def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept_vortex.gif",idx=0):
     #Opening the data files
     swept_hdf5 = h5py.File(swept_file, 'r')
     tsdata = swept_hdf5['data'][:,idx,:,:]
@@ -80,21 +80,26 @@ def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="vsdc.
     X=Y=10
     # # Meshgrid
     xpts = np.linspace(-X/2,X/2,len(sdata[0]),dtype=np.float64)
-    ypts = np.linspace(-Y/2,Y/2,len(ddata[0]),dtype=np.float64)
+    ypts = np.linspace(-Y/2,Y/2,len(sdata[0]),dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
     gs = gsc.GridSpec(2, 2)
     fig = plt.figure()
 
-    ax1 = plt.subplot(gs[0,0])
-    ax2 = plt.subplot(gs[0,1])
-    ax3 = plt.subplot(gs[1,:])
-    set_lims(fig,(ax1,ax2,ax3))
+    levels = 10
+    fig, ax =plt.subplots()
+    ax.set_ylim(-Y, Y)
+    ax.set_xlim(-X, X)
+    ax.set_title(property)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
 
-    animate = sweep_lambda((myContour,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata))
-    frames = len(ddata[0])
-    anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
+    # pos = ax.imshow(Zpos, cmap='Blues', interpolation='none')
+    fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(-1,1,10))
+    animate = lambda i: ax.contourf(xgrid,ygrid,sdata[i,:,:],levels=levels,cmap=cm.inferno)
+    frames = len(sdata)
+    anim = animation.FuncAnimation(fig,animate,frames=frames)
     anim.save(filename,writer="imagemagick")
     #Closing files
     swept_hdf5.close()
 
-comp_gif()
+create_hdf_gif()

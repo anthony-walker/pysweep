@@ -22,8 +22,6 @@ import matplotlib.animation as animation
 from notipy import NotiPy
 from mpi4py import MPI
 
-sm = "Hi,\nYour function run is complete.\n"
-notifier = NotiPy(None,tuple(),sm,"asw42695@gmail.com",timeout=None)
 
 
 def pm(arr,i):
@@ -279,7 +277,7 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-test_sweep_vortex()
-
-# notifier.fcn = test_sweep_vortex
-# notifier.run()
+#test_sweep_vortex()
+sm = "Hi,\nYour function run is complete.\n"
+notifier = NotiPy(test_sweep_vortex,(2,0.01,40,0,10,10,4),sm,"asw42695@gmail.com",timeout=None)
+notifier.run()
