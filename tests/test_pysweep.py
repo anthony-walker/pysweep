@@ -236,7 +236,7 @@ def test_eqt2(args=(1,40,0,10,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-def test_sweep_vortex(args=(2,0.01,40,0,10,10,4)):
+def test_sweep_vortex(args=(1,0.01,40,0,10,10,4)):
     swept_file = "\"./tests/data/swept_vortex\""
     sfp = "./tests/data/swept_vortex.hdf5"
     os.system("rm "+sfp)
@@ -277,7 +277,7 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-#test_sweep_vortex()
-sm = "Hi,\nYour function run is complete.\n"
-notifier = NotiPy(test_sweep_vortex,(2,0.01,40,0,10,10,4),sm,"asw42695@gmail.com",timeout=None)
-notifier.run()
+test_sweep_vortex()
+# sm = "Hi,\nYour function run is complete.\n"
+# notifier = NotiPy(test_sweep_vortex,(1,0.0001,40,0,10,10,4),sm,"asw42695@gmail.com",timeout=None)
+# notifier.run()

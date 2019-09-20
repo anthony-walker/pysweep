@@ -66,13 +66,17 @@ def test_flux():
     #Testing Flux
     dfdx,dfdy = source_mod_2D.dfdxy(num_test,iidx)
     df = source_mod_1D.fv5p(Qx,P)[2]
-
+    print(df)
+    print(dfdx)
+    print(dfdy)
     assert np.isclose(df[1],dfdx[1])
     assert np.isclose(df[1],dfdy[2])
     assert np.isclose(df[0],dfdx[0])
     assert np.isclose(df[0],dfdy[0])
     assert np.isclose(df[2],dfdx[3])
     assert np.isclose(df[2],dfdy[3])
+
+test_flux()
 
 def test_RK2_CPU():
     """Use this function to test the python version of the euler code.

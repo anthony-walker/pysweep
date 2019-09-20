@@ -5,6 +5,11 @@
 import numpy as np
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
+import sys
+import os
+cwd = os.getcwd()
+sys.path.insert(1,cwd+"/src")
+from analytical import *
 #----------------------------------Globals-------------------------------------#
 gamma = 0
 dtdx = 0
@@ -22,12 +27,13 @@ def step(state,iidx,ts,gts):
     half = 0.5
     vs = slice(0,state.shape[1],1)
     for idx,idy in iidx:
-        dfdx,dfdy = dfdxy(state,(ts,vs,idx,idy))
-        if (gts+1)%2==0:   #Corrector step
-            state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
-        else: #Predictor step
-            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*(dtdx*dfdx+dtdy*dfdy)
-    return state
+        dfdxy(state,(ts,vs,idx,idy))
+    #     dfdx,dfdy = dfdxy(state,(ts,vs,idx,idy))
+    #     if (gts+1)%2==0:   #Corrector step
+    #         state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
+    #     else: #Predictor step
+    #         state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*(dtdx*dfdx+dtdy*dfdy)
+    # return state
 
 def set_globals(gpu,source_mod,*args):
     """Use this function to set cpu global variables"""
@@ -56,15 +62,16 @@ def dfdxy(state,idx):
     ops = 2 #number of atomic operations
     idxx=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1),idx[3])
     idxy=(idx[0],idx[1],idx[2],slice(idx[3]-ops,idx[3]+ops+1,1))
-    idxyt=(idx[0],idx[1],idx[2],slice(idx[3]+ops+1,idx[3]-ops,-1))
     half = 0.5
+    print(idxx)
+    print(state[idxx])
+    print(state[idxy])
     #Finding pressure ratio
     Prx = pressure_ratio(state[idxx])
     Pry = pressure_ratio(state[idxy])
     #Finding spatial derivatives
-    dfdx = half*direction_flux(state[idxx],Prx,True)
-    dfdy = half*direction_flux(state[idxy],Pry,False)
-    return dfdx, dfdy
+    # dfdx = half*direction_flux(state[idxx],state[idxy],Prx,Pry)
+    # return dfdx, dfdy
 
 def pressure_ratio(state):
     """Use this function to calculate the pressure ratio for fpfv."""
@@ -95,7 +102,7 @@ def pressure(q):
     vss = (rho_1_inv*q[1]*q[1])+(rho_1_inv*q[2]*q[2])
     return (gamma - 1)*(q[3]-HALF*vss)
 
-def direction_flux(state,Pr,xy):
+def direction_flux(sx,sy,Prx,Pry):
     """Use this method to determine the flux in a particular direction."""
     ONE = 1    #Constant value of 1
     idx = 2     #This is the index of the point in state (stencil data)
@@ -103,18 +110,20 @@ def direction_flux(state,Pr,xy):
     flux = np.zeros(len(state[:,idx]))
 
     #Atomic Operation 1
-    tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
-    tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
+    tsw = flimiter(sx[:,idx-1],sx[:,idx],Prx[idx-2])
+    tse = flimiter(sy[:,idx],sx[:,idx-1],ONE/Prx[idx-1])
+    tsn = flimiter(sy[:,idx-1],sy[:,idx],Pry[idx-2])
+    tss = flimiter(sy[:,idx],sy[:,idx-1],ONE/Pry[idx-1])
 
-    flux += eflux(tsl,tsr,xy)
-    flux += espectral(tsl,tsr,xy)
-
-    #Atomic Operation 2
-    tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
-    tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
-
-    flux -= eflux(tsl,tsr,xy)
-    flux -= espectral(tsl,tsr,xy)
+    flux += eflux(tse,tsw,tsn,tss,xy)
+    # flux += espectral(tsl,tsr,xy)
+    #
+    # #Atomic Operation 2
+    # tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
+    # tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
+    #
+    # flux -= eflux(tsl,tsr,xy)
+    # flux -= espectral(tsl,tsr,xy)
 
     return flux
 
@@ -122,7 +131,7 @@ def flimiter(qL,qR,Pr):
     """Use this method to apply the flux limiter to get temporary state."""
     return qL+0.5*min(Pr,1)*(qL-qR) if not np.isinf(Pr) and not np.isnan(Pr) and Pr > 0 else qL
 
-def eflux(left_state,right_state,xy):
+def eflux(wst,est,nst,sst):
     """Use this method to calculation the flux.
     q (state) is set up as:
     q[0] = rho
@@ -179,15 +188,31 @@ def test_mod_load():
     print("Module sucessfully loaded.")
 
 if __name__ == "__main__":
-    TA = np.ones((5,4,10,10))
-    TA[2,:,5,5] = [3.7,1.4,0.5,0]
-    TA[2,:,5,5] = [4.5,2.3,3.8,4]
-    TA[2,:,5,5] = [0.526,0.01,0.647,0.328]
-    TA[2,:,5,5] = [3.2,1.49,0.25,0.37]
-    TA[2,:,5,5] = [0.9,0.7,0.5,0.1]
+
+    gamma  = 1.4
+
+
+    cvics = vics()
+    cvics.Shu(gamma)
+    nx  = 20
+    ny = 20
+    #Dimensions and steps
+    dx = 2*cvics.L/nx
+    dy = 2*cvics.L/ny
+    dt = 0.01
+
+    dtdx = dt/dx
+    dtdy = dt/dy
+
+    #Creating initial vortex from analytical code
+    flux_vortex = cvics.Shu(gamma,nx).flux
+    ta = np.zeros((2,)+flux_vortex.shape[1:])
+    ta[0,:,:,:] = flux_vortex[0,:,:,:]
     # for x in TA:
     #     for y in x:
     #         for t in y:
     #             print(t)
+    # print(flux_vortex[1,:,:])
+    print(ta[0,:,5,5])
     # Prx = pressure_ratio(TA,((2,5),(3,5),(4,5),(5,5),(6,5)),2)
-    step(TA,[(2,5)],2)
+    step(ta,[(2,5)],0,0)

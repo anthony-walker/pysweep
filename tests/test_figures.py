@@ -73,6 +73,7 @@ def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept
     #Opening the data files
     swept_hdf5 = h5py.File(swept_file, 'r')
     tsdata = swept_hdf5['data'][:,idx,:,:]
+    # tsdata /= swept_hdf5['data'][:,0,:,:]
     adj = 10
     sdata = np.zeros((int(len(tsdata)/adj),tsdata.shape[1],tsdata.shape[2]))
     for i,si in enumerate(range(0,len(tsdata)-adj,adj)):

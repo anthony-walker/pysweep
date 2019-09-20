@@ -4,13 +4,10 @@ former/
 *__pycache__/
 *.m
 *.hdf5
-vcluster
-testfile.py
 sources/
 figures/
 results/
 post_sweep/
 #notipy/
 *.gif
-nrg-nodes
 vortex/
