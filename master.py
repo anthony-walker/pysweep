@@ -12,7 +12,7 @@ class controller(object):
         self.ssm = "mpiexec -n "+str(self.np)+" python ~/pysweep/src/pst.py "
         self.swept = "swept_vortex"
         self.decomp = "standard_vortex"
-        self.asize = int(4*5*6)
+        self.asize = int(3*4*8)
         self.affs = np.arange(0.5,1,0.1)
         self.runs = list()
         self.block_sizes()
@@ -32,14 +32,14 @@ class controller(object):
     def block_sizes(self):
         """Use this function to create blocksizes"""
         self.blocks = list()
-        for i in range(8,33,4):
-            if self.asize%self.asize==0:
+        for i in range(8,33,2):
+            if self.asize%i==0:
                 self.blocks.append(i)
 
     def sizes(self):
         """Use this function to create a list of array sizes"""
         self.sizes = [self.asize]
-        for i in range(5,21,5):
+        for i in range(2,11,2):
             self.sizes.append(i*self.asize)
 
     def mpi_arg_parse(self,mode):
@@ -60,7 +60,6 @@ class controller(object):
                     self.runs.append(sstr)
 
 exe_cont = controller()
-# exe_cont(None)
 sm = "Hi,\nYour function run is complete.\n"
 notifier = NotiPy(exe_cont,tuple(),sm,"asw42695@gmail.com",timeout=None)
 notifier.run()
