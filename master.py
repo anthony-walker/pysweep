@@ -39,7 +39,7 @@ class controller(object):
     def sizes(self):
         """Use this function to create a list of array sizes"""
         self.sizes = [self.asize]
-        for i in range(2,11,2):
+        for i in range(2,6,1):
             self.sizes.append(i*self.asize)
 
     def mpi_arg_parse(self,mode):
