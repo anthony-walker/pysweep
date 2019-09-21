@@ -6,15 +6,15 @@ cwd = os.getcwd()
 sys.path.insert(1,cwd+"/src")
 import numpy as np
 import matplotlib as mpl
-mpl.use("Agg")
+mpl.use("tkAgg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gsc
 from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
-from mpi4py import MPI
-sys.path.insert(1,cwd+"/src")
+from mpl_toolkits import mplot3d
 from sweep import *
+from paper_plots import *
 
 def myContour(args):
     i,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata=args
@@ -34,6 +34,8 @@ def set_lims(fig,axes):
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(lim1[i],lim2[i],10))
+
+
 
 def comp_gif(filename="vsdc0.gif"):
     decomp_file = "/home/walkanth/pysweep/tests/data/decomp_vortex.hdf5"
@@ -103,4 +105,4 @@ def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept
     #Closing files
     swept_hdf5.close()
 
-create_hdf_gif()
+OCT_Fig()
