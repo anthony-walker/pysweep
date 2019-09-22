@@ -14,7 +14,9 @@ from collections.abc import Iterable
 import matplotlib.animation as animation
 from mpl_toolkits import mplot3d
 from sweep import *
-from paper_plots import *
+from shape_plots import *
+from data_plots import *
+
 
 def myContour(args):
     i,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata=args
