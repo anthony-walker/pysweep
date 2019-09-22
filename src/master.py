@@ -13,7 +13,7 @@ class controller(object):
         self.swept = "swept_vortex"
         self.decomp = "standard_vortex"
         self.asize = int(3*4*8)
-        self.affs = np.arange(0.5,1,0.1)
+        self.affs = np.arange(0.5,1.01,0.1)
         self.runs = list()
         self.block_sizes()
         self.sizes()

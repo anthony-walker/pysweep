@@ -19,13 +19,14 @@ from master import controller
 def create_test_files():
     """Use this function to create test files."""
     self = controller()
+    # print(self.blocks,self.sizes)
     hdfend = ".hdf5"
     names = ['./results/swept_vortex','./results/decomp_vortex']
     for n in names:
         for i, affinity in enumerate(self.affs):
             for j, block in enumerate(self.blocks):
                 for k, size in enumerate(self.sizes):
-                    print(i,j,k)
+                    # print(i,j,k)
                     hf = h5py.File(n+str(i)+str(j)+str(k)+hdfend,'w')
                     aff = hf.create_dataset('AF',(1,))
                     aff[0] = affinity
@@ -78,48 +79,125 @@ def create_swept_data(fn="sdcomp.hdf5"):
             dt+=1
     return sdata,ddata
 
-def create_swept_plot(cases=(0.5,0.6,0.7,0.8),cv2=12):
+def create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1):
     """Use this function to create figures"""
     sdata,ddata = create_swept_data()
     sdata[:,0] = np.round(sdata[:,0],1)
     ddata[:,0] = np.round(ddata[:,0],1)
+    idxs = [0,1,2,3]
+    idxs.remove(idx0)
+    idxs.remove(idx1)
+    idxx,idxy=idxs
+    fig = plt.figure()
+    sax = fig.add_subplot(1,2,1)
+    dax = fig.add_subplot(1,2,2)
+    plt.subplots_adjust(wspace=0.5,bottom=0.25)
+    colors = ['blue','red','green','yellow','black','magenta','cyan']
+    labels = ['Affinity','Block Size','Array Size','Time']
+    xlab = labels[idxx]
+    ylab = labels[idxy]
+    sax.set_title('Swept')
+    sax.set_ylabel(ylab)
+    sax.set_xlabel(xlab)
+    dax.set_title('Standard')
+    dax.set_ylabel(ylab)
+    dax.set_xlabel(xlab)
+    clab = labels[idx0]
+    clab2 = labels[idx1]
+    leglist = list()
+    fig.suptitle(clab+" Performance Comparison with Constant "+clab2+" ("+str(cv2[0])+")")
+    maxy = 0
     #Keep affinity constant:
+    ct = 0
+    for c1 in cv1:
+        leglist.append(str(c1))
+        for c2 in cv2:
+            xl = list()
+            yl = list()
+            for row in sdata:
+                if row[idx0] == c1 and row[idx1]==c2:
+                    xl.append(row[idxx])
+                    yl.append(row[idxy])
+                    if row[idxy] > maxy:
+                        maxy = row[idxy]
+            Z = [(x,y) for x,y in sorted(zip(xl,yl))]
+            if Z:
+                xl = list()
+                yl = list()
+                for z in Z:
+                    xl.append(z[0])
+                    yl.append(z[1])
+                sax.plot(xl,yl,color=colors[ct],marker='o')
+                ct+=1
+    sax.legend(leglist,ncol=len(leglist),bbox_to_anchor=(1.25, -0.3),loc="lower center")
+    #Keep affinity constant:
+    ct = 0
+    for c1 in cv1:
+        for c2 in cv2:
+            xl = list()
+            yl = list()
+            for row in ddata:
+                if row[idx0] == c1 and row[idx1]==c2:
+                    xl.append(row[idxx])
+                    yl.append(row[idxy])
+                    if row[idxy] > maxy:
+                        maxy = row[idxy]
+            Z = [(x,y) for x,y in sorted(zip(xl,yl))]
+            if Z:
+                xl = list()
+                yl = list()
+                for z in Z:
+                    xl.append(z[0])
+                    yl.append(z[1])
+                dax.plot(xl,yl,color=colors[ct],marker='o')
+                ct+=1
+    dax.set_ylim(0,np.ceil(maxy))
+    sax.set_ylim(0,np.ceil(maxy))
+    clb2str = str(cv2[0])
+    clb2str = clb2str.replace('.','')
+    fig.savefig('./figures/'+clab[:5]+"_"+xlab[:5]+"_"+clab2[:5]+clb2str)
+    return fig
 
-    index = 1
-    sdata = sdata[sdata[:,index].argsort()]
-    ddata = ddata[ddata[:,index].argsort()]
+def create_case_plots():
+    """This function creates the plots of interest for the paper"""
+    #Constant block size plots
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(8,),idx1=1)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(16,),idx1=1)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(24,),idx1=1)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(32,),idx1=1)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(8,),idx1=1)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(12,),idx1=1)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(16,),idx1=1)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(24,),idx1=1)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(32,),idx1=1)
+    #Constant Affinity Plots
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.5,),idx1=0)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.6,),idx1=0)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.7,),idx1=0)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.8,),idx1=0)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.9,),idx1=0)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(1.0,),idx1=0)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.5,),idx1=0)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.6,),idx1=0)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.7,),idx1=0)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.8,),idx1=0)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.9,),idx1=0)
+    create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(1.0,),idx1=0)
 
-    # sset = sorted(list(set(sdata[:,index])))
-    # sdict = dict()
-    # ddict = dict()
-    #
-    # for key in sset:
-    #     sdict[key]= (list(),list(),list(),list())
-    #     ddict[key]= (list(),list(),list(),list())
-    #
-    # for row in sdata:
-    #     sdict[row[index]][0].append(row[0])
-    #     sdict[row[index]][1].append(row[1])
-    #     sdict[row[index]][2].append(row[2])
-    #     sdict[row[index]][3].append(row[3])
-    #
-    # for row in ddata:
-    #     ddict[row[index]][0].append(row[0])
-    #     ddict[row[index]][1].append(row[1])
-    #     ddict[row[index]][2].append(row[2])
-    #     ddict[row[index]][3].append(row[3])
-    #
-    # fig = plt.figure()
-    # sax = fig.add_subplot(1,2,1)
-    # dax = fig.add_subplot(1,2,2)
-    # colors = ['blue','red','green','yellow','black','magenta','cyan']
-    # for i,key in enumerate(sset):
-    #     print(sdict[key][3])
-    #     print(sdict[key][1])
-    #     sax.scatter(sdict[key][2],sdict[key][3],color=colors[i])
-    #     dax.scatter(ddict[key][2],ddict[key][3],color=colors[i])
-    # plt.show()
-# create_test_files()
-# create_combined_hdf5()
-create_swept_plot()
+    #Constant Array Size Plot
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(96,),idx1=2)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(192,),idx1=2)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(288,),idx1=2)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(384,),idx1=2)
+    create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(480,),idx1=2)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(96,),idx1=2)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(192,),idx1=2)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(288,),idx1=2)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(384,),idx1=2)
+    create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(480,),idx1=2)
+
+
+
+create_case_plots()
 #
