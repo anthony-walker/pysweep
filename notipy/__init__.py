@@ -1,1 +1,0 @@
-from .notipy import NotiPy

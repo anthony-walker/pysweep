@@ -176,9 +176,6 @@ def test_sweep_pattern(args=None):
             hdf5_file.close()
             os.system("rm "+test_file) #Deleting testfile
 
-
-
-
 def test_sweep_write(args=None):
     estr = "mpiexec -n 8 python ./src/pst.py stest "
     estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "

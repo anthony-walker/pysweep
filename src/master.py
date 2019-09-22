@@ -3,7 +3,7 @@
 #Create arguments here for the solver and call them with pst.py
 import os
 import numpy as np
-from notipy.notipy import NotiPy
+from notipy import NotiPy
 
 class controller(object):
     def __init__(self):
@@ -59,7 +59,8 @@ class controller(object):
                     sstr += " -dt "+str(dt)+" -tf "+str(tf)
                     self.runs.append(sstr)
 
-exe_cont = controller()
-sm = "Hi,\nYour function run is complete.\n"
-notifier = NotiPy(exe_cont,tuple(),sm,"asw42695@gmail.com",timeout=None)
-notifier.run()
+if __name__ == "__main__":
+    exe_cont = controller()
+    sm = "Hi,\nYour function run is complete.\n"
+    notifier = NotiPy(exe_cont,tuple(),sm,"asw42695@gmail.com",timeout=None)
+    notifier.run()
