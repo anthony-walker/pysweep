@@ -36,13 +36,13 @@ def create_test_files():
                     arr_size[:] = (500,4,size,size)
                     tme = hf.create_dataset('time',(1,))
                     if 'decomp' in n:
-                        tme[0] = 10000/size/affinity/block*1.5
+                        tme[0] = 10000/size/affinity/block*1.5*np.random.ranf()*0.25
                     else:
-                        tme[0] = 10000/size/affinity/block
+                        tme[0] = 10000/size/affinity/block*np.random.ranf()*0.25
                     hf.close()
 
 
-def create_combined_hdf5(nfn="sdcomp.hdf5",sfn="swept_vortex",dfn="decomp_vortex",direc="/home/walkanth/pysweep/results/"):
+def create_combined_hdf5(nfn="sdcomp.hdf5",sfn="swept_vortex",dfn="decomp_vortex",direc="./results/"):
     """Use this function to create a combined hdf set"""
     files = os.listdir(direc)
     hf = h5py.File(direc+files[0],'r')
@@ -92,7 +92,8 @@ def create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1):
     sax = fig.add_subplot(1,2,1)
     dax = fig.add_subplot(1,2,2)
     plt.subplots_adjust(wspace=0.5,bottom=0.25)
-    colors = ['blue','red','green','yellow','black','magenta','cyan']
+    colors = ['blue','red','green','orange','black','#7160FD','#06ABFD']
+    markers = ['o','v','P','D','s','X','>','<']
     labels = ['Affinity','Block Size','Array Size','Time']
     xlab = labels[idxx]
     ylab = labels[idxy]
@@ -127,7 +128,7 @@ def create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1):
                 for z in Z:
                     xl.append(z[0])
                     yl.append(z[1])
-                sax.plot(xl,yl,color=colors[ct],marker='o')
+                sax.plot(xl,yl,color=colors[ct],marker=markers[ct])
                 ct+=1
     sax.legend(leglist,ncol=len(leglist),bbox_to_anchor=(1.25, -0.3),loc="lower center")
     #Keep affinity constant:
@@ -149,14 +150,83 @@ def create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1):
                 for z in Z:
                     xl.append(z[0])
                     yl.append(z[1])
-                dax.plot(xl,yl,color=colors[ct],marker='o')
+                dax.plot(xl,yl,color=colors[ct],marker=markers[ct])
                 ct+=1
     dax.set_ylim(0,np.ceil(maxy))
     sax.set_ylim(0,np.ceil(maxy))
     clb2str = str(cv2[0])
     clb2str = clb2str.replace('.','')
     fig.savefig('./figures/'+clab[:5]+"_"+xlab[:5]+"_"+clab2[:5]+clb2str)
-    return fig
+    plt.close()
+
+def create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1):
+    """Use this function to create figures"""
+    sdata,ddata = create_swept_data()
+    sdata[:,0] = np.round(sdata[:,0],1)
+    ddata[:,0] = np.round(ddata[:,0],1)
+    idxs = [0,1,2,3]
+    idxs.remove(idx0)
+    idxs.remove(idx1)
+    idxx,idxy=idxs
+    fig = plt.figure()
+    sax = fig.add_subplot(1,1,1)
+    plt.subplots_adjust(bottom=0.175)
+    colors = ['blue','red','green','orange','black','#7160FD','#06ABFD']
+    markers = ['o','v','P','D','s','X','>','<']
+    labels = ['Affinitie','Block Size','Array Size','Time']
+    xlab = labels[idxx]
+    xlab = 'Affinity' if xlab is 'Affinitie' else xlab
+    ylab = labels[idxy]
+    clab = labels[idx0]
+    clab2 = labels[idx1]
+    fig.suptitle("Swept Speed Up For Various "+clab+"s with Constant "+clab2+" ("+str(cv2[0])+")")
+    sax.set_ylabel('Speed Up')
+    sax.set_xlabel(xlab)
+    leglist = list()
+    maxy = 0
+    yrm = 0
+    #Keep affinity constant:
+    ct = 0
+    for c1 in cv1:
+        leglist.append(str(c1))
+        for c2 in cv2:
+            #Swept
+            xl = list()
+            yl = list()
+            for row in sdata:
+                if row[idx0] == c1 and row[idx1]==c2:
+                    xl.append(row[idxx])
+                    yl.append(row[idxy])
+                    if row[idxy] > maxy:
+                        maxy = row[idxy]
+            Z = [(x,y) for x,y in sorted(zip(xl,yl))]
+            #Nonswept
+            dxl = list()
+            dyl = list()
+            for row in ddata:
+                if row[idx0] == c1 and row[idx1]==c2:
+                    dxl.append(row[idxx])
+                    dyl.append(row[idxy])
+                    if row[idxy] > maxy:
+                        maxy = row[idxy]
+            dZ = [(x,y) for x,y in sorted(zip(dxl,dyl))]
+            if Z and dZ:
+                xl = list()
+                yl = list()
+                for i in range(len(Z)):
+                    yr = Z[i][1]/dZ[i][1]
+                    xl.append(Z[i][0])
+                    yl.append(yr)
+                    if yrm < yr:
+                        yrm = yr
+                sax.plot(xl,yl,color=colors[ct],marker=markers[ct])
+                ct+=1
+    sax.legend(leglist,ncol=len(leglist),bbox_to_anchor=(0.5, -0.25),loc="lower center")
+    sax.set_ylim(0,np.ceil(yrm))
+    clb2str = str(cv2[0])
+    clb2str = clb2str.replace('.','')
+    fig.savefig('./figures/NR'+clab[:5]+"_"+xlab[:5]+"_"+clab2[:5]+clb2str)
+    plt.close()
 
 def create_case_plots():
     """This function creates the plots of interest for the paper"""
@@ -166,11 +236,13 @@ def create_case_plots():
     create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(16,),idx1=1)
     create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(24,),idx1=1)
     create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(32,),idx1=1)
+
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(8,),idx1=1)
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(12,),idx1=1)
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(16,),idx1=1)
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(24,),idx1=1)
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(32,),idx1=1)
+
     #Constant Affinity Plots
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.5,),idx1=0)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.6,),idx1=0)
@@ -178,6 +250,7 @@ def create_case_plots():
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.8,),idx1=0)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.9,),idx1=0)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(1.0,),idx1=0)
+
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.5,),idx1=0)
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.6,),idx1=0)
     create_swept_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.7,),idx1=0)
@@ -191,12 +264,56 @@ def create_case_plots():
     create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(288,),idx1=2)
     create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(384,),idx1=2)
     create_swept_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(480,),idx1=2)
+
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(96,),idx1=2)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(192,),idx1=2)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(288,),idx1=2)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(384,),idx1=2)
     create_swept_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(480,),idx1=2)
 
+    #Speed up plots
+    #Constant block size plots
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(8,),idx1=1)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(12,),idx1=1)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(16,),idx1=1)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(24,),idx1=1)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(32,),idx1=1)
+
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(8,),idx1=1)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(12,),idx1=1)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(16,),idx1=1)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(24,),idx1=1)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(32,),idx1=1)
+
+    #Constant Affinity Plots
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.5,),idx1=0)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.6,),idx1=0)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.7,),idx1=0)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.8,),idx1=0)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(0.9,),idx1=0)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(1.0,),idx1=0)
+
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.5,),idx1=0)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.6,),idx1=0)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.7,),idx1=0)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.8,),idx1=0)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(0.9,),idx1=0)
+    create_speedup_plot(cv1=(96,192,288,284,480),idx0=2,cv2=(1.0,),idx1=0)
+
+    #Constant Array Size Plot
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(96,),idx1=2)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(192,),idx1=2)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(288,),idx1=2)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(384,),idx1=2)
+    create_speedup_plot(cv1=(0.5,0.6,0.7,0.8,0.9,1),idx0=0,cv2=(480,),idx1=2)
+
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(96,),idx1=2)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(192,),idx1=2)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(288,),idx1=2)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(384,),idx1=2)
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(480,),idx1=2)
 
 if __name__ == "__main__":
+    # create_test_files()
+    # create_combined_hdf5()
     create_case_plots()
