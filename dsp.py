@@ -92,7 +92,7 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-    gpu_rank = GPUtil.getAvailable(order = 'first',excludeID=exid,limit=1e8) #getting devices by load
+    gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
 
     print(gpu_rank)
 
