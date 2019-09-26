@@ -7,7 +7,7 @@ import os
 import sys
 
 #Writing imports
-import h5py
+# import h5py
 
 #DataStructure and Math imports
 import math
@@ -15,9 +15,9 @@ import numpy as np
 from collections import deque
 
 #CUDA Imports
-import pycuda.driver as cuda
-import pycuda.autoinit  #Cor debugging only
-from pycuda.compiler import SourceModule
+# import pycuda.driver as cuda
+# import pycuda.autoinit  #Cor debugging only
+# from pycuda.compiler import SourceModule
 # import pycuda.gpuarray as gpuarray
 
 #MPI imports
@@ -31,12 +31,12 @@ import ctypes
 import GPUtil
 
 #Swept imports
-from .pysweep_lambda import sweep_lambda
-from .pysweep_functions import *
-from .pysweep_decomposition import *
-from .pysweep_block import *
-from .pysweep_regions import *
-from .pysweep_source import *
+# from .pysweep_lambda import sweep_lambda
+# from .pysweep_functions import *
+# from .pysweep_decomposition import *
+# from .pysweep_block import *
+# from .pysweep_regions import *
+# from .pysweep_source import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -88,9 +88,11 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
+    cpu_procs = mp.cpu_count()
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
+    print(processor,cpu_procs)
     # #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     # if rank == master_rank:
     #     #Determining the split between gpu and cpu
@@ -342,18 +344,26 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     # if rank == master_rank:
     #     return avg_time
 
-if name == main:
-    comm = MPI.COMM_WORLD
-    master_rank = 0
-    rank = comm.Get_rank()  #current rank
-    nx = ny = 128
+if __name__ == "__main__":
+    nx = ny = 32
+    bs = 8
+    t0 = 0
+    tf = 0.1
+    dt = 0.01
+    dx = dy = 0.1
+    gamma = 1.4
     arr = np.ones((4,nx,ny))
+    printer = pysweep_printer(rank,master_rank)
     X = 1
     Y = 1
+    tso = 2
+    ops = 2
+    aff = 0.1
+
     #Dimensions and steps
-    dx = X/args.nx
-    dy = Y/args.ny
+    dx = X/nx
+    dy = Y/ny
     #Changing arguments
-    gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
-    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    sweep(arr,gargs,swargs,filename=args.hdf5)
+    gargs = (tf,t0,dt,dx,dy,gamma)
+    swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
+    dist_sweep(arr,gargs,swargs,filename="test")

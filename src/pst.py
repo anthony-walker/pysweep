@@ -168,3 +168,27 @@ parser.add_argument("-tf",nargs="?",default=1,type=float)
 parser.add_argument("-dt",nargs="?",default=0.05,type=float)
 args = parser.parse_args()
 fmap[args.fcn](args)
+
+if __name__ == "__main__":
+    nx = ny = 32
+    bs = 8
+    t0 = 0
+    tf = 0.1
+    dt = 0.01
+    dx = dy = 0.1
+    gamma = 1.4
+    arr = np.ones((4,nx,ny))
+    printer = pysweep_printer(rank,master_rank)
+    X = 1
+    Y = 1
+    tso = 2
+    ops = 2
+    aff = 0.1
+
+    #Dimensions and steps
+    dx = X/nx
+    dy = Y/ny
+    #Changing arguments
+    gargs = (tf,t0,dt,dx,dy,gamma)
+    swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
+    dist_sweep(arr,gargs,swargs,filename="test")
