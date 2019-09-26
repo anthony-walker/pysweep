@@ -92,30 +92,34 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-    print(processor,cpu_procs)
-    # #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
-    # if rank == master_rank:
-    #     #Determining the split between gpu and cpu
-    #     gpu_slices,cpu_slices = get_affinity_slices(AF,BS,arr0.shape)
-    #     #Getting gpus
-    #     if AF>0:
-    #         gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
-    #         gpu_rank = [(True,id) for id in gpu_rank]
-    #         num_gpus = len(gpu_rank)
-    #     else:
-    #         gpu_rank = []
-    #         num_gpus = 0
-    #     gpu_rank += [(False,None) for i in range(num_gpus,num_ranks)]
-    #     gpu_ranks = np.array([i for i in range(ZERO,num_gpus)])
-    #     cpu_ranks = np.array([i for i in range(num_gpus,num_ranks)])
-    #     #Update boundary points
-    # else:
-    #     gpu_rank = None
-    #     gpu_ranks = None
-    #     cpu_ranks = None
-    #     gpu_slices = None
-    #     cpu_slices = None
-    # #-------------------------------INITIAL COLLECTIVE COMMUNICATION
+    gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
+
+    print(gpu_rank)
+
+    #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
+    if rank == master_rank:
+        #Determining the split between gpu and cpu
+        # gpu_slices,cpu_slices = get_affinity_slices(AF,BS,arr0.shape)
+        #Getting gpus
+        if AF>0:
+            gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
+            gpu_rank = [(True,id) for id in gpu_rank]
+            num_gpus = len(gpu_rank)
+
+        else:
+            gpu_rank = []
+            num_gpus = 0
+        gpu_rank += [(False,None) for i in range(num_gpus,num_ranks)]
+        gpu_ranks = np.array([i for i in range(ZERO,num_gpus)])
+        cpu_ranks = np.array([i for i in range(num_gpus,num_ranks)])
+        #Update boundary points
+    else:
+        gpu_rank = None
+        gpu_ranks = None
+        cpu_ranks = None
+        gpu_slices = None
+        cpu_slices = None
+    #-------------------------------INITIAL COLLECTIVE COMMUNICATION
     # gpu_rank = comm.scatter(gpu_rank,root=master_rank)
     # gpu_ranks = comm.bcast(gpu_ranks,root=master_rank)
     # cpu_ranks = comm.bcast(cpu_ranks,root=master_rank)
