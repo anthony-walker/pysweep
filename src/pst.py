@@ -2,6 +2,7 @@
 #This is a file for testing decomp and sweep
 import sys
 from sweep import *
+from dist_sweep import *
 from analytical import *
 from equations import *
 from decomp import *
@@ -14,7 +15,6 @@ def pm(arr,i):
         for si in item:
             sys.stdout.write("%1.2f"%si+", ")
         sys.stdout.write("]\n")
-
 
 def AnalyticalVortex(args):
     """Use this function to create analytical vortex data."""
@@ -108,6 +108,22 @@ def STP(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     sweep(arr,gargs,swargs,filename=args.hdf5)
 
+def DSTP(args):
+    comm = MPI.COMM_WORLD
+    master_rank = 0
+    rank = comm.Get_rank()  #current rank
+    arr = np.ones((4,args.nx,args.ny))
+    printer = pysweep_printer(rank,master_rank)
+    X = 1
+    Y = 1
+    #Dimensions and steps
+    dx = X/args.nx
+    dy = Y/args.ny
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    dist_sweep(arr,gargs,swargs,filename=args.hdf5)
+
 def DTP(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
@@ -129,7 +145,7 @@ parser = argparse.ArgumentParser()
 fmap = {'swept_vortex' : SweptVortex,
                 'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
                                 'standard_hde' : StandardHDE, "stest":STP, "stest2":STP2,
-                                "dtest":DTP, "analytical":AnalyticalVortex}
+                                "dtest":DTP, "dstest":DSTP, "analytical":AnalyticalVortex}
 parser.add_argument('fcn', choices=fmap.keys())
 parser.add_argument("-b","--block",nargs="?",default=8,type=int)
 parser.add_argument("-o","--ops",nargs="?",default=2,type=int)
