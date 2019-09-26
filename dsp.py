@@ -51,6 +51,9 @@ def pm(arr,i):
             sys.stdout.write("%1.1f"%si+", ")
         sys.stdout.write("]\n")
 
+def node_split():
+    """Use this function to split data amongst nodes."""
+    pass
 
 def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
@@ -89,9 +92,9 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     nodes = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     master_node = ZERO #master rank
-    num_nodes = nodes.Get_size() #number of ranks
+    total_num_cpus = nodes.Get_size() #number of ranks
     node = nodes.Get_rank()  #current rank
-    num_cpus = mp.cpu_count()*num_nodes #Assumes all nodes have the same number of cores in CPU
+    num_cores = mp.cpu_count()*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
     #Getting GPUs if affinity is greater than 1
     if AF>0:
@@ -106,6 +109,7 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     NB = np.prod(arr0.shape[1:])/np.prod(BS)
     #Assert that the total number of blocks is an integer
     assert (NB).is_integer()
+    print(total_num_cpus,total_num_gpus,num_cores)
 
 
     #MAKE NODE SPLIT HERE
