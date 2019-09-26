@@ -38,7 +38,6 @@ import GPUtil
 # from .pysweep_regions import *
 # from .pysweep_source import *
 import importlib.util
-from tensorflow.python.client import device_lib
 #Testing and Debugging
 import warnings
 import time as timer
@@ -52,9 +51,6 @@ def pm(arr,i):
             sys.stdout.write("%1.1f"%si+", ")
         sys.stdout.write("]\n")
 
-def get_available_gpus():
-    local_device_protos = device_lib.list_local_devices()
-    return [x.name for x in local_device_protos if x.device_type == 'GPU']
 
 def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
@@ -96,7 +92,7 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     master_rank = ZERO #master rank
     num_ranks = comm.Get_size() #number of ranks
     rank = comm.Get_rank()  #current rank
-    gpu_rank = get_available_gpus() #getting devices by load
+    gpu_rank = GPUtil.getAvailable(order = 'first',excludeID=exid,limit=1e8) #getting devices by load
 
     print(gpu_rank)
 
