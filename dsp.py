@@ -353,7 +353,6 @@ if __name__ == "__main__":
     dx = dy = 0.1
     gamma = 1.4
     arr = np.ones((4,nx,ny))
-    printer = pysweep_printer(rank,master_rank)
     X = 1
     Y = 1
     tso = 2
