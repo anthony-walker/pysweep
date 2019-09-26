@@ -86,15 +86,30 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     TOPS = TWO*OPS
     #Getting GPU info
     #-------------MPI Set up----------------------------#
-    comm = MPI.COMM_WORLD
+    nodes = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
-    cpu_procs = mp.cpu_count()
-    master_rank = ZERO #master rank
-    num_ranks = comm.Get_size() #number of ranks
-    rank = comm.Get_rank()  #current rank
-    gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
+    master_node = ZERO #master rank
+    num_nodes = nodes.Get_size() #number of ranks
+    node = nodes.Get_rank()  #current rank
+    num_cpus = mp.cpu_count()*num_nodes #Assumes all nodes have the same number of cores in CPU
 
-    print(gpu_rank)
+    #Getting GPUs if affinity is greater than 1
+    if AF>0:
+        gpu_node = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
+        gpu_node = [(True,id) for id in gpu_node]
+        num_gpus = len(gpu_node)
+    else:
+        gpu_node = []
+        num_gpus = 0
+
+    #Get total number of blocks
+    NB = np.prod(arr0.shape[1:])/np.prod(BS)
+    #Assert that the total number of blocks is an integer
+    assert (NB).is_integer()
+
+
+    #MAKE NODE SPLIT HERE
+
 
     #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     # if rank == master_rank:
