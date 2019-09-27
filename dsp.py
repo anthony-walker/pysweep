@@ -13,7 +13,7 @@ import sys
 import math
 import numpy as np
 from collections import deque
-
+from itertools import cycle
 #CUDA Imports
 # import pycuda.driver as cuda
 # import pycuda.autoinit  #Cor debugging only
@@ -51,9 +51,32 @@ def pm(arr,i):
             sys.stdout.write("%1.1f"%si+", ")
         sys.stdout.write("]\n")
 
-def node_split():
+def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
     """Use this function to split data amongst nodes."""
-    pass
+    #Assert that the total number of blocks is an integer
+    gpu_rows = np.ceil(num_block_rows*AF)
+    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
+    cpu_rows = num_block_rows-gpu_rows
+    rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
+    #Over estimate number of rows
+    node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
+    #Number of row correction
+    tnr = nodes.gather(node_rows)
+    cores = nodes.gather(num_cores)
+    if node == master_node:
+        total_rows = np.sum(tnr)
+        cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
+        ncyc = cycle(range(0,nodes.Get_size(),1))
+        min_cores = min(cores)
+        while total_rows > num_block_rows:
+            curr = next(ncyc)
+            if min_cores >= cores[curr]:
+                tnr[curr]-=1
+                total_rows-=1
+            min_cores += next(cis)
+    nodes.Barrier()
+    node_rows = nodes.scatter(tnr,root=master_node)
+    return node_rows
 
 def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
@@ -94,7 +117,8 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     master_node = ZERO #master rank
     total_num_cpus = nodes.Get_size() #number of ranks
     node = nodes.Get_rank()  #current rank
-    num_cores = mp.cpu_count()*total_num_cpus #Assumes all nodes have the same number of cores in CPU
+    num_cores = mp.cpu_count()
+    total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
     #Getting GPUs if affinity is greater than 1
     if AF>0:
@@ -104,15 +128,23 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     else:
         gpu_node = []
         num_gpus = 0
+    num_cores -= num_gpus
 
+    #Get total number of GPUs
+    total_num_gpus = np.sum(nodes.allgather(num_gpus))
     #Get total number of blocks
     NB = np.prod(arr0.shape[1:])/np.prod(BS)
-    #Assert that the total number of blocks is an integer
     assert (NB).is_integer()
-    print(total_num_cpus,total_num_gpus,num_cores)
+    num_block_rows = arr0.shape[1]/BS[0]
+    #This function splits the rows among the nodes by affinity
+    node_rows = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
+    print(node, node_rows)
+    #Gathering a list of all nodes
+    node_list = nodes.allgather(node)
+    
+    #Sending adjusted number of rows
 
-
-    #MAKE NODE SPLIT HERE
+    # node_split(node,total_num_cpus,total_num_gpus,AF,BS)
 
 
     #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
@@ -368,7 +400,7 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     #     return avg_time
 
 if __name__ == "__main__":
-    nx = ny = 32
+    nx = ny = 512
     bs = 8
     t0 = 0
     tf = 0.1
@@ -380,9 +412,7 @@ if __name__ == "__main__":
     Y = 1
     tso = 2
     ops = 2
-    aff = 0.1
-
-    #Dimensions and steps
+    aff = 0.5    #Dimensions and steps
     dx = X/nx
     dy = Y/ny
     #Changing arguments

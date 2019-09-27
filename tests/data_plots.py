@@ -316,4 +316,5 @@ def create_case_plots():
 if __name__ == "__main__":
     # create_test_files()
     # create_combined_hdf5()
-    create_case_plots()
+    # create_case_plots()
+    create_speedup_plot(cv1=(8,12,16,24,32),idx0=1,cv2=(480,),idx1=2)
