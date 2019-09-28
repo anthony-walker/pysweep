@@ -134,7 +134,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     master_node = ZERO #master rank
     total_num_cpus = nodes.Get_size() #number of ranks
     node = nodes.Get_rank()  #current rank
-    num_cores = mp.cpu_count()
+    num_cores = pool_size = mp.cpu_count()
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
     #Getting GPUs if affinity is greater than 1
@@ -187,10 +187,14 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
 
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (time_steps,arr0.shape[0],int(node_rows*BS[1]),arr0.shape[2])
+    shared_shape = (MOSS+TSO+ONE,time_steps,arr0.shape[0],int(node_rows*BS[1]),arr0.shape[2])
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
     sarr = np.ctypeslib.as_array(sarr_base.get_obj())
     sarr = sarr.reshape(shared_shape)
+
+    
+
+
 
     # #Fill shared array and communicate initial boundaries
     # if rank == master_rank:
@@ -199,7 +203,8 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     # #------------------------------DECOMPOSITION BY REGION CREATION--------------#
     # GRB = gpu_rank[ZERO]
     # #Splits regions up amongst architecture
-    # if GRB:
+    # if GRB:#Total number of GPUS
+
     #     gri = gpu_comm.Get_rank()
     #     cri = None
     #     WR = create_write_region(gpu_comm,gri,gpu_master,num_gpus,BS,arr0.shape,gpu_slices,shared_shape[0],OPS)
