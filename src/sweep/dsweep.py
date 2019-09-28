@@ -7,18 +7,20 @@ import os
 import sys
 
 #Writing imports
-# import h5py
+import h5py
 
 #DataStructure and Math imports
 import math
 import numpy as np
+import ctypes
 from collections import deque
 from itertools import cycle
+
 #CUDA Imports
-# import pycuda.driver as cuda
-# import pycuda.autoinit  #Cor debugging only
-# from pycuda.compiler import SourceModule
-# import pycuda.gpuarray as gpuarray
+import pycuda.driver as cuda
+import pycuda.autoinit  #Cor debugging only
+from pycuda.compiler import SourceModule
+import pycuda.gpuarray as gpuarray
 
 #MPI imports
 from mpi4py import MPI
@@ -31,12 +33,12 @@ import ctypes
 import GPUtil
 
 #Swept imports
-# from .pysweep_lambda import sweep_lambda
-# from .pysweep_functions import *
-# from .pysweep_decomposition import *
-# from .pysweep_block import *
-# from .pysweep_regions import *
-# from .pysweep_source import *
+from .pysweep_lambda import sweep_lambda
+from .pysweep_functions import *
+from .pysweep_decomposition import *
+from .pysweep_block import *
+from .pysweep_regions import *
+from .pysweep_source import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -78,7 +80,21 @@ def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_core
     node_rows = nodes.scatter(tnr,root=master_node)
     return node_rows
 
-def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
+# def create_shared_arrays():
+#     """Use this function to create shared memory arrays for node communication."""
+#     #----------------------------Creating shared arrays-------------------------#
+#     global cpu_array
+#     cpu_array_base = mp.Array(ctypes.c_double, shm_dim)
+#     cpu_array = np.ctypeslib.as_array(cpu_array_base.get_obj())
+#     cpu_array = cpu_array.reshape(block_size)
+#
+#     global gpu_array
+#     gpu_array_base = mp.Array(ctypes.c_double, shm_dim)
+#     gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
+#     gpu_array = gpu_array.reshape(block_size)
+
+
+def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -137,85 +153,37 @@ def dist_sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",e
     assert (NB).is_integer()
     num_block_rows = arr0.shape[1]/BS[0]
     #This function splits the rows among the nodes by affinity
-    node_rows = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
+    node_rows = int(node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus))
     print(node, node_rows)
     #Gathering a list of all nodes
     node_list = nodes.allgather(node)
-    
-    #Sending adjusted number of rows
+    #---------------------SWEPT VARIABLE SETUP----------------------$
+    #Splits for shared array
+    SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
+    SPLITY = int(BS[ONE]/TWO)   #Split computation shift
+    up_sets = create_up_sets(BS,OPS)
+    down_sets = create_down_sets(BS,OPS)[:-1]
+    oct_sets = down_sets+up_sets[1:]
+    MPSS = len(up_sets)
+    MOSS = len(oct_sets)
+    bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
+    IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
 
-    # node_split(node,total_num_cpus,total_num_gpus,AF,BS)
+    #----------------Data Input setup -------------------------#
+    time_steps = int((tf-t0)/dt)  #Number of time steps
+    #Global swept step
+    MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
+    time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
 
+    #-----------------------SHARED ARRAY CREATION----------------------#
+    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
 
-    #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
-    # if rank == master_rank:
-    #     #Determining the split between gpu and cpu
-    #     # gpu_slices,cpu_slices = get_affinity_slices(AF,BS,arr0.shape)
-    #     #Getting gpus
-    #     if AF>0:
-    #         gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
-    #         gpu_rank = [(True,id) for id in gpu_rank]
-    #         num_gpus = len(gpu_rank)
-    #
-    #     else:
-    #         gpu_rank = []
-    #         num_gpus = 0
-    #     gpu_rank += [(False,None) for i in range(num_gpus,num_ranks)]
-    #     gpu_ranks = np.array([i for i in range(ZERO,num_gpus)])
-    #     cpu_ranks = np.array([i for i in range(num_gpus,num_ranks)])
-    #     #Update boundary points
-    # else:
-    #     gpu_rank = None
-    #     gpu_ranks = None
-    #     cpu_ranks = None
-    #     gpu_slices = None
-    #     cpu_slices = None
-    #-------------------------------INITIAL COLLECTIVE COMMUNICATION
-    # gpu_rank = comm.scatter(gpu_rank,root=master_rank)
-    # gpu_ranks = comm.bcast(gpu_ranks,root=master_rank)
-    # cpu_ranks = comm.bcast(cpu_ranks,root=master_rank)
-    # gpu_slices = comm.bcast(gpu_slices,root=master_rank)
-    # cpu_slices = comm.bcast(cpu_slices,root=master_rank)
-    # #GPU rank- MPI Variables
-    # if AF > 0:
-    #     gpu_group  = comm.group.Incl(gpu_ranks)
-    #     gpu_comm = comm.Create_group(gpu_group)
-    #     gpu_master = ZERO
-    # #Destroys cpu processes if AF is one
-    # if AF == 1:
-    #     comm = comm.Create_group(gpu_group)
-    #     if rank not in gpu_ranks:
-    #         MPI.Finalize()
-    #         exit(0)
-    # else:
-    #     #CPU rank- MPI Variables
-    #     cpu_group  = comm.group.Incl(cpu_ranks)
-    #     cpu_comm = comm.Create_group(cpu_group)
-    #     cpu_master = ZERO
-    # #Number of each architecture
-    # num_gpus = len(gpu_ranks)
-    # num_cpus = len(cpu_ranks)
-    # #---------------------SWEPT VARIABLE SETUP----------------------$
-    # #Splits for shared array
-    # SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
-    # # SPLITX = SPLITX if SPLITX%2==0 else SPLITX-1
-    # SPLITY = int(BS[ONE]/TWO)   #Split computation shift
-    # # SPLITY = SPLITY if SPLITY%2==0 else SPLITY-1
-    # up_sets = create_up_sets(BS,OPS)
-    # down_sets = create_down_sets(BS,OPS)[:-1]
-    # oct_sets = down_sets+up_sets[1:]
-    # MPSS = len(up_sets)
-    # MOSS = len(oct_sets)
-    # bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
-    # IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
-    # #----------------Data Input setup -------------------------#
-    # time_steps = int((tf-t0)/dt)  #Number of time steps
-    # #Global swept step
-    # MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
-    # # time_steps = int(np.ceil(((MGST-1+IEP)*2*MPSS/TSO))) #Updating time steps
-    # time_steps = (MGST*(MOSS)/TSO)+MPSS #Updating time steps
-    # #-----------------------SHARED ARRAY CREATION----------------------#
-    # #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
+    shared_shape = (time_steps,arr0.shape[0],node_rows,arr0.shape[2])
+    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
+    sarr = np.ctypeslib.as_array(sarr_base.get_obj())
+    sarr = sarr.reshape(shared_shape)
+    print(sarr.shape)
+
     # shared_shape = (MOSS+TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS+SPLITX,arr0.shape[TWO]+TOPS+SPLITY)
     # sarr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
@@ -418,4 +386,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (tf,t0,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
-    dist_sweep(arr,gargs,swargs,filename="test")
+    dsweep(arr,gargs,swargs,filename="test")

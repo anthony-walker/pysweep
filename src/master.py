@@ -2,8 +2,12 @@
 #This is the main file for running and testing the swept solver
 #Create arguments here for the solver and call them with pst.py
 import os
+import sys
 import numpy as np
 from notipy import NotiPy
+cwd = os.getcwd()
+sys.path.insert(1,cwd+"/src")
+from sweep import *
 
 class controller(object):
     def __init__(self):
@@ -60,7 +64,26 @@ class controller(object):
                     self.runs.append(sstr)
 
 if __name__ == "__main__":
-    exe_cont = controller()
-    sm = "Hi,\nYour function run is complete.\n"
-    notifier = NotiPy(exe_cont,tuple(),sm,"asw42695@gmail.com",timeout=None)
-    notifier.run()
+    # exe_cont = controller()
+    # sm = "Hi,\nYour function run is complete.\n"
+    # notifier = NotiPy(exe_cont,tuple(),sm,"asw42695@gmail.com",timeout=None)
+    # notifier.run()
+    nx = ny = 512
+    bs = 8
+    t0 = 0
+    tf = 1
+    dt = 0.1
+    dx = dy = 0.1
+    gamma = 1.4
+    arr = np.ones((4,nx,ny))
+    X = 1
+    Y = 1
+    tso = 2
+    ops = 2
+    aff = 0.5    #Dimensions and steps
+    dx = X/nx
+    dy = Y/ny
+    #Changing arguments
+    gargs = (t0,tf,dt,dx,dy,gamma)
+    swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
+    dsweep(arr,gargs,swargs,filename="test")
