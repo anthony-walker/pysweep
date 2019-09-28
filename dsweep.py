@@ -146,7 +146,6 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
         gpu_node = []
         num_gpus = 0
     num_cores -= num_gpus
-
     #Get total number of GPUs
     total_num_gpus = np.sum(nodes.allgather(num_gpus))
     #Get total number of blocks
@@ -155,9 +154,19 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     num_block_rows = arr0.shape[1]/BS[0]
     #This function splits the rows among the nodes by affinity
     node_rows = int(node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus))
-    print(node, node_rows)
     #Gathering a list of all nodes
-    node_list = nodes.allgather(node)
+    node_list = cycle(nodes.allgather((node,node_rows)))
+    #Creating forward and backward nodes
+    fnode = bnode = None
+    prev = next(node_list)
+    nxt = next(node_list)
+    while fnode is None:
+        curr = nxt
+        nxt = next(node_list)
+        if curr[0] == node:
+            fnode = nxt
+            bnode = prev
+        prev = curr
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
     SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
@@ -178,16 +187,11 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
 
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-
-    shared_shape = (time_steps,arr0.shape[0],node_rows,arr0.shape[2])
+    shared_shape = (time_steps,arr0.shape[0],int(node_rows*BS[1]),arr0.shape[2])
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
     sarr = np.ctypeslib.as_array(sarr_base.get_obj())
     sarr = sarr.reshape(shared_shape)
-    print(sarr.shape)
 
-    # shared_shape = (MOSS+TSO+ONE,arr0.shape[ZERO],arr0.shape[ONE]+TOPS+SPLITX,arr0.shape[TWO]+TOPS+SPLITY)
-    # sarr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
-    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     # #Fill shared array and communicate initial boundaries
     # if rank == master_rank:
     #     np.copyto(sarr[TSO-ONE,:,OPS:arr0.shape[ONE]+OPS,OPS:arr0.shape[TWO]+OPS],arr0[:,:,:])
