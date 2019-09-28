@@ -3,9 +3,10 @@
 #PySweep is a package used to implement the swept rule for solving PDEs
 
 #System imports
-import os
 import sys
-
+import os
+cwd = os.getcwd()
+sys.path.insert(1,cwd+"/src/sweep")
 #Writing imports
 import h5py
 
@@ -17,10 +18,10 @@ from collections import deque
 from itertools import cycle
 
 #CUDA Imports
-import pycuda.driver as cuda
-import pycuda.autoinit  #Cor debugging only
-from pycuda.compiler import SourceModule
-import pycuda.gpuarray as gpuarray
+# import pycuda.driver as cuda
+# import pycuda.autoinit  #Cor debugging only
+# from pycuda.compiler import SourceModule
+# import pycuda.gpuarray as gpuarray
 
 #MPI imports
 from mpi4py import MPI
@@ -33,12 +34,12 @@ import ctypes
 import GPUtil
 
 #Swept imports
-from .pysweep_lambda import sweep_lambda
-from .pysweep_functions import *
-from .pysweep_decomposition import *
-from .pysweep_block import *
-from .pysweep_regions import *
-from .pysweep_source import *
+# from .pysweep_lambda import sweep_lambda
+# from .pysweep_functions import *
+# from .pysweep_decomposition import *
+from pysweep_block import *
+# from .pysweep_regions import *
+# from .pysweep_source import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -384,6 +385,6 @@ if __name__ == "__main__":
     dx = X/nx
     dy = Y/ny
     #Changing arguments
-    gargs = (tf,t0,dt,dx,dy,gamma)
+    gargs = (t0,tf,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
     dsweep(arr,gargs,swargs,filename="test")
