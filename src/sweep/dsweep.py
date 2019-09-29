@@ -207,7 +207,6 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #Filling shared array
     global_slice =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[0,:,:,:] = arr0[:,global_slice,:]
-    print(np.sum(sarr[0]))
 
     # #Fill shared array and communicate initial boundaries
     # if rank == master_rank:
