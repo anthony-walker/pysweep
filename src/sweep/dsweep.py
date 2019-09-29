@@ -18,10 +18,10 @@ from collections import deque
 from itertools import cycle
 
 #CUDA Imports
-# import pycuda.driver as cuda
-# import pycuda.autoinit  #Cor debugging only
-# from pycuda.compiler import SourceModule
-# import pycuda.gpuarray as gpuarray
+import pycuda.driver as cuda
+import pycuda.autoinit  #Cor debugging only
+from pycuda.compiler import SourceModule
+import pycuda.gpuarray as gpuarray
 
 #MPI imports
 from mpi4py import MPI
@@ -34,12 +34,12 @@ import ctypes
 import GPUtil
 
 #Swept imports
-# from .pysweep_lambda import sweep_lambda
-# from .pysweep_functions import *
-# from .pysweep_decomposition import *
+from .pysweep_lambda import sweep_lambda
+from .pysweep_functions import *
+from .pysweep_decomposition import *
 from pysweep_block import *
-# from .pysweep_regions import *
-# from .pysweep_source import *
+from .pysweep_regions import *
+from .pysweep_source import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -130,6 +130,10 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #Getting GPU info
     #-------------MPI Set up----------------------------#
     nodes = MPI.COMM_WORLD
+    if rank == 0:
+        exid = [1]
+    else:
+        exid = [0]
     processor = MPI.Get_processor_name()
     master_node = ZERO #master rank
     total_num_cpus = nodes.Get_size() #number of ranks
@@ -191,8 +195,6 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
     sarr = np.ctypeslib.as_array(sarr_base.get_obj())
     sarr = sarr.reshape(shared_shape)
-
-    
 
 
 
