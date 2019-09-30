@@ -10,7 +10,12 @@ if __name__ == "__main__":
     dx = dy = 0.1
     gamma = 1.4
     arr = np.ones((4,nx,ny))
-    arr[:,256:,:] += 1
+    ct = 0
+    for i in range(nx):
+        for j in range(ny):
+            arr[0,i,j] = ct
+            ct+=1
+    # arr[:,256:,:] += 1
     X = 1
     Y = 1
     tso = 2
@@ -21,7 +26,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
-
-
-
     dsweep(arr,gargs,swargs,filename="test")

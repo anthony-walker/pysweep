@@ -90,19 +90,11 @@ def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_core
                 total_rows+=1
             max_cores -= next(cis)
     nodes.Barrier()
-    return nodes.bcast((nlst,tnr),root=master_node)
-# def create_shared_arrays():
-#     """Use this function to create shared memory arrays for node communication."""
-#     #----------------------------Creating shared arrays-------------------------#
-#     global cpu_array
-#     cpu_array_base = mp.Array(ctypes.c_double, shm_dim)
-#     cpu_array = np.ctypeslib.as_array(cpu_array_base.get_obj())
-#     cpu_array = cpu_array.reshape(block_size)
-#
-#     global gpu_array
-#     gpu_array_base = mp.Array(ctypes.c_double, shm_dim)
-#     gpu_array = np.ctypeslib.as_array(gpu_array_base.get_obj())
-#     gpu_array = gpu_array.reshape(block_size)
+    return nodes.bcast((nlst,tnr),root=master_node)+(gpu_rows,)
+
+def node_comm(nodes,fnode,cnode,bnode,sarr):
+    """Use this function to communicate node data"""
+    pass
 
 
 def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
@@ -169,7 +161,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     assert (NB).is_integer()
     num_block_rows = arr0.shape[1]/BS[0]
     #This function splits the rows among the nodes by affinity
-    node_ids,node_row_list = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
+    node_ids,node_row_list,gpu_rows = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
     node_row_list = [int(x) for x in node_row_list]
     #Getting nodes in front and behind current node
     nidx = node_ids.index(node)
@@ -181,8 +173,8 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
 
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
-    SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
-    SPLITY = int(BS[ONE]/TWO)   #Split computation shift
+    SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
+    SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
     up_sets = create_up_sets(BS,OPS)
     down_sets = create_down_sets(BS,OPS)[:-1]
     oct_sets = down_sets+up_sets[1:]
@@ -199,19 +191,15 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
 
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[1]),arr0.shape[2])
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2])
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
     sarr = np.ctypeslib.as_array(sarr_base.get_obj())
     sarr = sarr.reshape(shared_shape)
 
     #Filling shared array
-    global_slice =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    sarr[0,:,:,:] = arr0[:,global_slice,:]
-
-    # #Fill shared array and communicate initial boundaries
-    # if rank == master_rank:
-    #     np.copyto(sarr[TSO-ONE,:,OPS:arr0.shape[ONE]+OPS,OPS:arr0.shape[TWO]+OPS],arr0[:,:,:])
-    #     boundary_update(sarr,OPS,SPLITX,SPLITY)   #communicate boundaries
+    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
+    sarr[0,:,:,:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
+    print(sarr.shape)
     # #------------------------------DECOMPOSITION BY REGION CREATION--------------#
     # GRB = gpu_rank[ZERO]
     # #Splits regions up amongst architecture
