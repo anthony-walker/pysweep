@@ -199,7 +199,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[0,:,:,:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
-    print(sarr.shape)
+
     # #------------------------------DECOMPOSITION BY REGION CREATION--------------#
     # GRB = gpu_rank[ZERO]
     # #Splits regions up amongst architecture
