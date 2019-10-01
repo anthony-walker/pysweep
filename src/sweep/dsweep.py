@@ -138,7 +138,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     node = nodes.Get_rank()  #current rank
     num_cores = pool_size = mp.cpu_count() - 8
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
-
+    proc_pool = mp.Pool(pool_size)
 
     if node == 0:
         exid = [1]
@@ -191,14 +191,28 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
 
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2])
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
     sarr = np.ctypeslib.as_array(sarr_base.get_obj())
     sarr = sarr.reshape(shared_shape)
 
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    sarr[0,:,:,:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
+    sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
+    sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
+    sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
+    create_blocks(shared_shape,node_rows,gpu_rows,BS,num_gpus,SPX,SPY,OPS)
+
+def create_blocks(shared_shape,node_rows,gpu_rows,BS,num_gpus,spx,spy,ops):
+    """Use this function to create blocks."""
+    cpu_rows = node_rows-gpu_rows
+    blocks = []
+    for i in range(num_gpus):
+        blocks += (slice(spx+BS[0]*node_rows*i,spx+BS[0]*node_rows*(i+1),1),slice(ops,shared_shape[3]-ops,1))
+    cstart = BS[0]*node_rows*num_gpus+spx
+    print(cstart)
+    row_range = range(cstart,shared_shape[2],BS[0])
+    print(row_range)
 
     # #------------------------------DECOMPOSITION BY REGION CREATION--------------#
     # GRB = gpu_rank[ZERO]
