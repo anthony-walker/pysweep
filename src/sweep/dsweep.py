@@ -47,6 +47,12 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
+def pm(arr,i):
+    for item in arr[i,0,:,:]:
+        sys.stdout.write("[ ")
+        for si in item:
+            sys.stdout.write("%1.1f"%si+", ")
+        sys.stdout.write("]\n")
 
 def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     """Use this function to perform swept rule
@@ -146,38 +152,40 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
     sarr = np.ctypeslib.as_array(sarr_base.get_obj())
     sarr = sarr.reshape(shared_shape)
-
     #Filling shared array
-<<<<<<< HEAD
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
     sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
     sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
-    create_blocks(shared_shape,node_rows,gpu_rows,BS,num_gpus,SPX,SPY,OPS)
-
-def create_blocks(shared_shape,node_rows,gpu_rows,BS,num_gpus,spx,spy,ops):
-    """Use this function to create blocks."""
-    cpu_rows = node_rows-gpu_rows
-    blocks = []
-    for i in range(num_gpus):
-        blocks += (slice(spx+BS[0]*node_rows*i,spx+BS[0]*node_rows*(i+1),1),slice(ops,shared_shape[3]-ops,1))
-    cstart = BS[0]*node_rows*num_gpus+spx
-    print(cstart)
-    row_range = range(cstart,shared_shape[2],BS[0])
-    print(row_range)
-=======
-    gsc = slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)  #Slice of the global array
-    sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
-    sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
-    sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
->>>>>>> 407c1fbd609feb2db6cfefdbea6213307091554d
-
     #Creating blocks to be solved
     blocks = create_blocks(shared_shape,node_rows,rows_per_gpu,BS,num_gpus,SPX,OPS)
+    #Setting Globals and Creating Source Modules
+    GRD = (int((larr.shape[TWO]-TOPS)/BS[ZERO]),int((larr.shape[3]-TOPS)/BS[ONE]))   #Grid size
+    #Creating constants
+    NV = larr.shape[ONE] #Number of variables
+    SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
+    STS = SGIDS*NV #Shared time shift   #Shared time shift
+    VARS =  larr.shape[TWO]*larr.shape[3] #Variable shift
+    TIMES = VARS*NV #Time shift
+    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+    GSM = build_gpu_source(GS) #Building CUDA source code
+    CSM = build_cpu_source(CS) #Building Python source code
+    swept_constant_copy(SM,const_dict)
+    # Creating cuda device and Context
+    cuda.init()
+    cuda_devices = [cuda.Device(x) for x in gpu_node]
+    cuda_contexts = [device.make_context() for device in cuda_devices]
     #Synchronize nodes
     nodes.barrier()
     #Solve UpPyramid
     cpu_fcn = sweep_lambda((UpPyramid,SM,isets,gts,TSO))
+
+
+
+
+
+    #Pop cuda contexts
+    [ctx.pop() for ctx in cuda_contexts]
 
 def UpPyramid(sarr,upsets,gts,pargs):
     """
@@ -219,15 +227,6 @@ def create_blocks(shared_shape,node_rows,rows_per_gpu,BS,num_gpus,spx,ops):
     column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
     blocks += [(slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
     return blocks
-
-
-
-def pm(arr,i):
-    for item in arr[i,0,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write("%1.1f"%si+", ")
-        sys.stdout.write("]\n")
 
 def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
     """Use this function to split data amongst nodes."""
