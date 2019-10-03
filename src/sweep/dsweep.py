@@ -16,6 +16,7 @@ import numpy as np
 import ctypes
 from collections import deque
 from itertools import cycle
+from itertools import product
 
 #CUDA Imports
 import pycuda.driver as cuda
@@ -45,56 +46,6 @@ import importlib.util
 import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
-
-
-def pm(arr,i):
-    for item in arr[i,0,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write("%1.1f"%si+", ")
-        sys.stdout.write("]\n")
-
-def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
-    """Use this function to split data amongst nodes."""
-    #Assert that the total number of blocks is an integer
-    gpu_rows = np.ceil(num_block_rows*AF)
-    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
-    cpu_rows = num_block_rows-gpu_rows
-    rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
-    #Estimate number of rows per node
-    node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
-    nlst = None
-    #Number of row correction
-    tnr = nodes.gather((node,node_rows))
-    cores = nodes.gather(num_cores)
-    if node == master_node:
-        nlst = [x for x,y in tnr]
-        tnr = [y for x,y in tnr]
-        total_rows = np.sum(tnr)
-        cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
-        ncyc = cycle(range(0,nodes.Get_size(),1))
-        #If total rows are greater, reduce
-        min_cores = min(cores)
-        while total_rows > num_block_rows:
-            curr = next(ncyc)
-            if min_cores >= cores[curr]:
-                tnr[curr]-=1
-                total_rows-=1
-            min_cores += next(cis)
-        #If total rows are greater, add
-        max_cores = max(cores)
-        while total_rows < num_block_rows:
-            curr = next(ncyc)
-            if max_cores <= cores[curr]:
-                tnr[curr]+=1
-                total_rows+=1
-            max_cores -= next(cis)
-    nodes.Barrier()
-    return nodes.bcast((nlst,tnr),root=master_node)+(gpu_rows,)
-
-def node_comm(nodes,fnode,cnode,bnode,sarr):
-    """Use this function to communicate node data"""
-    pass
 
 
 def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
@@ -161,7 +112,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     assert (NB).is_integer()
     num_block_rows = arr0.shape[1]/BS[0]
     #This function splits the rows among the nodes by affinity
-    node_ids,node_row_list,gpu_rows = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
+    node_ids,node_row_list,rows_per_gpu = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
     node_row_list = [int(x) for x in node_row_list]
     #Getting nodes in front and behind current node
     nidx = node_ids.index(node)
@@ -174,7 +125,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
     SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
-    SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    # SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
     up_sets = create_up_sets(BS,OPS)
     down_sets = create_down_sets(BS,OPS)[:-1]
     oct_sets = down_sets+up_sets[1:]
@@ -197,6 +148,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     sarr = sarr.reshape(shared_shape)
 
     #Filling shared array
+<<<<<<< HEAD
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
     sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
@@ -213,53 +165,113 @@ def create_blocks(shared_shape,node_rows,gpu_rows,BS,num_gpus,spx,spy,ops):
     print(cstart)
     row_range = range(cstart,shared_shape[2],BS[0])
     print(row_range)
+=======
+    gsc = slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)  #Slice of the global array
+    sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
+    sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
+    sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
+>>>>>>> 407c1fbd609feb2db6cfefdbea6213307091554d
 
-    # #------------------------------DECOMPOSITION BY REGION CREATION--------------#
-    # GRB = gpu_rank[ZERO]
-    # #Splits regions up amongst architecture
-    # if GRB:#Total number of GPUS
+    #Creating blocks to be solved
+    blocks = create_blocks(shared_shape,node_rows,rows_per_gpu,BS,num_gpus,SPX,OPS)
+    #Synchronize nodes
+    nodes.barrier()
+    #Solve UpPyramid
+    cpu_fcn = sweep_lambda((UpPyramid,SM,isets,gts,TSO))
 
-    #     gri = gpu_comm.Get_rank()
-    #     cri = None
-    #     WR = create_write_region(gpu_comm,gri,gpu_master,num_gpus,BS,arr0.shape,gpu_slices,shared_shape[0],OPS)
-    # else:
-    #     cri = cpu_comm.Get_rank()
-    #     gri = None
-    #     WR = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
-    # #---------------------_REMOVING UNWANTED RANKS---------------------------#
-    # #Checking if rank is useful
-    # if WR[3].start == WR[3].stop or WR[2].start == WR[2].stop:
-    #     include_ranks = None
-    # else:
-    #     include_ranks = rank
-    # #Gathering results
-    # include_ranks = comm.gather(include_ranks,root=master_rank)
-    # if rank == master_rank:
-    #     include_ranks = list(filter(lambda a: a is not None, include_ranks))
-    # #Distributing new results
-    # include_ranks = comm.bcast(include_ranks,root=master_rank)
-    # #Creating new comm group
-    # comm_group = comm.group.Incl(include_ranks)
-    #Killing unwanted processes
-    # if rank not in include_ranks:
-    #     MPI.Finalize()
-    #     exit(0)
-    # #Updating comm
-    # comm = comm.Create_group(comm_group)
-    # #Sync all processes - Ensures boundaries are updated
-    # comm.Barrier()
-    # #--------------------------CREATING OTHER REGIONS--------------------------#
-    # RR = create_read_region(WR,OPS)   #Create read region
-    # SRR,SWR,XR,YR = create_shift_regions(RR,SPLITX,SPLITY,shared_shape,OPS)  #Create shifted read region
-    # BDR = create_boundaries(WR,SPLITX,SPLITY,OPS,shared_shape)
-    # SBDR = create_shifted_boundaries(SWR,SPLITX,SPLITY,OPS,shared_shape)
-    # wxt = create_standard_bridges(XR,OPS,bridge_slices[0],shared_shape,BS,rank)
-    # wyt = create_standard_bridges(YR,OPS,bridge_slices[1],shared_shape,BS,rank)
-    # wxts = create_shifted_bridges(YR,OPS,bridge_slices[0],shared_shape,BS,rank)
-    # wyts = create_shifted_bridges(XR,OPS,bridge_slices[1],shared_shape,BS,rank)
-    # #--------------------------------CREATING LOCAL ARRAYS-----------------------------------------#
-    # larr = np.copy(sarr[RR])
-    #---------------Generating Source Modules----------------------------------#
+def UpPyramid(sarr,upsets,gts,pargs):
+    """
+    This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
+    arr-the array that will be solved (t,v,x,y)
+    fcn - the function that solves the problem in question
+    OPS -  the number of atomic operations
+    """
+    SM,GRB,BS,GRD,CRS,OPS,TSO,ssb = pargs
+    #Splitting between cpu and gpu
+    if GRB:
+        # Getting GPU Function
+        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
+        gpu_fcn = SM.get_function("UpPyramid")
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        cuda.Context.synchronize()
+    else:   #CPUs do this
+        blocks = []
+        for local_region in CRS:
+            block = np.copy(arr[local_region])
+            blocks.append(block)
+        cpu_fcn = sweep_lambda((CPU_UpPyramid,SM,isets,gts,TSO))
+        blocks = list(map(cpu_fcn,blocks))
+        arr = rebuild_blocks(arr,blocks,CRS,OPS)
+    np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
+    for br in BDR:
+        np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
+
+
+
+def create_blocks(shared_shape,node_rows,rows_per_gpu,BS,num_gpus,spx,ops):
+    """Use this function to create blocks."""
+    cpu_rows = node_rows-rows_per_gpu
+    blocks = []
+    for i in range(num_gpus):
+        blocks.append((slice(int(spx+BS[0]*rows_per_gpu*i),int(spx+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
+    cstart = blocks[-1][0].stop
+    row_range = np.arange(cstart,shared_shape[2]-spx,BS[0],dtype=np.intc)
+    column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
+    blocks += [(slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
+    return blocks
+
+
+
+def pm(arr,i):
+    for item in arr[i,0,:,:]:
+        sys.stdout.write("[ ")
+        for si in item:
+            sys.stdout.write("%1.1f"%si+", ")
+        sys.stdout.write("]\n")
+
+def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
+    """Use this function to split data amongst nodes."""
+    #Assert that the total number of blocks is an integer
+    gpu_rows = np.ceil(num_block_rows*AF)
+    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
+    cpu_rows = num_block_rows-gpu_rows
+    rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
+    #Estimate number of rows per node
+    node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
+    nlst = None
+    #Number of row correction
+    tnr = nodes.gather((node,node_rows))
+    cores = nodes.gather(num_cores)
+    if node == master_node:
+        nlst = [x for x,y in tnr]
+        tnr = [y for x,y in tnr]
+        total_rows = np.sum(tnr)
+        cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
+        ncyc = cycle(range(0,nodes.Get_size(),1))
+        #If total rows are greater, reduce
+        min_cores = min(cores)
+        while total_rows > num_block_rows:
+            curr = next(ncyc)
+            if min_cores >= cores[curr]:
+                tnr[curr]-=1
+                total_rows-=1
+            min_cores += next(cis)
+        #If total rows are greater, add
+        max_cores = max(cores)
+        while total_rows < num_block_rows:
+            curr = next(ncyc)
+            if max_cores <= cores[curr]:
+                tnr[curr]+=1
+                total_rows+=1
+            max_cores -= next(cis)
+    nodes.Barrier()
+    return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
+
+def node_comm(nodes,fnode,cnode,bnode,sarr):
+    """Use this function to communicate node data"""
+    pass
+
+    # ---------------Generating Source Modules----------------------------------#
     # if GRB:
     #     # Creating cuda device and Context
     #     cuda.init()
