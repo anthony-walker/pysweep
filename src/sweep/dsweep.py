@@ -178,7 +178,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #Synchronize nodes
     nodes.barrier()
     #Solve UpPyramid
-    cpu_fcn = sweep_lambda((UpPyramid,SM,isets,gts,TSO))
+    # cpu_fcn = sweep_lambda((UpPyramid,SM,isets,gts,TSO))
 
 
 
