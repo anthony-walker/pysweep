@@ -9,12 +9,12 @@ if __name__ == "__main__":
     dt = 0.01
     dx = dy = 0.1
     gamma = 1.4
-    arr = np.ones((4,nx,ny))
-    ct = 0
-    for i in range(nx):
-        for j in range(ny):
-            arr[0,i,j] = ct
-            ct+=1
+    arr = np.zeros((4,nx,ny))
+    # ct = 0
+    # for i in range(nx):
+    #     for j in range(ny):
+    #         arr[0,i,j] = ct
+    #         ct+=1
     # arr[:,256:,:] += 1
     X = 1
     Y = 1

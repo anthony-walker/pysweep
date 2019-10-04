@@ -94,8 +94,8 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     node = nodes.Get_rank()  #current rank
     num_cores = pool_size = mp.cpu_count() - 8
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
-    proc_pool = mp.Pool(pool_size)
 
+    #Temp
     if node == 0:
         exid = [1]
     else:
@@ -130,9 +130,12 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
     SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
-    # SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    global up_sets
     up_sets = create_up_sets(BS,OPS)
+    global down_sets
     down_sets = create_down_sets(BS,OPS)[:-1]
+    global oct_sets
     oct_sets = down_sets+up_sets[1:]
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
@@ -158,33 +161,68 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
     #Creating blocks to be solved
     gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
+    gpu_block_shape = (shared_shape[0],shared_shape[1],(gpu_blocks[0][0].stop-gpu_blocks[0][0].start),(gpu_blocks[0][1].stop-gpu_blocks[0][1].start))
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=np.float32()).nbytes
+    #Create process pool
+    proc_pool = mp.Pool(pool_size)
     #Setting Globals and Creating Source Modules
-    # GRD = (int((larr.shape[TWO]-TOPS)/BS[ZERO]),int((larr.shape[3]-TOPS)/BS[ONE]))   #Grid size
-    # #Creating constants
-    # NV = larr.shape[ONE] #Number of variables
-    # SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
-    # STS = SGIDS*NV #Shared time shift   #Shared time shift
-    # VARS =  larr.shape[TWO]*larr.shape[3] #Variable shift
-    # TIMES = VARS*NV #Time shift
-    # const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
-    # GSM = build_gpu_source(GS) #Building CUDA source code
-    # CSM = build_cpu_source(CS) #Building Python source code
-    # swept_constant_copy(SM,const_dict)
-    # Creating cuda device and Context
+    GRD = (int((gpu_block_shape[TWO])/BS[ZERO]),int((gpu_block_shape[3])/BS[ONE]))   #Grid size
+    #Creating constants
+    NV = gpu_block_shape[1] #Number of variables
+    SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
+    STS = SGIDS*NV #Shared time shift   #Shared time shift
+    VARS = gpu_block_shape[2]*gpu_block_shape[3]  #Variable shift
+    TIMES = VARS*NV #Time shift
+    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPX,"SPLITY":SPY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+    GSM = build_gpu_source(GS) #Building CUDA source code
+    CSM = build_cpu_source(CS) #Building Python source code
+    #Initialize cuda devices
     cuda.init()
+    global cuda_devices
     cuda_devices = [cuda.Device(y) for x,y in gpu_node]
-    cuda_contexts = [device.make_context() for device in cuda_devices]
+    global cuda_contexts
+    cuda_contexts = [setup_Devices(device,gpu_blocks[i],const_dict,GSM) for i,device in enumerate(cuda_devices)]
+    GPUS = [(i,gpu_blocks[i],sarr,GRD,BS,ssb,node) for i in range(num_gpus)]
+    GPU = proc_pool.map(GPU_UpPyramid,GPUS)
+    # GPU.wait()
+
+    # for block in gpu_blocks:
+    #     print(np.sum(sarr[0,0,block[0],block[1]]))
+    # [ for block in gpu_blocks]
+    #Solving
+    # GPU_UpPyramid()
     #Synchronize nodes
     nodes.barrier()
     #Solve UpPyramid
     # cpu_fcn = sweep_lambda((UpPyramid,SM,isets,gts,TSO))
-
-
-
-
-
     #Pop cuda contexts
     [ctx.pop() for ctx in cuda_contexts]
+
+
+def setup_Devices(device,gblock,const_dict,GSM):
+    """Use this function to set globals for each gpu context"""
+    dev_ctx = device.make_context()
+    swept_constant_copy(GSM,const_dict)
+    return dev_ctx
+
+def GPU_UpPyramid(args):
+    """
+    This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
+    arr-the array that will be solved (t,v,x,y)
+    fcn - the function that solves the problem in question
+    OPS -  the number of atomic operations
+    """
+    global cuda_contexts
+    ctx_id,block,sarr,GRD,BS,ssb,rank = args
+    cuda_contexts[ctx_id.push()]
+    #Splitting between cpu and gpu
+    sarr[0,0,block[0],block[1]] = rank
+    # Getting GPU Function
+    # arr = np.ascontiguousarray(arr) #Ensure array is contiguous
+    # gpu_fcn = SM.get_function("UpPyramid")
+    # gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+    # cuda.Context.synchronize()
+
 
 def UpPyramid(sarr,upsets,gts,pargs):
     """
@@ -212,7 +250,6 @@ def UpPyramid(sarr,upsets,gts,pargs):
     np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
     for br in BDR:
         np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
-
 
 
 def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,spx,ops):
