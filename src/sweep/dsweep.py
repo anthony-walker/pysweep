@@ -20,9 +20,8 @@ from itertools import product
 
 #CUDA Imports
 import pycuda.driver as cuda
-import pycuda.autoinit  #Cor debugging only
+# import pycuda.autoinit  #Cor debugging only
 from pycuda.compiler import SourceModule
-import pycuda.gpuarray as gpuarray
 
 #MPI imports
 from mpi4py import MPI
@@ -158,22 +157,22 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
     sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
     #Creating blocks to be solved
-    blocks = create_blocks(shared_shape,node_rows,rows_per_gpu,BS,num_gpus,SPX,OPS)
+    gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
     #Setting Globals and Creating Source Modules
-    GRD = (int((larr.shape[TWO]-TOPS)/BS[ZERO]),int((larr.shape[3]-TOPS)/BS[ONE]))   #Grid size
-    #Creating constants
-    NV = larr.shape[ONE] #Number of variables
-    SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
-    STS = SGIDS*NV #Shared time shift   #Shared time shift
-    VARS =  larr.shape[TWO]*larr.shape[3] #Variable shift
-    TIMES = VARS*NV #Time shift
-    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
-    GSM = build_gpu_source(GS) #Building CUDA source code
-    CSM = build_cpu_source(CS) #Building Python source code
-    swept_constant_copy(SM,const_dict)
+    # GRD = (int((larr.shape[TWO]-TOPS)/BS[ZERO]),int((larr.shape[3]-TOPS)/BS[ONE]))   #Grid size
+    # #Creating constants
+    # NV = larr.shape[ONE] #Number of variables
+    # SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
+    # STS = SGIDS*NV #Shared time shift   #Shared time shift
+    # VARS =  larr.shape[TWO]*larr.shape[3] #Variable shift
+    # TIMES = VARS*NV #Time shift
+    # const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+    # GSM = build_gpu_source(GS) #Building CUDA source code
+    # CSM = build_cpu_source(CS) #Building Python source code
+    # swept_constant_copy(SM,const_dict)
     # Creating cuda device and Context
     cuda.init()
-    cuda_devices = [cuda.Device(x) for x in gpu_node]
+    cuda_devices = [cuda.Device(y) for x,y in gpu_node]
     cuda_contexts = [device.make_context() for device in cuda_devices]
     #Synchronize nodes
     nodes.barrier()
@@ -216,17 +215,16 @@ def UpPyramid(sarr,upsets,gts,pargs):
 
 
 
-def create_blocks(shared_shape,node_rows,rows_per_gpu,BS,num_gpus,spx,ops):
+def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,spx,ops):
     """Use this function to create blocks."""
-    cpu_rows = node_rows-rows_per_gpu
-    blocks = []
+    gpu_blocks = []
     for i in range(num_gpus):
-        blocks.append((slice(int(spx+BS[0]*rows_per_gpu*i),int(spx+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
-    cstart = blocks[-1][0].stop
+        gpu_blocks.append((slice(int(spx+BS[0]*rows_per_gpu*i),int(spx+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
+    cstart = gpu_blocks[-1][0].stop
     row_range = np.arange(cstart,shared_shape[2]-spx,BS[0],dtype=np.intc)
     column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
-    blocks += [(slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
-    return blocks
+    cpu_blocks = [(slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
+    return gpu_blocks, cpu_blocks
 
 def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
     """Use this function to split data amongst nodes."""
