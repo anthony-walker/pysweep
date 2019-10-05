@@ -19,9 +19,8 @@ from itertools import cycle
 from itertools import product
 
 #CUDA Imports
-import pycuda.driver as cuda
-# import pycuda.autoinit  #Cor debugging only
-from pycuda.compiler import SourceModule
+# import pycuda.driver as cuda
+# from pycuda.compiler import SourceModule
 
 #MPI imports
 from mpi4py import MPI
@@ -34,12 +33,12 @@ import ctypes
 import GPUtil
 
 #Swept imports
-from .pysweep_lambda import sweep_lambda
-from .pysweep_functions import *
-from .pysweep_decomposition import *
-from pysweep_block import *
-from .pysweep_regions import *
-from .pysweep_source import *
+# from .pysweep_lambda import sweep_lambda
+# from .pysweep_functions import *
+# from .pysweep_decomposition import *
+# from pysweep_block import *
+# from .pysweep_regions import *
+# from .pysweep_source import *
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -87,103 +86,121 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     TOPS = TWO*OPS
     #Getting GPU info
     #-------------MPI Set up----------------------------#
-    nodes = MPI.COMM_WORLD
+    comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
-    master_node = ZERO #master rank
-    total_num_cpus = nodes.Get_size() #number of ranks
-    node = nodes.Get_rank()  #current rank
-    num_cores = pool_size = mp.cpu_count() - 8
+    rank = comm.Get_rank()  #current rank
+
+    #Create individual node comm
+    nodes_processors = comm.allgather((rank,processor))
+    node_ranks = [n for n,p in nodes_processors if p==processor]
+    node_master = node_ranks[0]
+    node_group = comm.group.Incl(node_ranks)
+    node_comm = comm.Create_group(node_group)
+
+    #Create cluster comm
+    cluster_ranks = list(set(comm.allgather(node_master)))
+    cluster_master = cluster_ranks[0]
+    cluster_group = comm.group.Incl(cluster_ranks)
+    cluster_comm = comm.Create_group(cluster_group)
+    #CPU Core information
+    if rank == cluster_master:
+        total_num_cpus = cluster_comm.Get_size() #number of ranks
+    else:
+        total_num_cpus = None
+    total_num_cpus = comm.bcast(total_num_cpus,root=cluster_master)
+    num_cores = os.cpu_count()
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
-    #Temp
-    if node == 0:
-        exid = [1]
-    else:
-        exid = [0]
-
+    # #Temp
+    # if node == 0:
+    #     exid = [1]
+    # else:
+    #     exid = [0]
+    #
     #Getting GPUs if affinity is greater than 1
-    if AF>0:
-        gpu_node = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
-        gpu_node = [(True,id) for id in gpu_node]
-        num_gpus = len(gpu_node)
-    else:
-        gpu_node = []
-        num_gpus = 0
-    num_cores -= num_gpus
-    #Get total number of GPUs
-    total_num_gpus = np.sum(nodes.allgather(num_gpus))
-    #Get total number of blocks
-    NB = np.prod(arr0.shape[1:])/np.prod(BS)
-    assert (NB).is_integer()
-    num_block_rows = arr0.shape[1]/BS[0]
-    #This function splits the rows among the nodes by affinity
-    node_ids,node_row_list,rows_per_gpu = node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
-    node_row_list = [int(x) for x in node_row_list]
-    #Getting nodes in front and behind current node
-    nidx = node_ids.index(node)
-    node_rows = node_row_list[nidx]
-    bidx = node_ids.index(node-1) if node - 1 >= 0 else len(node_ids)-1
-    bnode = (node_ids[bidx],node_row_list[bidx])
-    fidx = node_ids.index(node+1) if node + 1 < len(node_ids) else 0
-    fnode = (node_ids[fidx],node_row_list[fidx])
-
-    #---------------------SWEPT VARIABLE SETUP----------------------$
-    #Splits for shared array
-    SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
-    SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
-    global up_sets
-    up_sets = create_up_sets(BS,OPS)
-    global down_sets
-    down_sets = create_down_sets(BS,OPS)[:-1]
-    global oct_sets
-    oct_sets = down_sets+up_sets[1:]
-    MPSS = len(up_sets)
-    MOSS = len(oct_sets)
-    bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
-    IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
-
-    #----------------Data Input setup -------------------------#
-    time_steps = int((tf-t0)/dt)  #Number of time steps
-    #Global swept step
-    MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
-    time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
-
-    #-----------------------SHARED ARRAY CREATION----------------------#
-    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
-    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
-    sarr = np.ctypeslib.as_array(sarr_base.get_obj())
-    sarr = sarr.reshape(shared_shape)
-    #Filling shared array
-    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
-    sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
-    sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
-    #Creating blocks to be solved
-    gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
-    gpu_block_shape = (shared_shape[0],shared_shape[1],(gpu_blocks[0][0].stop-gpu_blocks[0][0].start),(gpu_blocks[0][1].stop-gpu_blocks[0][1].start))
-    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=np.float32()).nbytes
-    #Create process pool
-    proc_pool = mp.Pool(pool_size)
-    #Setting Globals and Creating Source Modules
-    GRD = (int((gpu_block_shape[TWO])/BS[ZERO]),int((gpu_block_shape[3])/BS[ONE]))   #Grid size
-    #Creating constants
-    NV = gpu_block_shape[1] #Number of variables
-    SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
-    STS = SGIDS*NV #Shared time shift   #Shared time shift
-    VARS = gpu_block_shape[2]*gpu_block_shape[3]  #Variable shift
-    TIMES = VARS*NV #Time shift
-    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPX,"SPLITY":SPY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
-    GSM = build_gpu_source(GS) #Building CUDA source code
-    CSM = build_cpu_source(CS) #Building Python source code
+    if node_master == rank:
+        if AF>0:
+            gpu_node = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
+            gpu_node = [(True,id) for id in gpu_node]
+            num_gpus = len(gpu_node)
+        else:
+            gpu_node = []
+            num_gpus = 0
+        num_cores -= num_gpus
+        #Get total number of GPUs
+        total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
+        #Get total number of blocks
+        NB = np.prod(arr0.shape[1:])/np.prod(BS)
+        assert (NB).is_integer()
+        num_block_rows = arr0.shape[1]/BS[0]
+        #This function splits the rows among the nodes by affinity
+        node_ids,node_row_list,rows_per_gpu = node_split(cluster_comm,rank,cluster_master,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
+        node_row_list = [int(x) for x in node_row_list]
+        #Getting nodes in front and behind current node
+        nidx = node_ids.index(rank)
+        node_rows = node_row_list[nidx]
+        bidx = node_ids.index(-1) if  - 1 >= 0 else len(node_ids)-1
+        bnode = (node_ids[bidx],node_row_list[bidx])
+        fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
+        fnode = (node_ids[fidx],node_row_list[fidx])
+        print(node_rows,rows_per_gpu)
+    #
+    #
+    #
+    # #---------------------SWEPT VARIABLE SETUP----------------------$
+    # #Splits for shared array
+    # SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
+    # SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    # up_sets = create_up_sets(BS,OPS)
+    # down_sets = create_down_sets(BS,OPS)[:-1]
+    # oct_sets = down_sets+up_sets[1:]
+    # MPSS = len(up_sets)
+    # MOSS = len(oct_sets)
+    # bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
+    # IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
+    #
+    # #----------------Data Input setup -------------------------#
+    # time_steps = int((tf-t0)/dt)  #Number of time steps
+    # #Global swept step
+    # MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
+    # time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
+    #
+    # #-----------------------SHARED ARRAY CREATION----------------------#
+    # #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
+    # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
+    # sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
+    # sarr = np.ctypeslib.as_array(sarr_base.get_obj())
+    # sarr = sarr.reshape(shared_shape)
+    # #Filling shared array
+    # gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
+    # sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
+    # sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
+    # sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
+    # #Creating blocks to be solved
+    # gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
+    # gpu_block_shape = (shared_shape[0],shared_shape[1],(gpu_blocks[0][0].stop-gpu_blocks[0][0].start),(gpu_blocks[0][1].stop-gpu_blocks[0][1].start))
+    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=np.float32()).nbytes
+    # #Create process pool
+    # proc_pool = mp.Pool(pool_size)
+    # #Setting Globals and Creating Source Modules
+    # GRD = (int((gpu_block_shape[TWO])/BS[ZERO]),int((gpu_block_shape[3])/BS[ONE]))   #Grid size
+    # #Creating constants
+    # NV = gpu_block_shape[1] #Number of variables
+    # SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)    #Shared global index shift
+    # STS = SGIDS*NV #Shared time shift   #Shared time shift
+    # VARS = gpu_block_shape[2]*gpu_block_shape[3]  #Variable shift
+    # TIMES = VARS*NV #Time shift
+    # const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPX,"SPLITY":SPY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+    # GSM = build_gpu_source(GS) #Building CUDA source code
+    # CSM = build_cpu_source(CS) #Building Python source code
     #Initialize cuda devices
-    cuda.init()
-    global cuda_devices
-    cuda_devices = [cuda.Device(y) for x,y in gpu_node]
-    global cuda_contexts
-    cuda_contexts = [setup_Devices(device,gpu_blocks[i],const_dict,GSM) for i,device in enumerate(cuda_devices)]
-    GPUS = [(i,gpu_blocks[i],sarr,GRD,BS,ssb,node) for i in range(num_gpus)]
-    GPU = proc_pool.map(GPU_UpPyramid,GPUS)
+    # cuda.init()
+    # global cuda_devices
+    # cuda_devices = [cuda.Device(y) for x,y in gpu_node]
+    # global cuda_contexts
+    # cuda_contexts = [setup_Devices(device,gpu_blocks[i],const_dict,GSM) for i,device in enumerate(cuda_devices)]
+    # GPUS = [(i,gpu_blocks[i],sarr,GRD,BS,ssb,node) for i in range(num_gpus)]
+    # GPU = proc_pool.map(GPU_UpPyramid,GPUS)
     # GPU.wait()
 
     # for block in gpu_blocks:
@@ -192,11 +209,11 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     #Solving
     # GPU_UpPyramid()
     #Synchronize nodes
-    nodes.barrier()
+    # nodes.barrier()
     #Solve UpPyramid
     # cpu_fcn = sweep_lambda((UpPyramid,SM,isets,gts,TSO))
     #Pop cuda contexts
-    [ctx.pop() for ctx in cuda_contexts]
+    # [ctx.pop() for ctx in cuda_contexts]
 
 
 def setup_Devices(device,gblock,const_dict,GSM):
@@ -257,6 +274,7 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,spx,ops):
     gpu_blocks = []
     for i in range(num_gpus):
         gpu_blocks.append((slice(int(spx+BS[0]*rows_per_gpu*i),int(spx+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
+    print(gpu_blocks)
     cstart = gpu_blocks[-1][0].stop
     row_range = np.arange(cstart,shared_shape[2]-spx,BS[0],dtype=np.intc)
     column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
@@ -436,3 +454,29 @@ def node_comm(nodes,fnode,cnode,bnode,sarr):
     # #This if for testing only
     # if rank == master_rank:
     #     return avg_time
+if __name__ == "__main__":
+    nx = ny = 512
+    bs = 8
+    t0 = 0
+    tf = 0.1
+    dt = 0.01
+    dx = dy = 0.1
+    gamma = 1.4
+    arr = np.zeros((4,nx,ny))
+    # ct = 0
+    # for i in range(nx):
+    #     for j in range(ny):
+    #         arr[0,i,j] = ct
+    #         ct+=1
+    # arr[:,256:,:] += 1
+    X = 1
+    Y = 1
+    tso = 2
+    ops = 2
+    aff = 0.5    #Dimensions and steps
+    dx = X/nx
+    dy = Y/ny
+    #Changing arguments
+    gargs = (t0,tf,dt,dx,dy,gamma)
+    swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
+    dsweep(arr,gargs,swargs,filename="test")
