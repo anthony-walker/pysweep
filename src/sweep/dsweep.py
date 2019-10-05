@@ -35,8 +35,8 @@ import GPUtil
 #Swept imports
 # from .pysweep_lambda import sweep_lambda
 # from .pysweep_functions import *
-# from .pysweep_decomposition import *
-# from pysweep_block import *
+from src.sweep.pysweep_decomposition import *
+from src.sweep.pysweep_block import *
 # from .pysweep_regions import *
 # from .pysweep_source import *
 import importlib.util
@@ -52,7 +52,7 @@ def pm(arr,i):
             sys.stdout.write("%1.1f"%si+", ")
         sys.stdout.write("]\n")
 
-def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
+def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -72,11 +72,13 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     filename: Name of the output file excluding hdf5
     exid: GPU ids to exclude from the calculation.
     """
+
     #Unpacking arguments
     t0,tf,dt = gargs[:3]
     TSO,OPS,BS,AF,GS,CS = swargs
     BS = (BS,BS,1)
     start = timer.time()
+
     #Local Constants
     ZERO = 0
     QUARTER = 0.25
@@ -84,6 +86,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     ONE = 1
     TWO = 2
     TOPS = TWO*OPS
+
     #Getting GPU info
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
@@ -102,6 +105,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     cluster_master = cluster_ranks[0]
     cluster_group = comm.group.Incl(cluster_ranks)
     cluster_comm = comm.Create_group(cluster_group)
+
     #CPU Core information
     if rank == cluster_master:
         total_num_cpus = cluster_comm.Get_size() #number of ranks
@@ -143,45 +147,47 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
         bnode = (node_ids[bidx],node_row_list[bidx])
         fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
         fnode = (node_ids[fidx],node_row_list[fidx])
-        print(node_rows,rows_per_gpu)
-    #
-    #
-    #
-    # #---------------------SWEPT VARIABLE SETUP----------------------$
-    # #Splits for shared array
-    # SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
-    # SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
-    # up_sets = create_up_sets(BS,OPS)
-    # down_sets = create_down_sets(BS,OPS)[:-1]
-    # oct_sets = down_sets+up_sets[1:]
-    # MPSS = len(up_sets)
-    # MOSS = len(oct_sets)
-    # bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
-    # IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
-    #
-    # #----------------Data Input setup -------------------------#
-    # time_steps = int((tf-t0)/dt)  #Number of time steps
-    # #Global swept step
-    # MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
-    # time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
-    #
-    # #-----------------------SHARED ARRAY CREATION----------------------#
-    # #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
-    # sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
-    # sarr = np.ctypeslib.as_array(sarr_base.get_obj())
-    # sarr = sarr.reshape(shared_shape)
-    # #Filling shared array
-    # gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    # sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
-    # sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
-    # sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
-    # #Creating blocks to be solved
+    else:
+        node_row_list = None
+        node_rows=None
+        nidx = None
+
+    #Broad casting to node
+    node_rows = node_comm.bcast(node_rows)
+    nidx = node_comm.bcast(nidx)
+    node_row_list = node_comm.bcast(node_row_list)
+    print(node_rows,rank,processor)
+    #---------------------SWEPT VARIABLE SETUP----------------------$
+    #Splits for shared array
+    SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
+    SPY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    up_sets = create_up_sets(BS,OPS)
+    down_sets = create_down_sets(BS,OPS)[:-1]
+    oct_sets = down_sets+up_sets[1:]
+    MPSS = len(up_sets)
+    MOSS = len(oct_sets)
+    bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
+    IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
+
+    #----------------Data Input setup -------------------------#
+    time_steps = int((tf-t0)/dt)  #Number of time steps
+    #Global swept step
+    MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
+    time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
+
+    #-----------------------SHARED ARRAY CREATION----------------------#
+    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
+    sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    #Filling shared array
+    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
+    sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:]
+    sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
+    sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
+    #Creating blocks to be solved
     # gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
     # gpu_block_shape = (shared_shape[0],shared_shape[1],(gpu_blocks[0][0].stop-gpu_blocks[0][0].start),(gpu_blocks[0][1].stop-gpu_blocks[0][1].start))
-    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=np.float32()).nbytes
-    # #Create process pool
-    # proc_pool = mp.Pool(pool_size)
+    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     # #Setting Globals and Creating Source Modules
     # GRD = (int((gpu_block_shape[TWO])/BS[ZERO]),int((gpu_block_shape[3])/BS[ONE]))   #Grid size
     # #Creating constants
@@ -193,7 +199,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[]):
     # const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPX,"SPLITY":SPY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
     # GSM = build_gpu_source(GS) #Building CUDA source code
     # CSM = build_cpu_source(CS) #Building Python source code
-    #Initialize cuda devices
+    # Initialize cuda devices
     # cuda.init()
     # global cuda_devices
     # cuda_devices = [cuda.Device(y) for x,y in gpu_node]
