@@ -115,12 +115,6 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
     num_cores = os.cpu_count()
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
-    # #Temp
-    # if node == 0:
-    #     exid = [1]
-    # else:
-    #     exid = [0]
-    #
     #Getting GPUs if affinity is greater than 1
     if node_master == rank:
         if AF>0:
@@ -156,7 +150,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
     node_rows = node_comm.bcast(node_rows)
     nidx = node_comm.bcast(nidx)
     node_row_list = node_comm.bcast(node_row_list)
-    print(node_rows,rank,processor)
+
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
     SPX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
@@ -185,10 +179,26 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
     sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],-OPS:]
     sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPX,gsc.stop+SPX)%arr0.shape[1],:OPS]
     #Creating blocks to be solved
-    # gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
-    # gpu_block_shape = (shared_shape[0],shared_shape[1],(gpu_blocks[0][0].stop-gpu_blocks[0][0].start),(gpu_blocks[0][1].stop-gpu_blocks[0][1].start))
-    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
-    # #Setting Globals and Creating Source Modules
+    if rank==node_master:
+        gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPX,OPS)
+        gpu_ranks = node_ranks[:num_gpus]
+        cpu_ranks = node_ranks[num_gpus:]
+        blocks = np.array_split(gpu_blocks,num_gpus) if gpu_blocks else gpu_blocks
+        blocks += np.array_split(cpu_blocks,len(cpu_ranks)) if cpu_blocks else cpu_blocks
+        gpu_node += [(False,None) for i in range(len(cpu_ranks))]
+        node_data = zip(blocks,gpu_node)
+    else:
+        node_data = None
+    blocks,gpu_node =  node_comm.scatter(node_data)
+    
+        # print(gpu_node)
+        # gpu_block_shape = (shared_shape[0],shared_shape[1],(gpu_blocks[0][0].stop-gpu_blocks[0][0].start),(gpu_blocks[0][1].stop-gpu_blocks[0][1].start))
+        # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
+    # if rank == cluster_master:
+    #     print(node_ranks)
+    #     print(gpu_node)
+    #     print(rank,blocks)
+    #Setting Globals and Creating Source Modules
     # GRD = (int((gpu_block_shape[TWO])/BS[ZERO]),int((gpu_block_shape[3])/BS[ONE]))   #Grid size
     # #Creating constants
     # NV = gpu_block_shape[1] #Number of variables
@@ -280,8 +290,7 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,spx,ops):
     gpu_blocks = []
     for i in range(num_gpus):
         gpu_blocks.append((slice(int(spx+BS[0]*rows_per_gpu*i),int(spx+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
-    print(gpu_blocks)
-    cstart = gpu_blocks[-1][0].stop
+    cstart = gpu_blocks[-1][0].stop if gpu_blocks else spx
     row_range = np.arange(cstart,shared_shape[2]-spx,BS[0],dtype=np.intc)
     column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
     cpu_blocks = [(slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]

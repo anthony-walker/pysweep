@@ -1,4 +1,4 @@
-from src.sweep import dsweep
+from src.sweep.dsweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
