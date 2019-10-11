@@ -20,7 +20,7 @@ import GPUtil
 #Timer
 import time as timer
 
-def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')):
+def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -38,6 +38,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
         CS - CPU source code file
     filename: Name of the output file excluding hdf5
     exid: GPU ids to exclude from the calculation.
+    dType: a string data type which will be entered into numpy to obtain a datatype object
     """
     start = timer.time()
 
@@ -60,8 +61,13 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
     hdf5_file.create_dataset("gargs",(len(gargs),),data=gargs[:])
     GS = [ord(ch) for ch in swargs[4]]
     CS = [ord(ch) for ch in swargs[5]]
+    FN = [ord(ch) for ch in filename]
+    DT = [ord(ch) for ch in dType]
     hdf5_file.create_dataset("GS",(len(GS),),data=GS)
     hdf5_file.create_dataset("CS",(len(CS),),data=CS)
+    hdf5_file.create_dataset("exid",(len(exid),),data=exid)
+    hdf5_file.create_dataset("filename",(len(FN),),data=FN)
+    hdf5_file.create_dataset("dType",(len(DT),),data=DT)
     comm.Barrier()
     hdf5_file.close()
 

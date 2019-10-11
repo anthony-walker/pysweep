@@ -37,19 +37,26 @@ def read_input_file(comm):
     """This function is to read the input file"""
     file = h5py.File('input_file.hdf5','r',driver='mpio',comm=comm)
     gargs = tuple(file['gargs'])
-    swargs = list(file['swargs'])
-
+    swargs = tuple(file['swargs'])
+    exid = tuple(file['exid'])
     GS = ''
     for item in file['GS']:
         GS += chr(item)
     CS = ''
     for item in file['CS']:
         CS += chr(item)
+    filename = ''
+    for item in file['filename']:
+        filename += chr(item)
+    dType = ''
+    for item in file['dType']:
+        dType += chr(item)
+    dType = np.dtype(dType)
     arrf = file['arr0']
-    arr0 = np.zeros(np.shape(arrf))
+    arr0 = np.zeros(np.shape(arrf), dtype=dType)
     arr0[:,:,:] = arrf[:,:,:]
     file.close()
-    return arr0,gargs,swargs,GS,CS
+    return arr0,gargs,swargs,GS,CS,filename,exid,dType
 
 
 
@@ -78,8 +85,9 @@ def dsweep():
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     rank = comm.Get_rank()  #current rank
+    all_ranks = comm.allgather(rank) #All ranks in simulation
     #Getting input data
-    arr0,gargs,swargs,GS,CS = read_input_file(comm)
+    arr0,gargs,swargs,GS,CS,filename,exid,dType = read_input_file(comm)
     TSO,OPS,BS,AF = swargs
     comm.Barrier()
     #Local Constants
@@ -90,33 +98,67 @@ def dsweep():
     TWO = 2
     TOPS = TWO*OPS
 
-    # #Create individual node comm
-    # nodes_processors = comm.allgather((rank,processor))
-    # node_ranks = [n for n,p in nodes_processors if p==processor]
-    # node_master = node_ranks[0]
-    # node_group = comm.group.Incl(node_ranks)
-    # node_comm = comm.Create_group(node_group)
-    #
-    # #Create cluster comm
-    # cluster_ranks = list(set(comm.allgather(node_master)))
-    # cluster_master = cluster_ranks[0]
-    # cluster_group = comm.group.Incl(cluster_ranks)
-    # cluster_comm = comm.Create_group(cluster_group)
-    #
-    #
+    #Create individual node comm
+    nodes_processors = comm.allgather((rank,processor))
+    processors = tuple(zip(*nodes_processors))[1]
+    node_ranks = [n for n,p in nodes_processors if p==processor]
+    node_master = node_ranks[0]
 
+    #Create cluster comm
+    cluster_ranks = list(set(comm.allgather(node_master)))
+    cluster_master = cluster_ranks[0]
+    cluster_group = comm.group.Incl(cluster_ranks)
+    cluster_comm = comm.Create_group(cluster_group)
+    #CPU Core information
+    processors = set(processors)
+    total_num_cpus = len(processors)
+    num_cores = os.cpu_count()
+    total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
+    if node_master == rank:
+        if AF>0:
+            gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
+            gpu_rank = [(True,id) for id in gpu_rank]
+            num_gpus = len(gpu_rank)
+        else:
+            gpu_rank = []
+            num_gpus = 0
+        num_cores -= num_gpus
+        ranks_to_remove = list()
+        #Finding ranks to remove - keeps 1 for GPU operations
+        while len(node_ranks) > num_gpus+1:
+            ranks_to_remove.append(node_ranks.pop())
+    else:
+        ranks_to_remove = None
 
-
-    # #CPU Core information
-    # if rank == cluster_master:
-    #     total_num_cpus = cluster_comm.Get_size() #number of ranks
+    [all_ranks.remove(x) for x in set([x[0] for x in comm.allgather(ranks_to_remove) if x])]
+    comm.Barrier()
+    #Remaking global comm
+    ncg = comm.group.Incl(all_ranks)
+    new_comm = comm.Create_group(ncg)
+    comm.Barrier()
+    if rank not in all_ranks:
+        MPI.Finalize()
+    
+    comm = new_comm
+    print(rank)
+    # #Updating Comms
+    # if rank in ranks_to_remove:
+    #     MPI.Finalize()
     # else:
-    #     total_num_cpus = None
-    # total_num_cpus = comm.bcast(total_num_cpus,root=cluster_master)
-    # num_cores = os.cpu_count()
-    # total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
+    #     node_group = comm.group.Incl(node_ranks)
+    #     node_comm = comm.Create_group(node_group)
+    #     #Making new global comm
+    #     comm_group = comm.group.Incl()
+    #     comm = comm.Create_group(node_group)
+
+
+
+
     #
+    #
+
+
     # #Getting GPUs if affinity is greater than 1
     # if node_master == rank:
     #     if AF>0:
@@ -127,6 +169,7 @@ def dsweep():
     #         gpu_rank = []
     #         num_gpus = 0
     #     num_cores -= num_gpus
+    #
     #     #Get total number of GPUs
     #     total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
     #     assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
@@ -156,7 +199,14 @@ def dsweep():
     # node_rows = node_comm.bcast(node_rows)
     # nidx = node_comm.bcast(nidx)
     # node_row_list = node_comm.bcast(node_row_list)
-    #
+
+
+
+
+
+
+
+
     # #---------------------SWEPT VARIABLE SETUP----------------------$
     # #Splits for shared array
     # SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
