@@ -20,7 +20,7 @@ if __name__ == "__main__":
     Y = 1
     tso = 2
     ops = 2
-    aff = 0.5    #Dimensions and steps
+    aff = 0.5 #Dimensions and steps
     dx = X/nx
     dy = Y/ny
     #Changing arguments
