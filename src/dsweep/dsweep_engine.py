@@ -18,6 +18,9 @@ from itertools import product
 #CUDA Imports
 # import pycuda.driver as cuda
 # from pycuda.compiler import SourceModule
+#Dsweep imports
+from dsweep_decomposition import *
+from dsweep_blocks import *
 
 #MPI imports
 from mpi4py import MPI
@@ -33,30 +36,6 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
-def read_input_file(comm):
-    """This function is to read the input file"""
-    file = h5py.File('input_file.hdf5','r',driver='mpio',comm=comm)
-    gargs = tuple(file['gargs'])
-    swargs = tuple(file['swargs'])
-    exid = tuple(file['exid'])
-    GS = ''
-    for item in file['GS']:
-        GS += chr(item)
-    CS = ''
-    for item in file['CS']:
-        CS += chr(item)
-    filename = ''
-    for item in file['filename']:
-        filename += chr(item)
-    dType = ''
-    for item in file['dType']:
-        dType += chr(item)
-    dType = np.dtype(dType)
-    arrf = file['arr0']
-    arr0 = np.zeros(np.shape(arrf), dtype=dType)
-    arr0[:,:,:] = arrf[:,:,:]
-    file.close()
-    return arr0,gargs,swargs,GS,CS,filename,exid,dType
 
 
 
@@ -113,6 +92,7 @@ def dsweep():
     #CPU Core information
     processors = set(processors)
     total_num_cpus = len(processors)
+    assert comm.Get_size()%total_num_cpus==0,'Number of process requirements are not met'
     num_cores = os.cpu_count()
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
 
@@ -339,56 +319,7 @@ def dsweep():
 #         np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 #
 #
-def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPLITX,ops):
-    """Use this function to create blocks."""
-    gpu_blocks = []
-    s0 = slice(0,shared_shape[0],1)
-    s1 = slice(0,shared_shape[1],1)
-    for i in range(num_gpus):
-        gpu_blocks.append((s0,s1,slice(int(SPLITX+BS[0]*rows_per_gpu*i),int(SPLITX+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
-    cstart = gpu_blocks[-1][2].stop if gpu_blocks else SPLITX
-    row_range = np.arange(cstart,shared_shape[2]-SPLITX,BS[0],dtype=np.intc)
-    column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
-    cpu_blocks = [(s0,s1,slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
-    return gpu_blocks, cpu_blocks
 
-def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
-    """Use this function to split data amongst nodes."""
-    #Assert that the total number of blocks is an integer
-    gpu_rows = np.ceil(num_block_rows*AF)
-    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
-    cpu_rows = num_block_rows-gpu_rows
-    rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
-    #Estimate number of rows per node
-    node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
-    nlst = None
-    #Number of row correction
-    tnr = nodes.gather((node,node_rows))
-    cores = nodes.gather(num_cores)
-    if node == master_node:
-        nlst = [x for x,y in tnr]
-        tnr = [y for x,y in tnr]
-        total_rows = np.sum(tnr)
-        cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
-        ncyc = cycle(range(0,nodes.Get_size(),1))
-        #If total rows are greater, reduce
-        min_cores = min(cores)
-        while total_rows > num_block_rows:
-            curr = next(ncyc)
-            if min_cores >= cores[curr]:
-                tnr[curr]-=1
-                total_rows-=1
-            min_cores += next(cis)
-        #If total rows are greater, add
-        max_cores = max(cores)
-        while total_rows < num_block_rows:
-            curr = next(ncyc)
-            if max_cores <= cores[curr]:
-                tnr[curr]+=1
-                total_rows+=1
-            max_cores -= next(cis)
-    nodes.Barrier()
-    return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
 
 # def node_comm(nodes,fnode,cnode,bnode,sarr):
 #     """Use this function to communicate node data"""
