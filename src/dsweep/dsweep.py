@@ -35,8 +35,8 @@ import GPUtil
 #Swept imports
 from .pysweep_lambda import sweep_lambda
 # from .pysweep_functions import *
-from src.sweep.pysweep_decomposition import *
-from src.sweep.pysweep_block import *
+from src.dsweep.pysweep_decomposition import *
+from src.dsweep.pysweep_block import *
 # from .pysweep_regions import *
 from .pysweep_source import *
 import importlib.util

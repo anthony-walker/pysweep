@@ -1,4 +1,5 @@
 from .analytical import *
 from .equations import *
-from .sweep import *
+from .nsweep import *
+from .dsweep import *
 from .decomp import *
