@@ -2,7 +2,7 @@ from src.sweep.dsweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
-    nx = ny = 512
+    nx = ny = 16
     bs = 8
     t0 = 0
     tf = 0.1
@@ -25,5 +25,5 @@ if __name__ == "__main__":
     dy = Y/ny
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
-    swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
-    dsweep(arr,gargs,swargs,filename="test")
+    swargs = (tso,ops,bs,aff,"./src/equations/eqt.h","./src/equations/eqt.py")
+    dsweep(arr,gargs,swargs,filename="test",exid=[1])
