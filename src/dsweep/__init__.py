@@ -1,4 +1,4 @@
-from .sweep import *
+
 from .dsweep import *
 from .pysweep_lambda import *
 from .pysweep_functions import *
