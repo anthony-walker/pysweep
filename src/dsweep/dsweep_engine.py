@@ -89,6 +89,7 @@ def dsweep():
     #Getting input data
     arr0,gargs,swargs,GS,CS,filename,exid,dType = read_input_file(comm)
     TSO,OPS,BS,AF = swargs
+    BS = (BS,BS,1)
     comm.Barrier()
     #Local Constants
     ZERO = 0
@@ -128,114 +129,80 @@ def dsweep():
         #Finding ranks to remove - keeps 1 for GPU operations
         while len(node_ranks) > num_gpus+1:
             ranks_to_remove.append(node_ranks.pop())
+        total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
+        assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
+        assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
+        #Get total number of blocks
+        NB = np.prod(arr0.shape[1:])/np.prod(BS)
+        assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
+        num_block_rows = arr0.shape[1]/BS[0]
+        #This function splits the rows among the nodes by affinity
+        node_ids,node_row_list,rows_per_gpu = node_split(cluster_comm,rank,cluster_master,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
+        node_row_list = [int(x) for x in node_row_list]
+        #Getting nodes in front and behind current node
+        nidx = node_ids.index(rank)
+        node_rows = node_row_list[nidx]
+        bidx = node_ids.index(-1) if  - 1 >= 0 else len(node_ids)-1
+        bnode = (node_ids[bidx],node_row_list[bidx])
+        fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
+        fnode = (node_ids[fidx],node_row_list[fidx])
     else:
+        node_row_list = None
+        node_rows=None
+        nidx = None
         ranks_to_remove = None
 
+    #----------------------__Removing Unwanted MPI Processes------------------------#
     [all_ranks.remove(x) for x in set([x[0] for x in comm.allgather(ranks_to_remove) if x])]
     comm.Barrier()
-    #Remaking global comm
-    ncg = comm.group.Incl(all_ranks)
-    new_comm = comm.Create_group(ncg)
-    comm.Barrier()
-    if rank not in all_ranks:
+    #Remaking comms
+    if rank in all_ranks:
+        #New Global comm
+        ncg = comm.group.Incl(all_ranks)
+        comm = comm.Create_group(ncg)
+        #New node comm
+        node_group = comm.group.Incl(node_ranks)
+        node_comm = comm.Create_group(node_group)
+    else: #Ending unnecs
         MPI.Finalize()
-    
-    comm = new_comm
-    print(rank)
-    # #Updating Comms
-    # if rank in ranks_to_remove:
-    #     MPI.Finalize()
-    # else:
-    #     node_group = comm.group.Incl(node_ranks)
-    #     node_comm = comm.Create_group(node_group)
-    #     #Making new global comm
-    #     comm_group = comm.group.Incl()
-    #     comm = comm.Create_group(node_group)
+        exit(0)
+    comm.Barrier()
+    #Checking to ensure that there are enough
+    assert total_num_gpus >= comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
+    #Broad casting to node
+    node_rows = node_comm.bcast(node_rows)
+    nidx = node_comm.bcast(nidx)
+    node_row_list = node_comm.bcast(node_row_list)
 
+    #---------------------SWEPT VARIABLE SETUP----------------------$
+    #Splits for shared array
+    SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
+    SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    up_sets = create_up_sets(BS,OPS)
+    down_sets = create_down_sets(BS,OPS)[:-1]
+    oct_sets = down_sets+up_sets[1:]
+    MPSS = len(up_sets)
+    MOSS = len(oct_sets)
+    bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
+    IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
 
+    #----------------Data Input setup -------------------------#
+    time_steps = int((tf-t0)/dt)  #Number of time steps
+    #Global swept step
+    MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
+    time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
 
+    #-----------------------SHARED ARRAY CREATION----------------------#
+    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
+    sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    #Filling shared array
+    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
+    sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPLITX,gsc.stop+SPLITX)%arr0.shape[1],:]
+    sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPLITX,gsc.stop+SPLITX)%arr0.shape[1],-OPS:]
+    sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPLITX,gsc.stop+SPLITX)%arr0.shape[1],:OPS]
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
 
-    #
-    #
-
-
-    # #Getting GPUs if affinity is greater than 1
-    # if node_master == rank:
-    #     if AF>0:
-    #         gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
-    #         gpu_rank = [(True,id) for id in gpu_rank]
-    #         num_gpus = len(gpu_rank)
-    #     else:
-    #         gpu_rank = []
-    #         num_gpus = 0
-    #     num_cores -= num_gpus
-    #
-    #     #Get total number of GPUs
-    #     total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
-    #     assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
-    #     assert total_num_gpus >= comm.Get_size() if AF == 1 else True,"Too many ranks specified, not enough GPUs"
-    #     assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
-    #     #Get total number of blocks
-    #     NB = np.prod(arr0.shape[1:])/np.prod(BS)
-    #     assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
-    #     num_block_rows = arr0.shape[1]/BS[0]
-    #     #This function splits the rows among the nodes by affinity
-    #     node_ids,node_row_list,rows_per_gpu = node_split(cluster_comm,rank,cluster_master,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
-    #     node_row_list = [int(x) for x in node_row_list]
-    #
-    #     #Getting nodes in front and behind current node
-    #     nidx = node_ids.index(rank)
-    #     node_rows = node_row_list[nidx]
-    #     bidx = node_ids.index(-1) if  - 1 >= 0 else len(node_ids)-1
-    #     bnode = (node_ids[bidx],node_row_list[bidx])
-    #     fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
-    #     fnode = (node_ids[fidx],node_row_list[fidx])
-    # else:
-    #     node_row_list = None
-    #     node_rows=None
-    #     nidx = None
-    #
-    # #Broad casting to node
-    # node_rows = node_comm.bcast(node_rows)
-    # nidx = node_comm.bcast(nidx)
-    # node_row_list = node_comm.bcast(node_row_list)
-
-
-
-
-
-
-
-
-    # #---------------------SWEPT VARIABLE SETUP----------------------$
-    # #Splits for shared array
-    # SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
-    # SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
-    # up_sets = create_up_sets(BS,OPS)
-    # down_sets = create_down_sets(BS,OPS)[:-1]
-    # oct_sets = down_sets+up_sets[1:]
-    # MPSS = len(up_sets)
-    # MOSS = len(oct_sets)
-    # bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
-    # IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
-    #
-    # #----------------Data Input setup -------------------------#
-    # time_steps = int((tf-t0)/dt)  #Number of time steps
-    # #Global swept step
-    # MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
-    # time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
-    #
-    # #-----------------------SHARED ARRAY CREATION----------------------#
-    # #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+BS[0]+2*OPS,arr0.shape[2]+2*OPS)
-    # sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
-    # #Filling shared array
-    # gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    # sarr[0,:,:,OPS:-OPS] =  arr0[:,np.arange(gsc.start-SPLITX,gsc.stop+SPLITX)%arr0.shape[1],:]
-    # sarr[0,:,:,:OPS] =  arr0[:,np.arange(gsc.start-SPLITX,gsc.stop+SPLITX)%arr0.shape[1],-OPS:]
-    # sarr[0,:,:,-OPS:] =  arr0[:,np.arange(gsc.start-SPLITX,gsc.stop+SPLITX)%arr0.shape[1],:OPS]
-    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
-    #
     # #Creating blocks to be solved
     # if rank==node_master:
     #     gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPLITX,OPS)
@@ -372,57 +339,57 @@ def dsweep():
 #         np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 #
 #
-# def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPLITX,ops):
-#     """Use this function to create blocks."""
-#     gpu_blocks = []
-#     s0 = slice(0,shared_shape[0],1)
-#     s1 = slice(0,shared_shape[1],1)
-#     for i in range(num_gpus):
-#         gpu_blocks.append((s0,s1,slice(int(SPLITX+BS[0]*rows_per_gpu*i),int(SPLITX+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
-#     cstart = gpu_blocks[-1][2].stop if gpu_blocks else SPLITX
-#     row_range = np.arange(cstart,shared_shape[2]-SPLITX,BS[0],dtype=np.intc)
-#     column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
-#     cpu_blocks = [(s0,s1,slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
-#     return gpu_blocks, cpu_blocks
-#
-# def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
-#     """Use this function to split data amongst nodes."""
-#     #Assert that the total number of blocks is an integer
-#     gpu_rows = np.ceil(num_block_rows*AF)
-#     rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
-#     cpu_rows = num_block_rows-gpu_rows
-#     rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
-#     #Estimate number of rows per node
-#     node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
-#     nlst = None
-#     #Number of row correction
-#     tnr = nodes.gather((node,node_rows))
-#     cores = nodes.gather(num_cores)
-#     if node == master_node:
-#         nlst = [x for x,y in tnr]
-#         tnr = [y for x,y in tnr]
-#         total_rows = np.sum(tnr)
-#         cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
-#         ncyc = cycle(range(0,nodes.Get_size(),1))
-#         #If total rows are greater, reduce
-#         min_cores = min(cores)
-#         while total_rows > num_block_rows:
-#             curr = next(ncyc)
-#             if min_cores >= cores[curr]:
-#                 tnr[curr]-=1
-#                 total_rows-=1
-#             min_cores += next(cis)
-#         #If total rows are greater, add
-#         max_cores = max(cores)
-#         while total_rows < num_block_rows:
-#             curr = next(ncyc)
-#             if max_cores <= cores[curr]:
-#                 tnr[curr]+=1
-#                 total_rows+=1
-#             max_cores -= next(cis)
-#     nodes.Barrier()
-#     return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
-#
+def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPLITX,ops):
+    """Use this function to create blocks."""
+    gpu_blocks = []
+    s0 = slice(0,shared_shape[0],1)
+    s1 = slice(0,shared_shape[1],1)
+    for i in range(num_gpus):
+        gpu_blocks.append((s0,s1,slice(int(SPLITX+BS[0]*rows_per_gpu*i),int(SPLITX+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
+    cstart = gpu_blocks[-1][2].stop if gpu_blocks else SPLITX
+    row_range = np.arange(cstart,shared_shape[2]-SPLITX,BS[0],dtype=np.intc)
+    column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
+    cpu_blocks = [(s0,s1,slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
+    return gpu_blocks, cpu_blocks
+
+def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
+    """Use this function to split data amongst nodes."""
+    #Assert that the total number of blocks is an integer
+    gpu_rows = np.ceil(num_block_rows*AF)
+    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
+    cpu_rows = num_block_rows-gpu_rows
+    rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
+    #Estimate number of rows per node
+    node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
+    nlst = None
+    #Number of row correction
+    tnr = nodes.gather((node,node_rows))
+    cores = nodes.gather(num_cores)
+    if node == master_node:
+        nlst = [x for x,y in tnr]
+        tnr = [y for x,y in tnr]
+        total_rows = np.sum(tnr)
+        cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
+        ncyc = cycle(range(0,nodes.Get_size(),1))
+        #If total rows are greater, reduce
+        min_cores = min(cores)
+        while total_rows > num_block_rows:
+            curr = next(ncyc)
+            if min_cores >= cores[curr]:
+                tnr[curr]-=1
+                total_rows-=1
+            min_cores += next(cis)
+        #If total rows are greater, add
+        max_cores = max(cores)
+        while total_rows < num_block_rows:
+            curr = next(ncyc)
+            if max_cores <= cores[curr]:
+                tnr[curr]+=1
+                total_rows+=1
+            max_cores -= next(cis)
+    nodes.Barrier()
+    return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
+
 # def node_comm(nodes,fnode,cnode,bnode,sarr):
 #     """Use this function to communicate node data"""
 #     pass

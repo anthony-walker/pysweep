@@ -70,7 +70,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     hdf5_file.create_dataset("dType",(len(DT),),data=DT)
     comm.Barrier()
     hdf5_file.close()
-
+    
     #Getting GPUs if affinity is greater than 1
     if AF>0:
         gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
