@@ -78,10 +78,10 @@ def dsweep():
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     rank = comm.Get_rank()  #current rank
-    print(rank)
     #Getting input data
     arr0,gargs,swargs,GS,CS = read_input_file(comm)
     TSO,OPS,BS,AF = swargs
+    comm.Barrier()
     #Local Constants
     ZERO = 0
     QUARTER = 0.25

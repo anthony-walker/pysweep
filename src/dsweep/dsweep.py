@@ -55,15 +55,15 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
 
     #Create input file
     hdf5_file = h5py.File("input_file.hdf5", 'w', driver='mpio', comm=comm)
-    if rank == master_rank:
-        hdf5_file.create_dataset("arr0",arr0.shape,data=arr0)
-        hdf5_file.create_dataset("swargs",(len(swargs[:-2]),),data=swargs[:-2])
-        hdf5_file.create_dataset("gargs",(len(gargs),),data=gargs[:])
-        GS = [ord(ch) for ch in swargs[4]]
-        CS = [ord(ch) for ch in swargs[5]]
-        hdf5_file.create_dataset("GS",(len(GS),),data=GS)
-        hdf5_file.create_dataset("CS",(len(CS),),data=CS)
-
+    hdf5_file.create_dataset("arr0",arr0.shape,data=arr0)
+    hdf5_file.create_dataset("swargs",(len(swargs[:-2]),),data=swargs[:-2])
+    hdf5_file.create_dataset("gargs",(len(gargs),),data=gargs[:])
+    GS = [ord(ch) for ch in swargs[4]]
+    CS = [ord(ch) for ch in swargs[5]]
+    hdf5_file.create_dataset("GS",(len(GS),),data=GS)
+    hdf5_file.create_dataset("CS",(len(CS),),data=CS)
+    comm.Barrier()
+    hdf5_file.close()
 
     #Getting GPUs if affinity is greater than 1
     if AF>0:
@@ -78,11 +78,12 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32
         proc_mult += max(node_gpus_list)
     proc_mult = comm.bcast(proc_mult,root=master_rank)
     comm.Barrier()
-    hdf5_file.close()
     num_procs = int(proc_mult*comm.Get_size())
     #Spawning MPI processes
-    MPI.COMM_SELF.Spawn(sys.executable,args=['./src/dsweep/dsweep_engine.py'],maxprocs=num_procs)
+    if rank == master_rank:
+        MPI.COMM_SELF.Spawn(sys.executable,args=['./src/dsweep/dsweep_engine.py'],maxprocs=num_procs)
+    else:
+        MPI.Finalize()
 
     stop = timer.time()
-
     return stop-start
