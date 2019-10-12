@@ -92,6 +92,7 @@ def dsweep():
     cluster_master = cluster_ranks[0]
     cluster_group = comm.group.Incl(cluster_ranks)
     cluster_comm = comm.Create_group(cluster_group)
+
     #CPU Core information
     processors = set(processors)
     total_num_cpus = len(processors)
@@ -113,6 +114,7 @@ def dsweep():
         while len(node_ranks) > num_gpus+1:
             ranks_to_remove.append(node_ranks.pop())
         total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
+        #Testing ranks and number of gpus to ensure simulation is viable
         assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
         assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
         #Get total number of blocks
@@ -224,25 +226,26 @@ def dsweep():
         cpu_SM.set_globals(GRB,SM,*gargs)
         del cpu_SM
         del larr
+        mpi_pool = None
     else:
         SM = build_cpu_source(CS) #Building Python source code
         SM.set_globals(GRB,SM,*gargs)
         GRD = None
-        
+        mpi_pool = fmpi.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
-    # #------------------------------HDF5 File------------------------------------------#
-    # # filename+=".hdf5"
-    # # hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
-    # # hdf_bs = hdf5_file.create_dataset("BS",(len(BS),))
-    # # hdf_bs[:] = BS[:]
-    # # hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,))
-    # # hdf_as[:] = (time_steps,)+arr0.shape
-    # # hdf_aff = hdf5_file.create_dataset("AF",(ONE,))
-    # # hdf_aff[ZERO] = AF
-    # # hdf_time = hdf5_file.create_dataset("time",(1,))
-    # # hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-    # # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
-    # # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
+    #------------------------------HDF5 File------------------------------------------#
+    # filename+=".hdf5"
+    # hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
+    # hdf_bs = hdf5_file.create_dataset("BS",(len(BS),))
+    # hdf_bs[:] = BS[:]
+    # hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,))
+    # hdf_as[:] = (time_steps,)+arr0.shape
+    # hdf_aff = hdf5_file.create_dataset("AF",(ONE,))
+    # hdf_aff[ZERO] = AF
+    # hdf_time = hdf5_file.create_dataset("time",(1,))
+    # hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+    # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
+    # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
     # cwt = 1 #Current write time
     # gts = 0  #Counter for writing on the appropriate step
     # comm.Barrier() #Ensure all processes are prepared to solve
@@ -250,38 +253,38 @@ def dsweep():
     # pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     # #-------------------------------FIRST PYRAMID-------------------------------------------#
     # GPU_UpPyramid(sarr,up_sets,blocks,gts,pargs)
-    #
-    # #Pop Cuda Contexts
-    # if GRB:
-    #     cuda_context.pop()
-    # comm.Barrier()
-    #
 
-# def GPU_UpPyramid(sarr,upsets,blocks,gts,pargs):
-#     """
-#     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
-#     arr-the array that will be solved (t,v,x,y)
-#     fcn - the function that solves the problem in question
-#     OPS -  the number of atomic operations
-#     """
-#     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
-#     #Splitting between cpu and gpu
-#     if GRB:
-#         print(GRD,BS,ssb)
-#         # Getting GPU Function
-#         arr = np.copy(sarr[blocks])
-#         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-#         gpu_fcn = SM.get_function("UpPyramid")
-#         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
-#         cuda.Context.synchronize()
-#         sarr[blocks] = arr[:,:,:,:]
-#     else:   #CPUs do this
-#         cpu_fcn = sweep_lambda((DCPU_UpPyramid,sarr,SM,upsets,gts,TSO))
-#         map(cpu_fcn,blocks)
-    #     arr = rebuild_blocks(arr,blocks,CRS,OPS)
-    # np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
-    # for br in BDR:
-    #     np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
+    #Pop Cuda Contexts
+    if GRB:
+        cuda_context.pop()
+    comm.Barrier()
+
+
+def GPU_UpPyramid(sarr,upsets,blocks,gts,pargs):
+    """
+    This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
+    arr-the array that will be solved (t,v,x,y)
+    fcn - the function that solves the problem in question
+    OPS -  the number of atomic operations
+    """
+    SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
+    #Splitting between cpu and gpu
+    if GRB:
+        print(GRD,BS,ssb)
+        # Getting GPU Function
+        arr = np.copy(sarr[blocks])
+        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
+        gpu_fcn = SM.get_function("UpPyramid")
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        cuda.Context.synchronize()
+        sarr[blocks] = arr[:,:,:,:]
+    else:   #CPUs do this
+        cpu_fcn = sweep_lambda((DCPU_UpPyramid,sarr,SM,upsets,gts,TSO))
+        map(cpu_fcn,blocks)
+        arr = rebuild_blocks(arr,blocks,CRS,OPS)
+    np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
+    for br in BDR:
+        np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
 
 # def DCPU_UpPyramid(args):
 #     """Use this function to build the Up Pyramid."""
