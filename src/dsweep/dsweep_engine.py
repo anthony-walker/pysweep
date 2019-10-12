@@ -292,16 +292,17 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool):
 
 def CPU_UpPrism(block):
     """Use this function to build the Up Pyramid."""
+    print('UpPrism')
     #UpPyramid of Swept Step
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
         block = SM.step(sarr[block],swept_sets,ts,gts)
         gts+=1
     #X-Bridge - NEED TO SHIFT THIS
-    # for ts,swept_set in enumerate(x_sets,start=TSO):
-    #     #Calculating Step
-    #     block = SM.step(sarr[block],swept_sets,ts,gts)
-    #     gts+=1
+    for ts,swept_set in enumerate(x_sets,start=TSO):
+        #Calculating Step
+        block = SM.step(sarr[block],swept_sets,ts,gts)
+        gts+=1
     return block
 
 #Statement to execute dsweep
