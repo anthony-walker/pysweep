@@ -1,12 +1,10 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
-import sys
-from sweep import *
-from dist_sweep import *
-from analytical import *
-from equations import *
-from decomp import *
-import argparse
+import sys,argparse
+from .sweep import dist_sweep,node_sweep
+from .analytical import *
+from .equations import *
+from .decomp import decomp
 import numpy as np
 
 def pm(arr,i):
