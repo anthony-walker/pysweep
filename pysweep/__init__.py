@@ -3,5 +3,4 @@ from .equations import *
 from .sweep import dist_sweep, node_sweep
 from .decomp import decomp
 from .tests import *
-import master
-import pst
+from .tools import *
