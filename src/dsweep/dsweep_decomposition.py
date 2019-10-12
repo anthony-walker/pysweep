@@ -2,9 +2,11 @@
 #This file contains all of the necessary functions for implementing process management
 # and data decomposition for the swept rule.
 import numpy as np
-#MPI imports
 from mpi4py import MPI
 import importlib
+import h5py
+from itertools import cycle
+from itertools import product
 
 def read_input_file(comm):
     """This function is to read the input file"""
@@ -31,17 +33,25 @@ def read_input_file(comm):
     file.close()
     return arr0,gargs,swargs,GS,CS,filename,exid,dType
 
-def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,SPLITX,ops):
+def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
     """Use this function to create blocks."""
     gpu_blocks = []
     s0 = slice(0,shared_shape[0],1)
     s1 = slice(0,shared_shape[1],1)
     for i in range(num_gpus):
-        gpu_blocks.append((s0,s1,slice(int(SPLITX+BS[0]*rows_per_gpu*i),int(SPLITX+BS[0]*rows_per_gpu*(i+1)),1),slice(ops,shared_shape[3]-ops,1)))
-    cstart = gpu_blocks[-1][2].stop if gpu_blocks else SPLITX
-    row_range = np.arange(cstart,shared_shape[2]-SPLITX,BS[0],dtype=np.intc)
-    column_range = np.arange(ops,shared_shape[3]-int(BS[1]/2)+ops,BS[1],dtype=np.intc)
-    cpu_blocks = [(s0,s1,slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
+        gpu_blocks.append((s0,s1,slice(int(BS[0]*rows_per_gpu*i)+ops,int(BS[0]*rows_per_gpu*(i+1))+ops,1),slice(0,shared_shape[3],1)))
+    cstart = gpu_blocks[-1][2].stop if gpu_blocks else ops
+    row_range = np.arange(cstart,shared_shape[2]-BS[0],BS[0],dtype=np.intc)
+    column_range = np.arange(0,shared_shape[3],BS[1],dtype=np.intc)
+    cpu_blocks = [(s0,s1,slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)]
+    #This handles edge blocks in the y direction
+    for i,block in enumerate(cpu_blocks):
+        if block[3].start < 0:
+            new_block = (block[2],np.arange(block[3].start,block[3].stop))
+        elif block[3].stop > shared_shape[3]:
+            ny = np.concatenate((np.arange(block[3].start,block[3].stop-ops),np.arange(0,ops,1)))
+            new_block = (block[2],ny)
+            cpu_blocks[i] = new_block
     return gpu_blocks, cpu_blocks
 
 

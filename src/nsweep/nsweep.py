@@ -43,15 +43,6 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
-
-def pm(arr,i):
-    for item in arr[i,0,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write("%1.1f"%si+", ")
-        sys.stdout.write("]\n")
-
-
 def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
     args:

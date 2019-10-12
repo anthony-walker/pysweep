@@ -2,7 +2,7 @@ from src.dsweep.dsweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
-    nx = ny = 16
+    nx = ny = 32
     bs = 8
     t0 = 0
     tf = 0.1
@@ -26,4 +26,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./src/equations/eqt.h","./src/equations/eqt.py")
-    dsweep(arr,gargs,swargs,filename="test",exid=[1])
+    dsweep(arr,gargs,swargs,filename="test",exid=[])
