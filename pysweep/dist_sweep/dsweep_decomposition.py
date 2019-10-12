@@ -2,11 +2,95 @@
 #This file contains all of the necessary functions for implementing process management
 # and data decomposition for the swept rule.
 import numpy as np
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
-#MPI imports
 from mpi4py import MPI
 import importlib
+import h5py
+
+
+def read_input_file(comm):
+    """This function is to read the input file"""
+    file = h5py.File('input_file.hdf5','r',driver='mpio',comm=comm)
+    gargs = tuple(file['gargs'])
+    swargs = tuple(file['swargs'])
+    exid = tuple(file['exid'])
+    GS = ''
+    for item in file['GS']:
+        GS += chr(item)
+    CS = ''
+    for item in file['CS']:
+        CS += chr(item)
+    filename = ''
+    for item in file['filename']:
+        filename += chr(item)
+    dType = ''
+    for item in file['dType']:
+        dType += chr(item)
+    dType = np.dtype(dType)
+    arrf = file['arr0']
+    arr0 = np.zeros(np.shape(arrf), dtype=dType)
+    arr0[:,:,:] = arrf[:,:,:]
+    file.close()
+    return arr0,gargs,swargs,GS,CS,filename,exid,dType
+
+def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
+    """Use this function to create blocks."""
+    gpu_blocks = []
+    s0 = slice(0,shared_shape[0],1)
+    s1 = slice(0,shared_shape[1],1)
+    for i in range(num_gpus):
+        gpu_blocks.append((s0,s1,slice(int(BS[0]*rows_per_gpu*i)+ops,int(BS[0]*rows_per_gpu*(i+1))+ops,1),slice(0,shared_shape[3],1)))
+    cstart = gpu_blocks[-1][2].stop if gpu_blocks else ops
+    row_range = np.arange(cstart,shared_shape[2]-BS[0],BS[0],dtype=np.intc)
+    column_range = np.arange(0,shared_shape[3],BS[1],dtype=np.intc)
+    cpu_blocks = [(s0,s1,slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)]
+    #This handles edge blocks in the y direction
+    for i,block in enumerate(cpu_blocks):
+        if block[3].start < 0:
+            new_block = (s0,s1,block[2],np.arange(block[3].start,block[3].stop))
+        elif block[3].stop > shared_shape[3]:
+            ny = np.concatenate((np.arange(block[3].start,block[3].stop-ops),np.arange(0,ops,1)))
+            new_block = (s0,s1,block[2],ny)
+        cpu_blocks[i] = new_block
+    return gpu_blocks, cpu_blocks
+
+
+def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
+    """Use this function to split data amongst nodes."""
+    #Assert that the total number of blocks is an integer
+    gpu_rows = np.ceil(num_block_rows*AF)
+    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
+    cpu_rows = num_block_rows-gpu_rows
+    rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
+    #Estimate number of rows per node
+    node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
+    nlst = None
+    #Number of row correction
+    tnr = nodes.gather((node,node_rows))
+    cores = nodes.gather(num_cores)
+    if node == master_node:
+        nlst = [x for x,y in tnr]
+        tnr = [y for x,y in tnr]
+        total_rows = np.sum(tnr)
+        cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
+        ncyc = cycle(range(0,nodes.Get_size(),1))
+        #If total rows are greater, reduce
+        min_cores = min(cores)
+        while total_rows > num_block_rows:
+            curr = next(ncyc)
+            if min_cores >= cores[curr]:
+                tnr[curr]-=1
+                total_rows-=1
+            min_cores += next(cis)
+        #If total rows are greater, add
+        max_cores = max(cores)
+        while total_rows < num_block_rows:
+            curr = next(ncyc)
+            if max_cores <= cores[curr]:
+                tnr[curr]+=1
+                total_rows+=1
+            max_cores -= next(cis)
+    nodes.Barrier()
+    return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
 
 
 def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):

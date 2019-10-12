@@ -1,41 +1,22 @@
 #Programmer: Anthony Walker
 #Use the functions in this file to test the decomposition code.
+import sys, os
 import numpy as np
-import sys
-import os
-cwd = os.getcwd()
-sys.path.insert(1,cwd+"/src")
-sys.path.insert(1,cwd+"/notipy")
-from analytical import *
-from equations import *
-from sweep import *
-import numpy as np
-#Cuda imports
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
 import matplotlib as mpl
-mpl.use("Agg")
+mpl.use("tkAgg")
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gsc
 from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
-from notipy import NotiPy
+from mpl_toolkits import mplot3d
+from master import controller
 from mpi4py import MPI
-
-
-
-def pm(arr,i):
-    for item in arr[i,0,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write("%.4f"%si+", ")
-        sys.stdout.write("]\n")
 
 def map_test_fcn(args):
     block,tn = args
     block[1,:,:,:] = block[0,:,:,:]
     return block
-
 
 def test_block_management(args=None):
     x = 20
@@ -275,6 +256,3 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         os.system(estr)
 
 test_sweep_vortex()
-# sm = "Hi,\nYour function run is complete.\n"
-# notifier = NotiPy(test_sweep_vortex,(1,0.0001,40,0,10,10,4),sm,"asw42695@gmail.com",timeout=None)
-# notifier.run()

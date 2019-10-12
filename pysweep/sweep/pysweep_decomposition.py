@@ -2,11 +2,12 @@
 #This file contains all of the necessary functions for implementing process management
 # and data decomposition for the swept rule.
 import numpy as np
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
+#MPI imports
 from mpi4py import MPI
-import importlib
-import h5py
-from itertools import cycle
-from itertools import product
+import importlib, h5py
+from itertools import cycle, product
 
 def read_input_file(comm):
     """This function is to read the input file"""
@@ -92,6 +93,7 @@ def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_core
             max_cores -= next(cis)
     nodes.Barrier()
     return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
+
 
 
 def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):

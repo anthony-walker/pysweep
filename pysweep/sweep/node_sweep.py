@@ -1,32 +1,21 @@
-
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
 
-#System imports
-import os
-import sys
-
-#Writing imports
-import h5py
-
-#DataStructure and Math imports
-import math
+#Imports
+import os, sys, h5py, math
 import numpy as np
 from collections import deque
+import importlib.util
+import time as timer
 
 #CUDA Imports
 import pycuda.driver as cuda
-import pycuda.autoinit  #Cor debugging only
 from pycuda.compiler import SourceModule
-# import pycuda.gpuarray as gpuarray
 
 #MPI imports
 from mpi4py import MPI
-
 #Multiprocessing Imports
 import multiprocessing as mp
-import ctypes
-
 #GPU Utility Imports
 import GPUtil
 
@@ -37,11 +26,6 @@ from .pysweep_decomposition import *
 from .pysweep_block import *
 from .pysweep_regions import *
 from .pysweep_source import *
-import importlib.util
-#Testing and Debugging
-import warnings
-import time as timer
-warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
 def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule

@@ -1,34 +1,24 @@
 #Programmer: Anthony Walker
-import sys
-import os
-cwd = os.getcwd()
-sys.path.insert(1,cwd+"/src")
-import matplotlib
-from analytical import *
-from equations import *
-from sweep import *
-from decomp import *
+import sys, os
 import numpy as np
-#Plotting
 import matplotlib as mpl
-mpl.use("Tkagg")
+mpl.use("tkAgg")
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gsc
 from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
+from mpl_toolkits import mplot3d
+from master import controller
 #Cuda
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 #C
 from ctypes import *
-
-
-def pm(arr,i):
-    for item in arr[i,0,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write("%.5f"%si+", ")
-        sys.stdout.write("]\n")
+#From PySweep
+from analytical import *
+from equations import *
+from decomp import *
 
 def test_flux():
     """Use this function to test the python version of the euler code.

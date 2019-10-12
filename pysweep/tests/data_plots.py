@@ -1,9 +1,6 @@
 #Programmer: Anthony Walker
 #Use this file to generate figures for the 2D swept paper
-import sys
-import os
-cwd = os.getcwd()
-sys.path.insert(1,cwd+"/src")
+import sys, os, h5py
 import numpy as np
 import matplotlib as mpl
 mpl.use("tkAgg")
@@ -13,7 +10,6 @@ from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
 from mpl_toolkits import mplot3d
-import h5py
 from master import controller
 
 def create_test_files():

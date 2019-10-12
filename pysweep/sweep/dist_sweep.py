@@ -1,26 +1,13 @@
 
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-
-#System imports
-import sys
+import sys, os, h5py, math, GPUtil
 import os
-
-#DataStructure and Math imports
-import math
 import numpy as np
-
-#Writing imports
-import h5py
-#MPI imports
 from mpi4py import MPI
-
-#GPU Utility Imports
-import GPUtil
-#Timer
 import time as timer
 
-def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
+def sweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -70,7 +57,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     hdf5_file.create_dataset("dType",(len(DT),),data=DT)
     comm.Barrier()
     hdf5_file.close()
-    
+
     #Getting GPUs if affinity is greater than 1
     if AF>0:
         gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
@@ -87,7 +74,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     num_procs = int(proc_mult*comm.Get_size())
     #Spawning MPI processes
     if rank == master_rank:
-        MPI.COMM_SELF.Spawn(sys.executable,args=['./src/dsweep/dsweep_engine.py'],maxprocs=num_procs)
+        MPI.COMM_SELF.Spawn(sys.executable,args=['./pysweep/sweep/dist_sweep_engine.py'],maxprocs=num_procs)
     else:
         MPI.Finalize()
 
