@@ -70,6 +70,7 @@ def dsweep():
     rank = comm.Get_rank()  #current rank
     all_ranks = comm.allgather(rank) #All ranks in simulation
     #Getting input data
+    global OPS,TSO,AF
     arr0,gargs,swargs,GS,CS,filename,exid,dType = read_input_file(comm)
     TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
     t0,tf,dt = gargs[:3]
@@ -165,6 +166,7 @@ def dsweep():
     #Splits for shared array
     SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
     SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    global up_sets, down_sets, oct_sets, x_sets, y_sets
     up_sets = create_up_sets(BS,OPS)
     down_sets = create_down_sets(BS,OPS)[:-1]
     oct_sets = down_sets+up_sets[1:]
@@ -184,6 +186,7 @@ def dsweep():
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+2*OPS,arr0.shape[2])
+    global sarr
     sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
@@ -205,7 +208,7 @@ def dsweep():
         node_data = None
     blocks,gpu_rank =  node_comm.scatter(node_data)
     GRB = gpu_rank[0]
-
+    global SM
     #Operations specifically for GPus and CPUs
     if GRB:
         # Creating cuda device and Context
@@ -251,6 +254,7 @@ def dsweep():
     # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
     # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
     cwt = 1 #Current write time
+    global gts
     gts = 0  #Counter for writing on the appropriate step
     comm.Barrier() #Ensure all processes are prepared to solve
     # #-------------------------------SWEPT RULE---------------------------------------------#
@@ -283,32 +287,21 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool):
         # gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
         # cuda.Context.synchronize()
     else:   #CPUs do this
-        cpu_fcn = sweep_lambda((CPU_UpPrism,sarr,SM,up_sets,x_sets,gts,TSO))
-        mpi_pool.map(test_fcn,blocks)
+        mpi_pool.map(CPU_UpPrism,blocks)
 
 
-def test_fcn(block):
-    print('woo')
-
-def CPU_UpPrism(args):
+def CPU_UpPrism(block):
     """Use this function to build the Up Pyramid."""
-    print('Woo')
-    block,sarr,SM,up_sets,x_sets,gts,TSO = args
-
-    #Removing elements for swept step
-    # for ts,swept_set in enumerate(isets,start=TSO-1):
-    #     #Calculating Step
-    #     block = SM.step(block,swept_set,ts,gts)
-    #     gts+=1
-    # return block
-
-def CPU_Bridge(args):
-    """Use this function to build the Up Pyramid."""
-    block,SM,isets,gts,TSO = args
-    #Removing elements for swept step
-    for ts,swept_set in enumerate(isets,start=TSO):
+    print('UpPrism')
+    #UpPyramid of Swept Step
+    for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
-        block = SM.step(block,swept_set,ts,gts)
+        block = SM.step(sarr[block],swept_sets,ts,gts)
+        gts+=1
+    #X-Bridge - NEED TO SHIFT THIS
+    for ts,swept_set in enumerate(x_sets,start=TSO):
+        #Calculating Step
+        block = SM.step(sarr[block],swept_sets,ts,gts)
         gts+=1
     return block
 
