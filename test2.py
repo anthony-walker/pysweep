@@ -1,4 +1,4 @@
-from src.dsweep.dsweep import dsweep
+from pysweep.sweep.dist_sweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":

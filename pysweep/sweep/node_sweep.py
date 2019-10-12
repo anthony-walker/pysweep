@@ -20,12 +20,12 @@ import multiprocessing as mp
 import GPUtil
 
 #Swept imports
-from .pysweep_lambda import sweep_lambda
-from .pysweep_functions import *
-from .pysweep_decomposition import *
-from .pysweep_block import *
-from .pysweep_regions import *
-from .pysweep_source import *
+from .mplambda import sweep_lambda
+from .functions import *
+from .decomposition import *
+from .block import *
+from .regions import *
+from .source import *
 
 def nsweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule

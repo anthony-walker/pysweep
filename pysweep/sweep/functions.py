@@ -2,10 +2,10 @@
 #This file contains all of the necessary functions for implementing the swept rule.
 import numpy as np
 import sys
-from .pysweep_lambda import sweep_lambda
+from .mplambda import sweep_lambda
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
-from .pysweep_block import *
+from .block import *
 
 def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     """
