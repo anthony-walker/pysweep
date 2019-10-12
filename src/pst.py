@@ -3,8 +3,6 @@
 import sys
 from sweep import *
 from dist_sweep import *
-from analytical import *
-from equations import *
 from decomp import *
 import argparse
 import numpy as np
