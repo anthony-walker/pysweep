@@ -50,7 +50,7 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
             new_block = (block[2],np.arange(block[3].start,block[3].stop))
         elif block[3].stop > shared_shape[3]:
             ny = np.concatenate((np.arange(block[3].start,block[3].stop-ops),np.arange(0,ops,1)))
-            new_block = (block[2],ny)
+            new_block = (s0,s1,block[2],ny)
             cpu_blocks[i] = new_block
     return gpu_blocks, cpu_blocks
 

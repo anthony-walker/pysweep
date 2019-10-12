@@ -23,10 +23,12 @@ from pycuda.compiler import SourceModule
 from dsweep_decomposition import *
 from dsweep_block import *
 from dsweep_source import *
+from dsweep_lambda import sweep_lambda
 
 #MPI imports
 from mpi4py import MPI
-import mpi4py.futures as fmpi
+#Multi-processing imports
+from concurrent import futures
 
 #GPU Utility Imports
 import GPUtil
@@ -169,6 +171,8 @@ def dsweep():
     MPSS = len(up_sets)
     MOSS = len(oct_sets)
     bridge_sets, bridge_slices = create_bridge_sets(BS,OPS,MPSS)
+    x_sets = bridge_sets[0]
+    y_sets = bridge_sets[1]
     IEP = 1 if MPSS%2==0 else 0 #This accounts for even or odd MPSS
 
     #----------------Data Input setup -------------------------#
@@ -231,7 +235,7 @@ def dsweep():
         SM = build_cpu_source(CS) #Building Python source code
         SM.set_globals(GRB,SM,*gargs)
         GRD = None
-        mpi_pool = fmpi.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
+        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
     #------------------------------HDF5 File------------------------------------------#
     # filename+=".hdf5"
@@ -246,21 +250,23 @@ def dsweep():
     # hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
     # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
     # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
-    # cwt = 1 #Current write time
-    # gts = 0  #Counter for writing on the appropriate step
-    # comm.Barrier() #Ensure all processes are prepared to solve
+    cwt = 1 #Current write time
+    gts = 0  #Counter for writing on the appropriate step
+    comm.Barrier() #Ensure all processes are prepared to solve
     # #-------------------------------SWEPT RULE---------------------------------------------#
-    # pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
-    # #-------------------------------FIRST PYRAMID-------------------------------------------#
-    # GPU_UpPyramid(sarr,up_sets,blocks,gts,pargs)
+    pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
+    #-------------------------------FIRST PYRAMID-------------------------------------------#
+    UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool)
 
     #Pop Cuda Contexts
     if GRB:
         cuda_context.pop()
+    else:
+        mpi_pool.shutdown()
     comm.Barrier()
 
 
-def GPU_UpPyramid(sarr,upsets,blocks,gts,pargs):
+def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -270,199 +276,41 @@ def GPU_UpPyramid(sarr,upsets,blocks,gts,pargs):
     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
     #Splitting between cpu and gpu
     if GRB:
-        print(GRD,BS,ssb)
+        pass
         # Getting GPU Function
-        arr = np.copy(sarr[blocks])
-        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-        gpu_fcn = SM.get_function("UpPyramid")
-        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
-        cuda.Context.synchronize()
-        sarr[blocks] = arr[:,:,:,:]
+        # arr = np.ascontiguousarray(arr) #Ensure array is contiguous
+        # gpu_fcn = SM.get_function("UpPyramid")
+        # gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        # cuda.Context.synchronize()
     else:   #CPUs do this
-        cpu_fcn = sweep_lambda((DCPU_UpPyramid,sarr,SM,upsets,gts,TSO))
-        map(cpu_fcn,blocks)
-        arr = rebuild_blocks(arr,blocks,CRS,OPS)
-    np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
-    for br in BDR:
-        np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
-
-# def DCPU_UpPyramid(args):
-#     """Use this function to build the Up Pyramid."""
-#     bslice,sarr,SM,isets,gts,TSO = args
-#     block = np.copy(sarr[bslice])
-#     #Removing elements for swept step
-#     for ts,swept_set in enumerate(isets,start=TSO-1):
-#         #Calculating Step
-#         block = SM.step(block,swept_set,ts,gts)
-#         gts+=1
-#     sarr[bslice] = block[:,:,:,:]
-#
-# def UpPyramid(sarr,upsets,gts,pargs):
-#     """
-#     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
-#     arr-the array that will be solved (t,v,x,y)
-#     fcn - the function that solves the problem in question
-#     OPS -  the number of atomic operations
-#     """
-#     SM,GRB,BS,GRD,CRS,OPS,TSO,ssb = pargs
-#     #Splitting between cpu and gpu
-#     if GRB:
-#         # Getting GPU Function
-#         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-#         gpu_fcn = SM.get_function("UpPyramid")
-#         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
-#         cuda.Context.synchronize()
-#     else:   #CPUs do this
-#         blocks = []
-#         for local_region in CRS:
-#             block = np.copy(arr[local_region])
-#             blocks.append(block)
-#         cpu_fcn = sweep_lambda((CPU_UpPyramid,SM,isets,gts,TSO))
-#         blocks = list(map(cpu_fcn,blocks))
-#         arr = rebuild_blocks(arr,blocks,CRS,OPS)
-#     np.copyto(sarr[WR], arr[:,:,OPS:-OPS,OPS:-OPS])
-#     for br in BDR:
-#         np.copyto(sarr[br[0],br[1],br[4],br[5]],arr[br[0],br[1],br[2],br[3]])
-#
-#
+        cpu_fcn = sweep_lambda((CPU_UpPrism,sarr,SM,up_sets,x_sets,gts,TSO))
+        mpi_pool.map(test_fcn,blocks)
 
 
-# def node_comm(nodes,fnode,cnode,bnode,sarr):
-#     """Use this function to communicate node data"""
-#     pass
+def test_fcn(block):
+    print('woo')
 
-    # ---------------Generating Source Modules----------------------------------#
-    # if GRB:
-    #     # Creating cuda device and Context
-    #     cuda.init()
-    #     cuda_device = cuda.Device(gpu_rank[ONE])
-    #     cuda_context = cuda_device.make_context()
-    #     #Creating local GPU array with split
-    #     GRD = (int((larr.shape[TWO]-TOPS)/BS[ZERO]),int((larr.shape[3]-TOPS)/BS[ONE]))   #Grid size
-    #     #Creating constants
-    #     NV = larr.shape[ONE]
-    #     SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
-    #     STS = SGIDS*NV #Shared time shift
-    #     VARS =  larr.shape[TWO]*larr.shape[3]
-    #     TIMES = VARS*NV
-    #     const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
-    #     #Building CUDA source code
-    #     SM = build_gpu_source(GS)
-    #     swept_constant_copy(SM,const_dict)
-    #     cpu_SM = build_cpu_source(CS)   #Building cpu source for set_globals
-    #     cpu_SM.set_globals(GRB,SM,*gargs)
-    #     del cpu_SM
-    #     CRS = None
-    # else:
-    #     SM = build_cpu_source(CS) #Building Python source code
-    #     SM.set_globals(GRB,SM,*gargs)
-    #     CRS = create_blocks_list(larr.shape,BS,OPS)
-    #     GRD = None
+def CPU_UpPrism(args):
+    """Use this function to build the Up Pyramid."""
+    print('Woo')
+    block,sarr,SM,up_sets,x_sets,gts,TSO = args
 
-    # #------------------------------HDF5 File------------------------------------------#
-    # filename+=".hdf5"
-    # hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
-    # hdf_bs = hdf5_file.create_dataset("BS",(len(BS),))
-    # hdf_bs[:] = BS[:]
-    # hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,))
-    # hdf_as[:] = (time_steps,)+arr0.shape
-    # hdf_aff = hdf5_file.create_dataset("AF",(ONE,))
-    # hdf_aff[ZERO] = AF
-    # hdf_time = hdf5_file.create_dataset("time",(1,))
-    # hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-    # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
-    # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
-    # cwt = 1 #Current write time
-    # wb = 0  #Counter for writing on the appropriate step
-    # comm.Barrier() #Ensure all processes are prepared to solve
-    # #-------------------------------SWEPT RULE---------------------------------------------#
-    # pargs = (SM,GRB,BS,GRD,CRS,OPS,TSO,ssb) #Passed arguments to the swept functions
-    # #-------------------------------FIRST PYRAMID-------------------------------------------#
-    # UpPyramid(sarr,larr,WR,BDR,up_sets,wb,pargs) #THis modifies shared array
-    # wb+=1
-    # comm.Barrier()
-    # #-------------------------------FIRST BRIDGE-------------------------------------------#
-    # #Getting x and y arrays
-    # xarr = np.copy(sarr[XR])
-    # yarr = np.copy(sarr[YR])
-    # comm.Barrier()  #Barrier after read
-    # # Bridge Step
-    # Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
-    # comm.Barrier()  #Solving Bridge Barrier
-    # #------------------------------SWEPT LOOP-------------------------------#
-    # #Getting next points for the local array
-    # larr = np.copy(sarr[SRR])
-    # comm.Barrier()
-    # #Swept Octahedrons and Bridges
-    # for GST in range(MGST):
-    #     comm.Barrier()  #Read barrier for local array
-    #     #-------------------------------FIRST OCTAHEDRON (NONSHIFT)-------------------------------------------#
-    #     Octahedron(sarr,larr,SWR,SBDR,oct_sets,wb,pargs)
-    #     comm.Barrier()  #Solving Barrier
-    #     # Writing Step
-    #     cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
-    #     comm.Barrier()  #Write Barrier
-    #     #Updating Boundary Conditions Step
-    #     boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-    #     comm.Barrier()
-    #     #-------------------------------FIRST REVERSE BRIDGE-------------------------------------------#
-    #     #Getting reverse x and y arrays
-    #     xarr = np.copy(sarr[YR]) #Regions are purposely switched here
-    #     yarr = np.copy(sarr[XR])
-    #     comm.Barrier()  #Barrier after read
-    #     #Reverse Bridge Step
-    #     Bridge(sarr,xarr,yarr,wxts,wyts,bridge_sets,wb,pargs) #THis modifies shared array
-    #     comm.Barrier()  #Solving Bridge Barrier
-    #     #-------------------------------SECOND OCTAHEDRON (SHIFT)-------------------------------------------#
-    #     #Getting next points for the local array
-    #     larr = np.copy(sarr[RR])
-    #     comm.Barrier()
-    #     #Octahedron Step
-    #     Octahedron(sarr,larr,WR,BDR,oct_sets,wb,pargs)
-    #     comm.Barrier()  #Solving Barrier
-    #     #Write step
-    #     cwt,wb = hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
-    #     comm.Barrier()
-    #     #Updating Boundary Conditions Step
-    #     boundary_update(sarr,OPS,SPLITX,SPLITY) #Communicate all boundaries
-    #     comm.barrier()  #Barrier following data write
-    #     #-------------------------------SECOND BRIDGE (NON-REVERSED)-------------------------------------------#
-    #     #Getting x and y arrays
-    #     xarr = np.copy(sarr[XR])
-    #     yarr = np.copy(sarr[YR])
-    #     comm.Barrier()  #Barrier after read
-    #     #Bridge Step
-    #     Bridge(sarr,xarr,yarr,wxt,wyt,bridge_sets,wb,pargs) #THis modifies shared array
-    #     comm.Barrier()
-    #     #Getting next points for the local array
-    #     larr = np.copy(sarr[SRR])
-    # #Last read barrier for down pyramid
-    # comm.Barrier()
-    # #--------------------------------------DOWN PYRAMID------------------------#
-    # DownPyramid(sarr,larr,SWR,SBDR,down_sets,wb,pargs)
-    # comm.Barrier()
-    # #Writing Step
-    # hdf_swept_write(cwt,wb,sarr,WR,hdf5_data_set,hregion,MPSS,TSO,IEP)
-    # comm.Barrier()  #Write Barrier
-    # CUDA clean up - One of the last steps
-    if GRB:
-        cuda_context.pop()
-    comm.Barrier()
-    # #-------------------------------TIMING-------------------------------------#
-    # stop = timer.time()
-    # exec_time = abs(stop-start)
-    # exec_time = comm.gather(exec_time)
-    # if rank == master_rank:
-    #     avg_time = sum(exec_time)/num_ranks
-    #     hdf_time[0] = avg_time
-    # comm.Barrier()
-    # # Close file
-    # hdf5_file.close()
-    # comm.Barrier()
-    # #This if for testing only
-    # if rank == master_rank:
-    #     return avg_time
+    #Removing elements for swept step
+    # for ts,swept_set in enumerate(isets,start=TSO-1):
+    #     #Calculating Step
+    #     block = SM.step(block,swept_set,ts,gts)
+    #     gts+=1
+    # return block
 
+def CPU_Bridge(args):
+    """Use this function to build the Up Pyramid."""
+    block,SM,isets,gts,TSO = args
+    #Removing elements for swept step
+    for ts,swept_set in enumerate(isets,start=TSO):
+        #Calculating Step
+        block = SM.step(block,swept_set,ts,gts)
+        gts+=1
+    return block
 
 #Statement to execute dsweep
 dsweep()
