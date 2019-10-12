@@ -2,28 +2,19 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
 
-#System imports
-import sys
-import os
-
-#Writing imports
-import h5py
-
-#DataStructure and Math imports
-import math
+import sys, os, h5py, math
 import numpy as np
-from itertools import cycle
-from itertools import product
+from itertools import cycle, product
 
 #CUDA Imports
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 
 #Dsweep imports
-from dsweep_decomposition import *
-from dsweep_block import *
-from dsweep_source import *
-from dsweep_lambda import sweep_lambda
+from decomposition import create_blocks, node_split, read_input_file
+
+from block import *
+from source import *
 
 #MPI imports
 from mpi4py import MPI
@@ -40,10 +31,7 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
-
-
-
-def dsweep():
+def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
     """Use this function to perform swept rule
     args:
@@ -306,6 +294,6 @@ def CPU_UpPrism(block):
     return block
 
 #Statement to execute dsweep
-dsweep()
+dsweep_engine()
 #Statement to finalize MPI processes
 MPI.Finalize()

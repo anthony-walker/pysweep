@@ -27,7 +27,7 @@ from .pysweep_block import *
 from .pysweep_regions import *
 from .pysweep_source import *
 
-def sweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
+def nsweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)

@@ -2,9 +2,6 @@
 #This file contains all of the necessary functions for implementing process management
 # and data decomposition for the swept rule.
 import numpy as np
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
-#MPI imports
 from mpi4py import MPI
 import importlib, h5py
 from itertools import cycle, product

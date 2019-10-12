@@ -7,7 +7,7 @@ import numpy as np
 from mpi4py import MPI
 import time as timer
 
-def sweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
+def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)

@@ -35,7 +35,7 @@ def SweptVortex(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    sweep(flux_vortex,gargs,swargs,filename=args.hdf5)
+    nsweep(flux_vortex,gargs,swargs,filename=args.hdf5)
 
 def StandardVortex(args):
     #Analytical properties
@@ -60,7 +60,7 @@ def SweptHDE(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    sweep(arr0,gargs,swargs,filename=args.hdf5)
+    nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
 def StandardHDE(args):
     #Analytical properties
@@ -90,7 +90,7 @@ def STP2(args):
     #Dimensions and steps
     gargs = (args.t0,args.tf,args.dt)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    sweep(arr0,gargs,swargs,filename=args.hdf5)
+    nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
 def STP(args):
     comm = MPI.COMM_WORLD
@@ -106,7 +106,7 @@ def STP(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    sweep(arr,gargs,swargs,filename=args.hdf5)
+    nsweep(arr,gargs,swargs,filename=args.hdf5)
 
 def DSTP(args):
     comm = MPI.COMM_WORLD
