@@ -189,4 +189,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (tf,t0,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
-    dist_sweep(arr,gargs,swargs,filename="test")
+    dsweep(arr,gargs,swargs,filename="test")
