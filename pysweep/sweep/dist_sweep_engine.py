@@ -11,7 +11,7 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 
 #Dsweep imports
-from decomposition import create_blocks, node_split, read_input_file
+from decomposition import create_blocks, node_split, read_input_file, create_CPU_sarray
 
 from block import *
 from source import *

@@ -7,13 +7,6 @@ from .equations import *
 from .decomp import decomp
 import numpy as np
 
-def pm(arr,i):
-    for item in arr[i,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write("%1.2f"%si+", ")
-        sys.stdout.write("]\n")
-
 def AnalyticalVortex(args):
     """Use this function to create analytical vortex data."""
     cvics = vics()
@@ -138,55 +131,31 @@ def DTP(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     decomp(arr,gargs,swargs,filename=args.hdf5)
 
-
-parser = argparse.ArgumentParser()
-fmap = {'swept_vortex' : SweptVortex,
-                'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
-                                'standard_hde' : StandardHDE, "stest":STP, "stest2":STP2,
-                                "dtest":DTP, "dstest":DSTP, "analytical":AnalyticalVortex}
-parser.add_argument('fcn', choices=fmap.keys())
-parser.add_argument("-b","--block",nargs="?",default=8,type=int)
-parser.add_argument("-o","--ops",nargs="?",default=2,type=int)
-parser.add_argument("--tso",nargs="?",default=2,type=int)
-parser.add_argument("-a","--affinity",nargs="?",default=0.5,type=float)
-parser.add_argument("-g","--gpu",nargs="?",default="./src/equations/euler.h",type=str)
-parser.add_argument("-c","--cpu",nargs="?",default="./src/equations/euler.py",type=str)
-parser.add_argument("--hdf5",nargs="?",default="./results/result",type=str)
-parser.add_argument("-nx",nargs="?",default=32,type=int)
-parser.add_argument("-ny",nargs="?",default=32,type=int)
-parser.add_argument("-X",nargs="?",default=1,type=float)
-parser.add_argument("-Y",nargs="?",default=1,type=float)
-parser.add_argument("-R",nargs="?",default=1,type=float)
-parser.add_argument("-TH",nargs="?",default=373.0,type=float)
-parser.add_argument("-TL",nargs="?",default=298.0,type=float)
-parser.add_argument("--gamma",nargs="?",default=1.4,type=float)
-parser.add_argument("--alpha",nargs="?",default=25e-6,type=float)
-parser.add_argument("-t0",nargs="?",default=0,type=float)
-parser.add_argument("-tf",nargs="?",default=1,type=float)
-parser.add_argument("-dt",nargs="?",default=0.05,type=float)
-args = parser.parse_args()
-fmap[args.fcn](args)
-
 if __name__ == "__main__":
-    nx = ny = 32
-    bs = 8
-    t0 = 0
-    tf = 0.1
-    dt = 0.01
-    dx = dy = 0.1
-    gamma = 1.4
-    arr = np.ones((4,nx,ny))
-    printer = pysweep_printer(rank,master_rank)
-    X = 1
-    Y = 1
-    tso = 2
-    ops = 2
-    aff = 0.1
-
-    #Dimensions and steps
-    dx = X/nx
-    dy = Y/ny
-    #Changing arguments
-    gargs = (tf,t0,dt,dx,dy,gamma)
-    swargs = (tso,ops,bs,aff,"./src/equations/euler.h","./src/equations/euler.py")
-    dsweep(arr,gargs,swargs,filename="test")
+    parser = argparse.ArgumentParser()
+    fmap = {'swept_vortex' : SweptVortex,
+                    'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
+                                    'standard_hde' : StandardHDE, "stest":STP, "stest2":STP2,
+                                    "dtest":DTP, "dstest":DSTP, "analytical":AnalyticalVortex}
+    parser.add_argument('fcn', choices=fmap.keys())
+    parser.add_argument("-b","--block",nargs="?",default=8,type=int)
+    parser.add_argument("-o","--ops",nargs="?",default=2,type=int)
+    parser.add_argument("--tso",nargs="?",default=2,type=int)
+    parser.add_argument("-a","--affinity",nargs="?",default=0.5,type=float)
+    parser.add_argument("-g","--gpu",nargs="?",default="./src/equations/euler.h",type=str)
+    parser.add_argument("-c","--cpu",nargs="?",default="./src/equations/euler.py",type=str)
+    parser.add_argument("--hdf5",nargs="?",default="./results/result",type=str)
+    parser.add_argument("-nx",nargs="?",default=32,type=int)
+    parser.add_argument("-ny",nargs="?",default=32,type=int)
+    parser.add_argument("-X",nargs="?",default=1,type=float)
+    parser.add_argument("-Y",nargs="?",default=1,type=float)
+    parser.add_argument("-R",nargs="?",default=1,type=float)
+    parser.add_argument("-TH",nargs="?",default=373.0,type=float)
+    parser.add_argument("-TL",nargs="?",default=298.0,type=float)
+    parser.add_argument("--gamma",nargs="?",default=1.4,type=float)
+    parser.add_argument("--alpha",nargs="?",default=25e-6,type=float)
+    parser.add_argument("-t0",nargs="?",default=0,type=float)
+    parser.add_argument("-tf",nargs="?",default=1,type=float)
+    parser.add_argument("-dt",nargs="?",default=0.05,type=float)
+    args = parser.parse_args()
+    fmap[args.fcn](args)

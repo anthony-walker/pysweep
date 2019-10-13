@@ -25,5 +25,5 @@ if __name__ == "__main__":
     dy = Y/ny
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
-    swargs = (tso,ops,bs,aff,"./src/equations/eqt.h","./src/equations/eqt.py")
+    swargs = (tso,ops,bs,aff,"./pysweep/equations/eqt.h","./pysweep/equations/eqt.py")
     dsweep(arr,gargs,swargs,filename="test",exid=[])
