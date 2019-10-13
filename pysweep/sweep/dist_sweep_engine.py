@@ -4,14 +4,14 @@
 
 import sys, os, h5py, math
 import numpy as np
-from itertools import cycle, product
+from itertools import cycle, product, count
 
 #CUDA Imports
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 
 #Dsweep imports
-from decomposition import create_blocks, node_split, read_input_file, create_CPU_sarray
+from decomposition import create_blocks, node_split, read_input_file, create_CPU_sarray, create_es_blocks
 
 from block import *
 from source import *
@@ -223,11 +223,11 @@ def dsweep_engine():
         del larr
         mpi_pool = None
     else:
+        blocks = create_es_blocks(blocks,shared_shape,OPS,BS)
         SM = build_cpu_source(CS) #Building Python source code
         SM.set_globals(GRB,SM,*gargs)
         GRD = None
         mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
-
     #------------------------------HDF5 File------------------------------------------#
     # filename+=".hdf5"
     # hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
@@ -275,21 +275,23 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool):
         # gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
         # cuda.Context.synchronize()
     else:   #CPUs do this
-        mpi_pool.map(CPU_UpPrism,blocks)
+        res = mpi_pool.map(CPU_UpPrism,blocks)
 
 def CPU_UpPrism(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
-    i1,i2,i3,i4 = block
     global gts
+    upb,xbb = block
+    i1,i2,i3,i4 = upb
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
         SM.step(sarr[i1,i2,i3,i4],swept_set,ts,gts)
         gts+=1
+    j1,j2,j3,j4 = xbb
     #X-Bridge - NEED TO SHIFT THIS
     for ts,swept_set in enumerate(x_sets,start=TSO):
         #Calculating Step
-        block = SM.step(sarr[block],swept_set,ts,gts)
+        block = SM.step(sarr[j1,j2,j3,j4],swept_set,ts,gts)
         gts+=1
     return block
 

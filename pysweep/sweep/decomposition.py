@@ -31,6 +31,36 @@ def read_input_file(comm):
     file.close()
     return arr0,gargs,swargs,GS,CS,filename,exid,dType
 
+
+
+def create_es_blocks(cpu_blocks,shared_shape,ops,BS):
+    """Use this function to create shift blocks and edge blocks."""
+    #This handles edge blocks in the y direction
+    s0 = slice(0,shared_shape[0],1)
+    s1 = slice(0,shared_shape[1],1)
+    shift = int(BS[1]/2)
+    #Creating shift blocks and edges
+    shift_blocks = [(s0,s1,block[2],slice(block[3].start+shift,block[3].stop+shift,1)) for block in cpu_blocks]
+    for i,block in enumerate(shift_blocks):
+        if block[3].start < 0:
+            new_block = (s0,s1,block[2],np.arange(block[3].start,block[3].stop))
+            shift_blocks[i] = new_block
+        elif block[3].stop > shared_shape[3]:
+            ny = np.concatenate((np.arange(block[3].start,block[3].stop-shift-ops),np.arange(0,shift+ops,1)))
+            new_block = (s0,s1,block[2],ny)
+            shift_blocks[i] = new_block
+
+    #Creating non-shift block edges
+    for i,block in enumerate(cpu_blocks):
+        if block[3].start < 0:
+            new_block = (s0,s1,block[2],np.arange(block[3].start,block[3].stop))
+            cpu_blocks[i] = new_block
+        elif block[3].stop > shared_shape[3]:
+            ny = np.concatenate((np.arange(block[3].start,block[3].stop-ops),np.arange(0,ops,1)))
+            new_block = (s0,s1,block[2],ny)
+            cpu_blocks[i] = new_block
+    return zip(cpu_blocks,shift_blocks)
+
 def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
     """Use this function to create blocks."""
     gpu_blocks = []
@@ -42,14 +72,6 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
     row_range = np.arange(cstart,shared_shape[2]-BS[0],BS[0],dtype=np.intc)
     column_range = np.arange(0,shared_shape[3],BS[1],dtype=np.intc)
     cpu_blocks = [(s0,s1,slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)]
-    #This handles edge blocks in the y direction
-    for i,block in enumerate(cpu_blocks):
-        if block[3].start < 0:
-            new_block = (s0,s1,block[2],np.arange(block[3].start,block[3].stop))
-        elif block[3].stop > shared_shape[3]:
-            ny = np.concatenate((np.arange(block[3].start,block[3].stop-ops),np.arange(0,ops,1)))
-            new_block = (s0,s1,block[2],ny)
-        cpu_blocks[i] = new_block
     return gpu_blocks, cpu_blocks
 
 
