@@ -277,19 +277,19 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool):
     else:   #CPUs do this
         mpi_pool.map(CPU_UpPrism,blocks)
 
-
 def CPU_UpPrism(block):
     """Use this function to build the Up Pyramid."""
-    print('UpPrism')
     #UpPyramid of Swept Step
+    i1,i2,i3,i4 = block
+    global gts
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
-        block = SM.step(sarr[block],swept_sets,ts,gts)
+        SM.step(sarr[i1,i2,i3,i4],swept_set,ts,gts)
         gts+=1
     #X-Bridge - NEED TO SHIFT THIS
     for ts,swept_set in enumerate(x_sets,start=TSO):
         #Calculating Step
-        block = SM.step(sarr[block],swept_sets,ts,gts)
+        block = SM.step(sarr[block],swept_set,ts,gts)
         gts+=1
     return block
 

@@ -14,7 +14,6 @@ def step(state,iidx,ts,gts):
     """
     half = 0.5
     vSlice = slice(0,state.shape[1],1)
-    print('Here')
     for idx,idy in iidx:
         ntidx = (ts+1,vSlice,idx,idy)  #next step index
         cidx = (ts,vSlice,idx,idy)
