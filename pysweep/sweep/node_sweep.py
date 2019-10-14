@@ -201,7 +201,7 @@ def nsweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         TIMES = VARS*NV
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
-        SM = build_gpu_source(GS)
+        SM = build_gpu_source(GS,os.path.basename(__file__))
         swept_constant_copy(SM,const_dict)
         cpu_SM = build_cpu_source(CS)   #Building cpu source for set_globals
         cpu_SM.set_globals(GRB,SM,*gargs)

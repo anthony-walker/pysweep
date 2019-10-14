@@ -19,14 +19,18 @@ def build_cpu_source(cpu_source):
     spec.loader.exec_module(source_mod)
     return source_mod
 
-def build_gpu_source(kernel_source):
+def build_gpu_source(kernel_source,name):
     """Use this function to build the given and swept source module together.
     """
     #GPU Swept Calculations
     #----------------Reading In Source Code-------------------------------#
+    if 'd' in name:
+        cuda_file = "dsweep.h"
+    else:
+        cuda_file = "nsweep.h"
     file = inspect.getfile(build_cpu_source)
     fname = file.split("/")[-1]
-    fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+"sweep.h"
+    fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+cuda_file
     source_code = source_code_read(kernel_source)
     split_source_code = source_code_read(fpath).split("//!!(@#\n")
     source_code = split_source_code[0]+"\n"+source_code+"\n"+split_source_code[1]
@@ -60,7 +64,7 @@ def swept_constant_copy(source_mod,const_dict):
         c_ptr,_ = source_mod.get_global(key)
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
-        
+
 def getDeviceAttrs(devNum=0,print_device = False):
     """Use this function to get device attributes and print them"""
     device = cuda.Device(devNum)

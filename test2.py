@@ -2,14 +2,14 @@ from pysweep.sweep.dist_sweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
-    nx = ny = 32
-    bs = 8
+    nx = ny = 24
+    bs = 12
     t0 = 0
     tf = 0.1
     dt = 0.01
     dx = dy = 0.1
     gamma = 1.4
-    arr = np.zeros((4,nx,ny))
+    arr = np.ones((4,nx,ny))
     # ct = 0
     # for i in range(nx):
     #     for j in range(ny):
@@ -26,4 +26,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./pysweep/equations/eqt.h","./pysweep/equations/eqt.py")
-    dsweep(arr,gargs,swargs,filename="test",exid=[])
+    dsweep(arr,gargs,swargs,filename="test",exid=[1])
