@@ -33,6 +33,9 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
+sarr = None
+gts = None
+
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
     """Use this function to perform swept rule
@@ -229,7 +232,7 @@ def dsweep_engine():
         oct_sets = down_sets+up_sets
         x_sets,y_sets = create_dist_bridge_sets(BS,OPS,MPSS)
         GRD,block_shape = None,None
-        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1,initializer=initProcess,initargs=(sarr,))
+        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
         # mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1,initargs=sarr)
         # mpi_pool = futures.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
@@ -266,9 +269,9 @@ def dsweep_engine():
         mpi_pool.shutdown()
     comm.Barrier()
 
-def initProcess(sarr):
-    global mpsarr
-    mpsarr = sarr
+# def initProcess(sarr):
+#     global mpsarr
+#     mpsarr = sarr
 
 def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
     """
@@ -309,7 +312,7 @@ def CPU_UpPrism(block):
         #Calculating Step
         larr = SM.step(larr,swept_set,ts,ts)
         # gts+=1
-    mpsarr[i1,i2,i3,i4]=larr[:,:,:,:]
+    sarr[i1,i2,i3,i4]=larr[:,:,:,:]
 
     j1,j2,j3,j4 = xbb
     #X-Bridge - NEED TO SHIFT THIS
