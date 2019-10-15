@@ -170,9 +170,10 @@ def dsweep_engine():
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+2*OPS,arr0.shape[2])
-    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
-    sarr = np.ctypeslib.as_array(sarr_base.get_obj())
+    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)),lock=False)
+    sarr = np.ctypeslib.as_array(sarr_base)
     sarr = sarr.reshape(shared_shape)
+    sarr[:,:,:,:] = 5
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[TSO-ONE,:,OPS:-OPS,:] =  arr0[:,gsc,:]
@@ -228,7 +229,7 @@ def dsweep_engine():
         oct_sets = down_sets+up_sets
         x_sets,y_sets = create_dist_bridge_sets(BS,OPS,MPSS)
         GRD,block_shape = None,None
-        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1,initargs=(sarr,))
+        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1,initializer=initProcess,initargs=(sarr,))
         # mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1,initargs=sarr)
         # mpi_pool = futures.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
@@ -257,7 +258,7 @@ def dsweep_engine():
     UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape)
     node_comm.Barrier()
     if rank == node_master:
-        pm(sarr,2)
+        pm(sarr,3)
     #Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
@@ -265,6 +266,9 @@ def dsweep_engine():
         mpi_pool.shutdown()
     comm.Barrier()
 
+def initProcess(sarr):
+    global mpsarr
+    mpsarr = sarr
 
 def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
     """
@@ -274,7 +278,7 @@ def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
     OPS -  the number of atomic operations
     """
     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
-    global sarr
+
     #Splitting between cpu and gpu
     if GRB:
         i1,i2,i3,i4 = blocks
@@ -300,11 +304,12 @@ def CPU_UpPrism(block):
     upb,xbb = block
     i1,i2,i3,i4 = upb
     larr = np.copy(sarr[i1,i2,i3,i4])
+
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
         larr = SM.step(larr,swept_set,ts,ts)
         # gts+=1
-    sarr[i1,i2,i3,i4]=larr[:,:,:,:]
+    mpsarr[i1,i2,i3,i4]=larr[:,:,:,:]
 
     j1,j2,j3,j4 = xbb
     #X-Bridge - NEED TO SHIFT THIS
