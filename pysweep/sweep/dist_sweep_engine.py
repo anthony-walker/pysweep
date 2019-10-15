@@ -20,7 +20,9 @@ from source import *
 from mpi4py import MPI
 #Multi-processing imports
 from concurrent import futures
-# from mpi4py import futures
+import multiprocessing as mp
+import ctypes
+
 #GPU Utility Imports
 import GPUtil
 
@@ -168,7 +170,9 @@ def dsweep_engine():
     #-----------------------SHARED ARRAY CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+2*OPS,arr0.shape[2])
-    sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)))
+    sarr = np.ctypeslib.as_array(sarr_base.get_obj())
+    sarr = sarr.reshape(shared_shape)
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[TSO-ONE,:,OPS:-OPS,:] =  arr0[:,gsc,:]
@@ -224,7 +228,8 @@ def dsweep_engine():
         oct_sets = down_sets+up_sets
         x_sets,y_sets = create_dist_bridge_sets(BS,OPS,MPSS)
         GRD,block_shape = None,None
-        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
+        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1,initargs=(sarr,))
+        # mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1,initargs=sarr)
         # mpi_pool = futures.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
 
@@ -249,10 +254,10 @@ def dsweep_engine():
     # #-------------------------------SWEPT RULE---------------------------------------------#
     pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-    # UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape)
-    # node_comm.Barrier()
-    # if rank == node_master:
-    #     pm(sarr,2)
+    UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape)
+    node_comm.Barrier()
+    if rank == node_master:
+        pm(sarr,2)
     #Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
@@ -279,26 +284,26 @@ def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
         arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("UpPrism")
-        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        # gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
         sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
         # pm(sarr[blocks],1)
     else:   #CPUs do this
         res = mpi_pool.map(CPU_UpPrism,blocks)
-        # for x in res:
-        #     print(x)
+        for x in res:
+            print(x)
 
 def CPU_UpPrism(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
-    global gts, sarr
+    global sarr,gts
     upb,xbb = block
     i1,i2,i3,i4 = upb
     larr = np.copy(sarr[i1,i2,i3,i4])
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
-        larr = SM.step(larr,swept_set,ts,gts)
-        gts+=1
+        larr = SM.step(larr,swept_set,ts,ts)
+        # gts+=1
     sarr[i1,i2,i3,i4]=larr[:,:,:,:]
 
     j1,j2,j3,j4 = xbb
