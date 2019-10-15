@@ -16,6 +16,20 @@ def create_dist_up_sets(block_size,ops):
         ul-=ops
     return sets
 
+def create_dist_down_sets(block_size,ops):
+    """Use this function to create the down pyramid sets from up sets."""
+    bsx = int(block_size[0]/2)
+    bsy = int(block_size[1]/2)
+    dl = int((bsy)-ops); #lower y
+    ul = int((bsy)+ops); #upper y
+    sets = tuple()
+    while dl > 0:
+        r = np.arange(dl,ul,1)
+        sets+=(tuple(product(r,r)),)
+        dl-=ops
+        ul+=ops
+    return sets
+
 def create_dist_bridge_sets(block_size,ops,MPSS):
     """Use this function to create the iidx sets for bridges."""
     sets = tuple()
@@ -32,7 +46,6 @@ def create_dist_bridge_sets(block_size,ops,MPSS):
         ydl-=ops
         yul+=ops
     return sets,sets[::-1]
-
 
 def create_up_sets(block_size,ops):
     """Use this function to create uppyramid sets."""

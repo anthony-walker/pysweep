@@ -71,7 +71,7 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
     cstart = gpu_blocks[-1][2].stop if gpu_blocks else ops
     row_range = np.arange(cstart,shared_shape[2]-BS[0],BS[0],dtype=np.intc)
     column_range = np.arange(0,shared_shape[3],BS[1],dtype=np.intc)
-    cpu_blocks = [(s0,s1,slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)]
+    cpu_blocks = [(s0,s1,slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
     return gpu_blocks, cpu_blocks
 
 
