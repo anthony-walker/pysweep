@@ -25,8 +25,6 @@ import ctypes
 
 #GPU Utility Imports
 import GPUtil
-
-
 import importlib.util
 #Testing and Debugging
 import warnings
@@ -34,7 +32,6 @@ import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
 sarr = None
-gts = None
 
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
@@ -57,13 +54,14 @@ def dsweep_engine():
     filename: Name of the output file excluding hdf5
     exid: GPU ids to exclude from the calculation.
     """
+    #Setting global variables
+    global OPS,TSO,AF,gts, up_sets, down_sets, oct_sets, x_sets, y_sets,SM
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
     rank = comm.Get_rank()  #current rank
     all_ranks = comm.allgather(rank) #All ranks in simulation
     #Getting input data
-    global OPS,TSO,AF
     arr0,gargs,swargs,GS,CS,filename,exid,dType = read_input_file(comm)
     TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
     t0,tf,dt = gargs[:3]
@@ -162,27 +160,12 @@ def dsweep_engine():
     SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
     MPSS = int(BS[0]/(2*OPS)-1)
     MOSS = 2*MPSS
-    global up_sets, down_sets, oct_sets, x_sets, y_sets,sarr,SM
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+2*OPS,arr0.shape[2])
 
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)  #Number of time steps
-    #Global swept step
-    MGST = int(TSO*(time_steps)/(MOSS)-1)    #THIS ASSUMES THAT time_steps > MOSS
+    MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
     time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
-
-    #-----------------------SHARED ARRAY CREATION----------------------#
-    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+2*OPS,arr0.shape[2])
-    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)),lock=False)
-    sarr = np.ctypeslib.as_array(sarr_base)
-    sarr = sarr.reshape(shared_shape)
-    sarr[:,:,:,:] = 5
-    #Filling shared array
-    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    sarr[TSO-ONE,:,OPS:-OPS,:] =  arr0[:,gsc,:]
-    sarr[TSO-ONE,:,:OPS,:] =  arr0[:,np.arange(gsc.start-OPS,gsc.start),:]
-    sarr[TSO-ONE,:,-OPS:,:] =  arr0[:,np.arange(gsc.start,gsc.start+OPS),:]
-    ssb = np.zeros((2,arr0.shape[ZERO],BS[0],BS[1]),dtype=dType).nbytes
 
     #Creating blocks to be solved
     if rank==node_master:
@@ -232,11 +215,22 @@ def dsweep_engine():
         oct_sets = down_sets+up_sets
         x_sets,y_sets = create_dist_bridge_sets(BS,OPS,MPSS)
         GRD,block_shape = None,None
-        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
-        # mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1,initargs=sarr)
+
+    #-----------------------SHARED ARRAY CREATION AND POOL----------------------#
+    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
+    sarr = create_shared_pool_array(shared_shape)
+    # mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
+    mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
         # mpi_pool = futures.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
 
+
+    #Filling shared array
+    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
+    # sarr[TSO-ONE,:,OPS:-OPS,:] =  arr0[:,gsc,:]
+    # sarr[TSO-ONE,:,:OPS,:] =  arr0[:,np.arange(gsc.start-OPS,gsc.start),:]
+    # sarr[TSO-ONE,:,-OPS:,:] =  arr0[:,np.arange(gsc.start,gsc.start+OPS),:]
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0],BS[1]),dtype=dType).nbytes
 
     #------------------------------HDF5 File------------------------------------------#
     # filename+=".hdf5"
@@ -251,27 +245,39 @@ def dsweep_engine():
     # hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
     # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
     # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
-    cwt = 1 #Current write time
-    global gts
-    gts = 0  #Counter for writing on the appropriate step
-    comm.Barrier() #Ensure all processes are prepared to solve
-    # #-------------------------------SWEPT RULE---------------------------------------------#
-    pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
+    # cwt = 1 #Current write time
+    # gts = 0  #Counter for writing on the appropriate step
+    # comm.Barrier() #Ensure all processes are prepared to solve
+    # # #-------------------------------SWEPT RULE---------------------------------------------#
+    # pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-    UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape)
+    # UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape)
+    if not GRB:
+        res = mpi_pool.map(function_test,range(shared_shape[0]))
+        for r in res:
+            print(r)
     node_comm.Barrier()
     if rank == node_master:
-        pm(sarr,3)
+        for i in range(shared_shape[0]):
+            print(sarr[i,0,5,5])
     #Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
-    else:
-        mpi_pool.shutdown()
+    # else:
+    #     mpi_pool.shutdown()
     comm.Barrier()
 
-# def initProcess(sarr):
-#     global mpsarr
-#     mpsarr = sarr
+def create_shared_pool_array(shared_shape):
+    """Use this function to create the shared array for the process pool."""
+    global sarr
+    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)),lock=False)
+    sarr = np.ctypeslib.as_array(sarr_base)
+    sarr = sarr.reshape(shared_shape)
+    return sarr
+
+def function_test(val):
+    sarr[val,0,:,:] = val
+
 
 def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
     """
@@ -312,7 +318,8 @@ def CPU_UpPrism(block):
         #Calculating Step
         larr = SM.step(larr,swept_set,ts,ts)
         # gts+=1
-    sarr[i1,i2,i3,i4]=larr[:,:,:,:]
+    # sarr[i1,i2,i3,i4]=larr[:,:,:,:]
+    sarr[i1,i2,i3,i4]+=1
 
     j1,j2,j3,j4 = xbb
     #X-Bridge - NEED TO SHIFT THIS
@@ -321,6 +328,7 @@ def CPU_UpPrism(block):
     #     block = SM.step(sarr[j1,j2,j3,j4],swept_set,ts,gts)
     #     gts+=1
 
+gts = None
 
 #Statement to execute dsweep
 dsweep_engine()
