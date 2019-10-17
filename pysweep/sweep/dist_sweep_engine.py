@@ -11,16 +11,17 @@ import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 
 #Dsweep imports
-from decomposition import create_blocks, node_split, read_input_file, create_CPU_sarray, create_es_blocks
+from decomposition import *
 from printer import *
 from block import *
 from source import *
 
 #MPI imports
 from mpi4py import MPI
+# from mpi4py import futures
 #Multi-processing imports
 from concurrent import futures
-import multiprocessing as mp
+# import multiprocessing as mp
 import ctypes
 
 #GPU Utility Imports
@@ -31,7 +32,7 @@ import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
-sarr = None
+carr = None #MP shared array
 
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
@@ -55,7 +56,8 @@ def dsweep_engine():
     exid: GPU ids to exclude from the calculation.
     """
     #Setting global variables
-    global OPS,TSO,AF,gts, up_sets, down_sets, oct_sets, x_sets, y_sets,SM
+    global carr,OPS,TSO,AF,gts,up_sets, down_sets, oct_sets, x_sets, y_sets,SM
+
     #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
     processor = MPI.Get_processor_name()
@@ -132,6 +134,7 @@ def dsweep_engine():
         nidx = None
         ranks_to_remove = None
 
+
     #----------------------__Removing Unwanted MPI Processes------------------------#
     [all_ranks.remove(x) for x in set([x[0] for x in comm.allgather(ranks_to_remove) if x])]
     comm.Barrier()
@@ -160,16 +163,22 @@ def dsweep_engine():
     SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
     MPSS = int(BS[0]/(2*OPS)-1)
     MOSS = 2*MPSS
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0])+2*OPS,arr0.shape[2])
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0]),arr0.shape[2])
+    sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0],BS[1]),dtype=dType).nbytes
+    #Filling shared array
+    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
+    sarr[TSO-ONE,:,:,:] =  arr0[:,gsc,:]
+
+
 
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)  #Number of time steps
     MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
     time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
-
     #Creating blocks to be solved
     if rank==node_master:
-        gpu_blocks,cpu_blocks = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,OPS)
+        gpu_blocks,cpu_blocks,total_cpu_block = create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,OPS)
         gpu_ranks = node_ranks[:num_gpus]
         cpu_ranks = node_ranks[num_gpus:]
         blocks = np.array_split(gpu_blocks,num_gpus) if gpu_blocks else gpu_blocks
@@ -178,9 +187,12 @@ def dsweep_engine():
         node_data = zip(blocks,gpu_rank)
     else:
         node_data = None
+        total_cpu_block = None
     blocks,gpu_rank =  node_comm.scatter(node_data)
+    total_cpu_block = node_comm.bcast(total_cpu_block)
     GRB = gpu_rank[0]
-    #Operations specifically for GPus and CPUs
+
+    # Operations specifically for GPus and CPUs
     if GRB:
         # Creating cuda device and Context
         cuda.init()
@@ -193,7 +205,7 @@ def dsweep_engine():
         GRD = (int((block_shape[TWO])/BS[ZERO]),int((block_shape[3])/BS[ONE]))   #Grid size
         #Creating constants
         NV = block_shape[ONE]
-        SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
+        SGIDS = int(np.prod(BS))
         STS = SGIDS*NV #Shared time shift
         VARS =  block_shape[TWO]*block_shape[3]
         TIMES = VARS*NV
@@ -204,7 +216,7 @@ def dsweep_engine():
         cpu_SM = build_cpu_source(CS)   #Building cpu source for set_globals
         cpu_SM.set_globals(GRB,SM,*gargs)
         del cpu_SM
-        mpi_pool,up_sets,down_sets,oct_sets,x_sets,y_sets = None,None,None,None,None,None
+        mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets = None,None,None,None,None,None,None
     else:
         blocks = create_es_blocks(blocks,shared_shape,OPS,BS)
         SM = build_cpu_source(CS) #Building Python source code
@@ -215,71 +227,42 @@ def dsweep_engine():
         oct_sets = down_sets+up_sets
         x_sets,y_sets = create_dist_bridge_sets(BS,OPS,MPSS)
         GRD,block_shape = None,None
+        carr = create_shared_pool_array(sarr[total_cpu_block].shape)
+        carr[:,:,:,:] = sarr[total_cpu_block]
+        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
-    #-----------------------SHARED ARRAY CREATION AND POOL----------------------#
-    #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    sarr = create_shared_pool_array(shared_shape)
-    # mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
-    mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
-        # mpi_pool = futures.MPIPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
-
-
-
-    #Filling shared array
-    gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
-    # sarr[TSO-ONE,:,OPS:-OPS,:] =  arr0[:,gsc,:]
-    # sarr[TSO-ONE,:,:OPS,:] =  arr0[:,np.arange(gsc.start-OPS,gsc.start),:]
-    # sarr[TSO-ONE,:,-OPS:,:] =  arr0[:,np.arange(gsc.start,gsc.start+OPS),:]
-    ssb = np.zeros((2,arr0.shape[ZERO],BS[0],BS[1]),dtype=dType).nbytes
 
     #------------------------------HDF5 File------------------------------------------#
-    # filename+=".hdf5"
-    # hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
-    # hdf_bs = hdf5_file.create_dataset("BS",(len(BS),))
-    # hdf_bs[:] = BS[:]
-    # hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,))
-    # hdf_as[:] = (time_steps,)+arr0.shape
-    # hdf_aff = hdf5_file.create_dataset("AF",(ONE,))
-    # hdf_aff[ZERO] = AF
-    # hdf_time = hdf5_file.create_dataset("time",(1,))
-    # hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-    # hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
-    # hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-ONE,WR[1],WR[2],WR[3]]
-    # cwt = 1 #Current write time
-    # gts = 0  #Counter for writing on the appropriate step
-    # comm.Barrier() #Ensure all processes are prepared to solve
-    # # #-------------------------------SWEPT RULE---------------------------------------------#
-    # pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
+    filename+=".hdf5"
+    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
+    hdf_bs = hdf5_file.create_dataset("BS",(len(BS),),data=BS)
+    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,),data=(time_steps,)+arr0.shape)
+    hdf_aff = hdf5_file.create_dataset("AF",(ONE,),data=AF)
+    hdf_time = hdf5_file.create_dataset("time",(1,))
+    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
+    if rank == cluster_master:
+        hdf5_data_set[0,:,:,:] = arr0[:,:,:]
+    cwt = 1 #Current write time
+    gts = 0  #Counter for writing on the appropriate step
+    comm.Barrier() #Ensure all processes are prepared to solve
+    #-------------------------------SWEPT RULE---------------------------------------------#
+    pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-    # UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape)
-    if not GRB:
-        res = mpi_pool.map(function_test,range(shared_shape[0]))
-        for r in res:
-            print(r)
+    UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_block)
     node_comm.Barrier()
     if rank == node_master:
-        for i in range(shared_shape[0]):
-            print(sarr[i,0,5,5])
-    #Pop Cuda Contexts and Close Pool
+        for i in range(2,4,1):
+            print(sarr[i,0,:,:])
+
+    #Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
-    # else:
-    #     mpi_pool.shutdown()
+    else:
+        mpi_pool.shutdown()
     comm.Barrier()
+    hdf5_file.close()
 
-def create_shared_pool_array(shared_shape):
-    """Use this function to create the shared array for the process pool."""
-    global sarr
-    sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)),lock=False)
-    sarr = np.ctypeslib.as_array(sarr_base)
-    sarr = sarr.reshape(shared_shape)
-    return sarr
-
-def function_test(val):
-    sarr[val,0,:,:] = val
-
-
-def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
+def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_block):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -287,7 +270,6 @@ def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
     OPS -  the number of atomic operations
     """
     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
-
     #Splitting between cpu and gpu
     if GRB:
         i1,i2,i3,i4 = blocks
@@ -303,32 +285,24 @@ def UpPrism(blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape):
         # pm(sarr[blocks],1)
     else:   #CPUs do this
         res = mpi_pool.map(CPU_UpPrism,blocks)
-        for x in res:
-            print(x)
+        sarr[total_cpu_block] = carr[:,:,:,:]
 
 def CPU_UpPrism(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
-    global sarr,gts
+    global carr
     upb,xbb = block
-    i1,i2,i3,i4 = upb
-    larr = np.copy(sarr[i1,i2,i3,i4])
-
+    # print(carr[block[0]])
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
-        larr = SM.step(larr,swept_set,ts,ts)
+        carr[upb] = SM.step(carr[upb],swept_set,ts,ts)
         # gts+=1
-    # sarr[i1,i2,i3,i4]=larr[:,:,:,:]
-    sarr[i1,i2,i3,i4]+=1
-
-    j1,j2,j3,j4 = xbb
     #X-Bridge - NEED TO SHIFT THIS
     # for ts,swept_set in enumerate(x_sets,start=TSO):
     #     #Calculating Step
     #     block = SM.step(sarr[j1,j2,j3,j4],swept_set,ts,gts)
     #     gts+=1
 
-gts = None
 
 #Statement to execute dsweep
 dsweep_engine()
