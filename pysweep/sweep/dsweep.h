@@ -19,8 +19,6 @@ __device__ __constant__  int MPSS; //max pyramid swept steps
 __device__ __constant__  int MOSS; //max octahedron swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
-__device__ __constant__  float SPLITX; //half an octahedron x
-__device__ __constant__  float SPLITY; //half an octahedron y
 __device__ __constant__ int TSO; //Time scheme order
 __device__ __constant__ int STS;
 //GPU Constants
@@ -29,13 +27,12 @@ __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max thr
 
 //!!(@#
 
-
 /*
     Use this function to get the shared id
 */
 __device__ int get_sgid(int tidx, int tidy)
 {
-    return tidy + (blockDim.y+2*OPS)*tidx;
+    return tidy + (blockDim.y)*tidx;
 }
 /*
     Use this function to get the global id
@@ -43,28 +40,13 @@ __device__ int get_sgid(int tidx, int tidy)
 __device__ int get_gid()
 {
     int bid = blockIdx.x + blockIdx.y * gridDim.x;
-    int M = gridDim.y*blockDim.y+2*OPS;
-    return M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
-}
-
-/*
-    Use this function for testing points by thread indices
-*/
-__device__ void test_gid(int tdx,int tdy)
-{
-    if (tdx == threadIdx.x && tdy == threadIdx.y)
-    {
-        int bid = blockIdx.x + blockIdx.y * gridDim.x;
-        int M = gridDim.y*blockDim.y+2*OPS;
-        int gid = M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
-        printf("%d\n", gid);
-    }
+    int tid = bid*(blockDim.x*blockDim.y)+(threadIdx.y*blockDim.x)+threadIdx.x;
+    return tid;
 }
 
 /*
     Use this function to print the shared array
 */
-
 __device__
 void pint(int myInt,bool test_bool)
 {
@@ -78,10 +60,10 @@ void pint(int myInt,bool test_bool)
 __device__
 void print_sarr(float * shared_state,bool test_bool,int smod)
 {
-    int bdx = blockDim.x+OPS;
-    int bdy = blockDim.y+OPS;
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
+    int bdx = blockDim.x;
+    int bdy = blockDim.y;
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
     int sgid = get_sgid(tidx,tidy)+smod*STS; //Shared global index
     int id;
     __syncthreads();
@@ -105,9 +87,9 @@ void print_sarr(float * shared_state,bool test_bool,int smod)
 __device__
 void print_state(float * state,bool test_bool,int tmod)
 {
-    int bdy = blockDim.y*(gridDim.y)+2*OPS;
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
+    int bdy = blockDim.y*(gridDim.y);
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
     int gid = get_gid()+tmod*TIMES; //global index
     int id;
     __syncthreads();
@@ -134,27 +116,15 @@ void print_state(float * state,bool test_bool,int tmod)
 __device__
 void shared_state_fill(float * shared_state, float * state, int smod, int tmod)
 {
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
     int sgid = get_sgid(tidx,tidy)+smod*STS; //Shared global index
     int gid = get_gid()+tmod*TIMES; //global index
-    int bdy = blockDim.y+2*OPS;
-    int gbdy = blockDim.y*gridDim.y+2*OPS;
-    int lsgid = sgid-bdy;
-    int usgid = sgid+bdy;
-    int lgid = gid-gbdy;
-    int ugid = gid+gbdy;
     for (int j = 0; j < NV; j++)
     {
-        shared_state[lsgid+j*SGIDS] = state[lgid+j*VARS];
-        shared_state[usgid+j*SGIDS] = state[ugid+j*VARS];
-        shared_state[lsgid-OPS+j*SGIDS] = state[lgid-OPS+j*VARS];
-        shared_state[usgid+OPS+j*SGIDS] = state[ugid+OPS+j*VARS];
-        shared_state[lsgid+OPS+j*SGIDS] = state[lgid+OPS+j*VARS];
-        shared_state[usgid-OPS+j*SGIDS] = state[ugid-OPS+j*VARS];
+        shared_state[sgid+j*SGIDS] = state[gid+j*VARS];
     }
 }
-
 
 /*
     Use this function to clear out former values in the shared array. (Zero them)
@@ -162,23 +132,14 @@ void shared_state_fill(float * shared_state, float * state, int smod, int tmod)
 __device__
 void shared_state_clear(float * shared_state)
 {
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
     int sgid = get_sgid(tidx,tidy); //Shared global index
-    int bdx = blockDim.x+2*OPS;
-    int bdy = blockDim.y+2*OPS;
-    int lsgid = sgid-bdx;
-    int usgid = sgid+bdx;
     for (int i = 0; i < TWO; i++)
     {
         for (int j = 0; j < NV; j++)
         {
-            shared_state[lsgid+STS*i+j*SGIDS] = 0;
-            shared_state[usgid+STS*i+j*SGIDS] = 0;
-            shared_state[lsgid-OPS+STS*i+j*SGIDS] = 0;
-            shared_state[usgid+OPS+STS*i+j*SGIDS] = 0;
-            shared_state[lsgid+OPS+STS*i+j*SGIDS] = 0;
-            shared_state[usgid-OPS+STS*i+j*SGIDS] = 0;
+            shared_state[sgid+i*STS+j*SGIDS] = 0;
         }
     }
 }
@@ -202,8 +163,8 @@ UpPrism(float *state, int gts)
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ly = OPS; // Lower y swept bound
-    int ux = blockDim.x+OPS; //upper x
-    int uy = blockDim.y+OPS; //upper y
+    int ux = blockDim.x-OPS; //upper x
+    int uy = blockDim.y-OPS; //upper y
     //Communicating interior points for TSO data and calculation data
     //UpPyramid Always starts on predictor so no if needed here
     shared_state_fill(shared_state,state,ZERO,(TSO-ONE));
@@ -213,24 +174,24 @@ UpPrism(float *state, int gts)
     for (int k = 0; k < MPSS; k++)
     {
         // Solving step function
-        step(shared_state,sgid,gts);
+        // step(shared_state,sgid,gts);
         //Putting sweep values into next time step
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
             // printf("%d,%d\n",tidx,tidy );
             for (int j = 0; j < NV; j++)
             {
-                state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+                state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS]+5;
             }
         }
         __syncthreads();
-        for (int j = 0; j < NV; j++)
-        {
-            //Copy latest step
-            shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
-            //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
-        }
+        // for (int j = 0; j < NV; j++)
+        // {
+        //     //Copy latest step
+        //     shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
+        //     //Copy TSO Step Down
+        //     shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+        // }
         gts += 1;   //Update gts
         //Update swept bounds
         ux -= OPS;

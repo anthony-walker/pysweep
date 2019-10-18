@@ -72,9 +72,10 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
         gpu_blocks.append((s0,s1,slice(int(BS[0]*rows_per_gpu*i),int(BS[0]*rows_per_gpu*(i+1)),1),slice(0,shared_shape[3],1)))
     # cstart = gpu_blocks[-1][2].stop if gpu_blocks else 0
     cstart =  0
-    row_range = np.arange(cstart,shared_shape[2]-gpu_blocks[-1][2].stop,BS[0],dtype=np.intc)
+    gstop = gpu_blocks[-1][2].stop if gpu_blocks else 0
+    total_cpu_block = (s0,s1,slice(gstop,shared_shape[2],1),slice(0,shared_shape[3],1))
+    row_range = np.arange(cstart,shared_shape[2]-gstop,BS[0],dtype=np.intc)
     column_range = np.arange(0,shared_shape[3],BS[1],dtype=np.intc)
-    total_cpu_block = (s0,s1,slice(cstart,shared_shape[2]-gpu_blocks[-1][2].stop,1),slice(0,shared_shape[3],1))
     cpu_blocks = [(s0,s1,slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
     return gpu_blocks, cpu_blocks, total_cpu_block
 

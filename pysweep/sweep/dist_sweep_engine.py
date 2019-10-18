@@ -20,8 +20,8 @@ from source import *
 from mpi4py import MPI
 # from mpi4py import futures
 #Multi-processing imports
-from concurrent import futures
-# import multiprocessing as mp
+# from concurrent import futures
+import multiprocessing as mp
 import ctypes
 
 #GPU Utility Imports
@@ -33,6 +33,7 @@ import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
 
 carr = None #MP shared array
+gts = None #Global time step
 
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
@@ -191,7 +192,7 @@ def dsweep_engine():
     blocks,gpu_rank =  node_comm.scatter(node_data)
     total_cpu_block = node_comm.bcast(total_cpu_block)
     GRB = gpu_rank[0]
-
+    gts = 0  #Counter for writing on the appropriate step
     # Operations specifically for GPus and CPUs
     if GRB:
         # Creating cuda device and Context
@@ -209,7 +210,7 @@ def dsweep_engine():
         STS = SGIDS*NV #Shared time shift
         VARS =  block_shape[TWO]*block_shape[3]
         TIMES = VARS*NV
-        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"SPLITX":SPLITX,"SPLITY":SPLITY,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+        const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
         SM = build_gpu_source(GS,os.path.basename(__file__))
         swept_constant_copy(SM,const_dict)
@@ -229,7 +230,8 @@ def dsweep_engine():
         GRD,block_shape = None,None
         carr = create_shared_pool_array(sarr[total_cpu_block].shape)
         carr[:,:,:,:] = sarr[total_cpu_block]
-        mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
+        mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
+        # mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
 
 
     #------------------------------HDF5 File------------------------------------------#
@@ -243,22 +245,21 @@ def dsweep_engine():
     if rank == cluster_master:
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     cwt = 1 #Current write time
-    gts = 0  #Counter for writing on the appropriate step
     comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
     pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
     UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_block)
     node_comm.Barrier()
-    if rank == node_master:
-        for i in range(2,4,1):
-            print(sarr[i,0,:,:])
+    # if rank == node_master:
+    #     for i in range(2,4,1):
+    #         pm(sarr,i)
 
     #Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
-    else:
-        mpi_pool.shutdown()
+    # else:
+    #     mpi_pool.shutdown()
     comm.Barrier()
     hdf5_file.close()
 
@@ -279,29 +280,38 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_
         arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("UpPrism")
-        # gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
-        sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
-        # pm(sarr[blocks],1)
+        pm(arr,3,'%0.0f')
+
+        # sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
+
     else:   #CPUs do this
-        res = mpi_pool.map(CPU_UpPrism,blocks)
+        cblocks,xblocks = zip(*blocks)
+        mpi_pool.map(CPU_UpPyramid,cblocks)
+        mpi_pool.map(CPU_Xbridge,xblocks)
+        #Copy result to MPI shared process array
         sarr[total_cpu_block] = carr[:,:,:,:]
 
-def CPU_UpPrism(block):
+
+def CPU_UpPyramid(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
-    global carr
-    upb,xbb = block
-    # print(carr[block[0]])
+    global carr,gts
+    ct = gts
     for ts,swept_set in enumerate(up_sets,start=TSO-1):
         #Calculating Step
-        carr[upb] = SM.step(carr[upb],swept_set,ts,ts)
-        # gts+=1
-    #X-Bridge - NEED TO SHIFT THIS
-    # for ts,swept_set in enumerate(x_sets,start=TSO):
-    #     #Calculating Step
-    #     block = SM.step(sarr[j1,j2,j3,j4],swept_set,ts,gts)
-    #     gts+=1
+        carr[block] = SM.step(carr[block],swept_set,ts,ct)
+        ct+=1
+
+def CPU_Xbridge(block):
+    """Use this function to build the XBridge."""
+    global carr,gts
+    ct = gts
+    for ts,swept_set in enumerate(x_sets,start=TSO-1):
+        #Calculating Step
+        carr[block] = SM.step(carr[block],swept_set,ts,ct)
+        ct+=1
 
 
 #Statement to execute dsweep
