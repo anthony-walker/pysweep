@@ -18,9 +18,7 @@ from source import *
 
 #MPI imports
 from mpi4py import MPI
-# from mpi4py import futures
 #Multi-processing imports
-# from concurrent import futures
 import multiprocessing as mp
 import ctypes
 
@@ -170,9 +168,6 @@ def dsweep_engine():
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[TSO-ONE,:,:,:] =  arr0[:,gsc,:]
-
-
-
     #----------------Data Input setup -------------------------#
     time_steps = int((tf-t0)/dt)  #Number of time steps
     MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
@@ -231,9 +226,6 @@ def dsweep_engine():
         carr = create_shared_pool_array(sarr[total_cpu_block].shape)
         carr[:,:,:,:] = sarr[total_cpu_block]
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
-        # mpi_pool = futures.ProcessPoolExecutor(os.cpu_count()-node_comm.Get_size()+1)
-
-
     #------------------------------HDF5 File------------------------------------------#
     filename+=".hdf5"
     hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
@@ -280,9 +272,10 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_
         arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
         arr = np.ascontiguousarray(arr) #Ensure array is contiguous
         gpu_fcn = SM.get_function("UpPrism")
+        # pm(arr,1,'%0.0f')
         gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
-        pm(arr,3,'%0.0f')
+        # pm(arr,3,'%0.0f')
 
         # sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
 
