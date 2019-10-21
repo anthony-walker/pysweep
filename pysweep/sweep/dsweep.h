@@ -47,6 +47,14 @@ __device__ int get_gid()
     return M*(threadIdx.x)+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
 }
 
+__device__ int get_bgid()
+{
+    int bid = blockIdx.x + blockIdx.y * gridDim.x;
+    int M = (gridDim.y+1)*blockDim.y;
+    return M*(threadIdx.x)+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M+blockDim.y/2;
+}
+
+
 /*
     Use this function for testing points by thread indices
 */
@@ -187,7 +195,7 @@ UpPyramid(float *state, int gts)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
-    int gid = get_gid()+(TSO-ONE)*TIMES; //global index
+    int gid = get_gid()+(TSO-1)*TIMES; //global index
 
     __syncthreads();
     //Creating swept boundaries
@@ -232,11 +240,11 @@ UpPyramid(float *state, int gts)
 }
 
 /*
-    Use this function to create and return the GPU X-Bridge
+    Use this function to create and return the GPU Y-Bridge
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-XBridge(float *state, int gts)
+YBridge(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
     extern __shared__ float shared_state[];    //Shared state specified externally
@@ -246,12 +254,12 @@ XBridge(float *state, int gts)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
-    int gid = get_gid()+(TSO)*TIMES; //global index
+    int gid = get_bgid()+(TSO-1)*TIMES; //global index
     //Creating swept boundaries
-    int lx = blockDim.x/2; //Lower x swept bound
-    int ly = 2*OPS; // Lower y swept bound
-    int ux = lx+2*OPS; //upper x
-    int uy = ly+blockDim.y-2*OPS; //upper y
+    int lx = OPS; //Lower x swept bound
+    int ux = blockDim.x-OPS; //upper x
+    int ly = blockDim.y/2-OPS; // Lower y swept bound
+    int uy = blockDim.y/2+OPS; //upper y
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
@@ -259,11 +267,11 @@ XBridge(float *state, int gts)
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
-    for (int k = 0; k < MPSS-ONE; k++)
+    for (int k = 0; k < MPSS; k++)
     {
         step(shared_state,sgid,gts);
         // Solving step function
-        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
+        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             //Ensures steps are done prior to communication
             for (int j = 0; j < NV; j++)
@@ -282,10 +290,10 @@ XBridge(float *state, int gts)
         }
         gts += 1;   //Update gts
         //Update swept bounds
-        lx-=OPS;
-        ux+=OPS;
-        ly+=OPS;
-        uy-=OPS;
+        lx+=OPS;
+        ux-=OPS;
+        ly-=OPS;
+        uy+=OPS;
         __syncthreads(); //Sync threads here to ensure all initial values are copied
     }
 

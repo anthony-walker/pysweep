@@ -2,8 +2,8 @@ from pysweep.sweep.dist_sweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
-    nx = ny = 16
-    bs = 8
+    nx = ny = 24
+    bs = 12
     t0 = 0
     tf = 0.1
     dt = 0.01
