@@ -129,6 +129,19 @@ def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):
     arr = np.ndarray(buffer=shared_buf, dtype=dType.type, shape=arr_shape)
     return arr
 
+def create_local_gpu_array(block_shape):
+    """Use this function to create the local gpu array"""
+    arr = np.zeros(block_shape)
+    arr = arr.astype(np.float32)
+    return arr
+
+def copy_s_to_g(sarr,arr,blocks,BS):
+    """Use this function to copy the shared array to the local array."""
+    i1,i2,i3,i4 = blocks
+    arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
+    arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
+    arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
+    return arr
 
 def create_shared_pool_array(shared_shape):
     """Use this function to create the shared array for the process pool."""

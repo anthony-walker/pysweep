@@ -201,11 +201,13 @@ def dsweep_engine():
         GRD = (int((block_shape[TWO])/BS[ZERO]),int((block_shape[3])/BS[ONE]))   #Grid size
         #Creating constants
         NV = block_shape[ONE]
-        SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
+        SGIDS = (BS[ZERO]+TOPS)*(BS[ONE]+TOPS)
         STS = SGIDS*NV #Shared time shift
         VARS =  block_shape[TWO]*(block_shape[3])
         TIMES = VARS*NV
+        print(SGIDS,STS,VARS,TIMES)
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+        garr = create_local_gpu_array(block_shape)
         #Building CUDA source code
         SM = build_gpu_source(GS,os.path.basename(__file__))
         swept_constant_copy(SM,const_dict)
@@ -222,7 +224,7 @@ def dsweep_engine():
         down_sets = create_dist_down_sets(BS,OPS)
         oct_sets = down_sets+up_sets
         x_sets,y_sets = create_dist_bridge_sets(BS,OPS,MPSS)
-        GRD,block_shape = None,None
+        GRD,block_shape,garr = None,None,None
         carr = create_shared_pool_array(sarr[total_cpu_block].shape)
         carr[:,:,:,:] = sarr[total_cpu_block]
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
@@ -241,7 +243,7 @@ def dsweep_engine():
     #-------------------------------SWEPT RULE---------------------------------------------#
     pargs = (SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-    UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_block)
+    UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     # if rank == node_master:
     #     for i in range(2,4,1):
@@ -255,7 +257,7 @@ def dsweep_engine():
     comm.Barrier()
     hdf5_file.close()
 
-def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_block):
+def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -265,22 +267,14 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_
     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
     #Splitting between cpu and gpu
     if GRB:
-        i1,i2,i3,i4 = blocks
-        arr = np.zeros(block_shape)
-        arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
-        arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
-        arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
-        print(arr.shape,GRD,BS)
-        arr = arr.astype(np.float32)
-        arr_gpu = cuda.mem_alloc(arr.nbytes)
-        # pm(arr,1,'%.1f')
-        cuda.memcpy_htod(arr_gpu,arr)
-        SM.get_function("UpPrism")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        arr_gpu = cuda.mem_alloc(garr.nbytes)
+        garr = copy_s_to_g(sarr,garr,blocks,BS)
+        cuda.memcpy_htod(arr_gpu,garr)
+        SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
-        cuda.memcpy_dtoh(arr,arr_gpu)
-        pm(arr,3,'%.0f')
-        sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
-
+        cuda.memcpy_dtoh(garr,arr_gpu)
+        pm(garr,2,'%.0f')
+        sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
         mpi_pool.map(CPU_UpPyramid,cblocks)
