@@ -196,14 +196,14 @@ def dsweep_engine():
         cuda_context = cuda_device.make_context()
         blocks = tuple(blocks[0])
         block_shape = [i.stop-i.start for i in blocks]
-        block_shape[-1] += int(2*BS[0])
+        block_shape[-1] += int(2*BS[0]) #Adding 2 blocks in the column direction
         # Creating local GPU array with split
         GRD = (int((block_shape[TWO])/BS[ZERO]),int((block_shape[3])/BS[ONE]))   #Grid size
         #Creating constants
         NV = block_shape[ONE]
         SGIDS = int(np.prod(BS))
         STS = SGIDS*NV #Shared time shift
-        VARS =  block_shape[TWO]*block_shape[3]
+        VARS =  block_shape[TWO]*(block_shape[3]+TWO)
         TIMES = VARS*NV
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
@@ -270,14 +270,15 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_
         arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
         arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
         arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
-        arr = np.ascontiguousarray(arr) #Ensure array is contiguous
-        gpu_fcn = SM.get_function("UpPrism")
-        # pm(arr,1,'%0.0f')
-        gpu_fcn(cuda.InOut(arr),np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        arr = arr.astype(np.float32)
+        arr_gpu = cuda.mem_alloc(arr.nbytes)
+        # pm(arr,1,'%.1f')
+        cuda.memcpy_htod(arr_gpu,arr)
+        SM.get_function("UpPrism")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
-        # pm(arr,3,'%0.0f')
-
-        # sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
+        cuda.memcpy_dtoh(arr,arr_gpu)
+        pm(arr,1,'%.0f')
+        sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
 
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
