@@ -145,13 +145,13 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 UpPrism(float *state, int gts)
 {
-    //Creating flattened shared array ptr (x,y,v) length
-    // extern __shared__ float shared_state[];    //Shared state specified externally
+    // Creating flattened shared array ptr (x,y,v) length
+    extern __shared__ float shared_state[];    //Shared state specified externally
     // Cleaning out shared array
-    // shared_state_clear(shared_state);
-    // __syncthreads();
+    shared_state_clear(shared_state);
+    __syncthreads();
     //Other quantities for indexing
-    // int sgid = get_sgid()+STS; //Shared global index
+    int sgid = get_sgid()+STS; //Shared global index
     int gid = get_gid()+(TSO-ONE)*TIMES; //global index
     __syncthreads();
     //Creating swept boundaries
@@ -160,45 +160,37 @@ UpPrism(float *state, int gts)
     int ux = blockDim.x-OPS; //upper x
     int uy = blockDim.y-OPS; //upper y
     //Communicating interior points for TSO data and calculation data
-    //UpPyramid Always starts on predictor so no if needed here
-    // shared_state_fill(shared_state,state,ZERO,(TSO-ONE));
-    // shared_state_fill(shared_state,state,ONE,(TSO-ONE));
-    // __syncthreads();
-    // printf("%d\n", gid);
-    for (int i = 0; i < NV; i++) {
-        state[gid+i*VARS] = 2.0;
-    }
-
-
+    // UpPyramid Always starts on predictor so no if needed here
+    shared_state_fill(shared_state,state,ZERO,(TSO-ONE));
+    shared_state_fill(shared_state,state,ONE,(TSO-ONE));
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     //Swept loop
-    // for (int k = 0; k < MPSS; k++)
-    // {
-    //     // Solving step function
-    //     // step(shared_state,sgid,gts);
-    //     //Putting sweep values into next time step
-    //     // if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
-    //     // {
-    //     //     // printf("%d,%d\n",tidx,tidy );
-    //     //     for (int j = 0; j < NV; j++)
-    //     //     {
-    //     //         state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS]+5;
-    //     //     }
-    //     // }
-    //     __syncthreads();
-    //     // for (int j = 0; j < NV; j++)
-    //     // {
-    //     //     //Copy latest step
-    //     //     shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
-    //     //     //Copy TSO Step Down
-    //     //     shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
-    //     // }
-    //     gts += 1;   //Update gts
-    //     //Update swept bounds
-    //     ux -= OPS;
-    //     uy -= OPS;
-    //     lx += OPS;
-    //     ly += OPS;
-    //     __syncthreads(); //Sync threads here to ensure all initial values are copied
-    // }
+    for (int k = 0; k < MPSS; k++)
+    {
+        // Solving step function
+        // step(shared_state,sgid,gts);
+        //Putting sweep values into next time step
+        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
+        {
+            for (int j = 0; j < NV; j++)
+            {
+                state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS]+5;
+            }
+        }
+        __syncthreads();
+        for (int j = 0; j < NV; j++)
+        {
+            //Copy latest step
+            shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
+            //Copy TSO Step Down
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+        }
+        gts += 1;   //Update gts
+        //Update swept bounds
+        ux -= OPS;
+        uy -= OPS;
+        lx += OPS;
+        ly += OPS;
+        __syncthreads(); //Sync threads here to ensure all initial values are copied
+    }
 }

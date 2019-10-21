@@ -164,7 +164,7 @@ def dsweep_engine():
     MOSS = 2*MPSS
     shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0]),arr0.shape[2])
     sarr = create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
-    ssb = np.zeros((2,arr0.shape[ZERO],BS[0],BS[1]),dtype=dType).nbytes
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+TOPS,BS[1]+TOPS),dtype=dType).nbytes
     #Filling shared array
     gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     sarr[TSO-ONE,:,:,:] =  arr0[:,gsc,:]
@@ -201,9 +201,9 @@ def dsweep_engine():
         GRD = (int((block_shape[TWO])/BS[ZERO]),int((block_shape[3])/BS[ONE]))   #Grid size
         #Creating constants
         NV = block_shape[ONE]
-        SGIDS = int(np.prod(BS))
+        SGIDS = (BS[ZERO]+TWO*OPS)*(BS[ONE]+TWO*OPS)
         STS = SGIDS*NV #Shared time shift
-        VARS =  block_shape[TWO]*(block_shape[3]+TWO)
+        VARS =  block_shape[TWO]*(block_shape[3])
         TIMES = VARS*NV
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
@@ -270,6 +270,7 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_
         arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
         arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
         arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
+        print(arr.shape,GRD,BS)
         arr = arr.astype(np.float32)
         arr_gpu = cuda.mem_alloc(arr.nbytes)
         # pm(arr,1,'%.1f')
@@ -277,7 +278,7 @@ def UpPrism(sarr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,block_shape,total_cpu_
         SM.get_function("UpPrism")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(arr,arr_gpu)
-        pm(arr,1,'%.0f')
+        pm(arr,3,'%.0f')
         sarr[blocks]=arr[:,:,:,BS[0]:-BS[0]]
 
     else:   #CPUs do this
