@@ -188,6 +188,7 @@ def dsweep_engine():
     total_cpu_block = node_comm.bcast(total_cpu_block)
     GRB = gpu_rank[0]
     gts = 0  #Counter for writing on the appropriate step
+
     # Operations specifically for GPus and CPUs
     if GRB:
         # Creating cuda device and Context
@@ -197,6 +198,7 @@ def dsweep_engine():
         blocks = tuple(blocks[0])
         block_shape = [i.stop-i.start for i in blocks]
         block_shape[-1] += int(2*BS[0]) #Adding 2 blocks in the column direction
+
         # Creating local GPU array with split
         GRD = (int((block_shape[TWO])/BS[ZERO]),int((block_shape[3])/BS[ONE]))   #Grid size
         #Creating constants
@@ -205,7 +207,6 @@ def dsweep_engine():
         STS = SGIDS*NV #Shared time shift
         VARS =  block_shape[TWO]*(block_shape[3])
         TIMES = VARS*NV
-        print(SGIDS,STS,VARS,TIMES)
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
         garr = create_local_gpu_array(block_shape)
         #Building CUDA source code
@@ -271,6 +272,7 @@ def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
         garr = copy_s_to_g(sarr,garr,blocks,BS)
         cuda.memcpy_htod(arr_gpu,garr)
         SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        SM.get_function("XBridge")(arr_gpu,np.int32(gts),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(garr,arr_gpu)
         pm(garr,2,'%.0f')

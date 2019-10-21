@@ -133,6 +133,7 @@ def create_local_gpu_array(block_shape):
     """Use this function to create the local gpu array"""
     arr = np.zeros(block_shape)
     arr = arr.astype(np.float32)
+    arr = np.ascontiguousarray(arr)
     return arr
 
 def copy_s_to_g(sarr,arr,blocks,BS):
