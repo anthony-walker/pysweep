@@ -5,6 +5,8 @@ import sys
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 from itertools import repeat
+from .mplambda import sweep_lambda
+from .block import rebuild_blocks
 
 def UpPyramid(sarr,arr,WR,BDR,isets,gts,pargs):
     """

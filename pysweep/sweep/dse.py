@@ -7,7 +7,7 @@ from itertools import cycle, product, count
 import pycuda.driver as cuda
 from pycuda.compiler import SourceModule
 #Dsweep imports
-from dcore import dcore,block,decomp,functions,sgs
+from dcore import dcore,decomp,functions,sgs
 from ccore import source, printer
 #MPI imports
 from mpi4py import MPI

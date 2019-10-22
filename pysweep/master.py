@@ -3,7 +3,7 @@
 #Create arguments here for the solver and call them with pst.py
 import os
 import numpy as np
-from .notipy import NotiPy
+from notipy import NotiPy
 
 
 class controller(object):

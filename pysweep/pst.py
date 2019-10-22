@@ -1,11 +1,11 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
 import sys,argparse
-from .sweep import dist_sweep,node_sweep
-from .analytical import *
-from .equations import *
-from .decomp import decomp
+import equations,decomposition
+from sweep import nsweep, dsweep, ccore
+from analytical import vortex,ahde
 import numpy as np
+from mpi4py import MPI
 
 def AnalyticalVortex(args):
     """Use this function to create analytical vortex data."""
@@ -16,17 +16,17 @@ def AnalyticalVortex(args):
 
 def SweptVortex(args):
     #Analytical properties
-    cvics = vics()
+    cvics = vortex.vics()
     cvics.Shu(args.gamma)
     #Dimensions and steps
     dx = 2*cvics.L/args.nx
     dy = 2*cvics.L/args.ny
     #Creating initial vortex from analytical code
-    flux_vortex = cvics.Shu(gamma,args.nx).flux[0]
+    flux_vortex = cvics.Shu(args.gamma,args.nx).flux[0]
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep(flux_vortex,gargs,swargs,filename=args.hdf5)
+    nsweep.nsweep(flux_vortex,gargs,swargs,filename=args.hdf5)
 
 def StandardVortex(args):
     #Analytical properties
@@ -44,18 +44,18 @@ def StandardVortex(args):
 
 def SweptHDE(args):
     #Analytical properties
-    arr0 = TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
+    arr0 = ahde.TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
     #Dimensions and steps
     dx = args.X/args.nx
     dy = args.Y/args.ny
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep(arr0,gargs,swargs,filename=args.hdf5)
+    nsweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
 def StandardHDE(args):
     #Analytical properties
-    arr0 = TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
+    arr0 = ahde.TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
     #Dimensions and steps
     dx = args.X/args.nx
     dy = args.Y/args.ny
@@ -81,14 +81,14 @@ def STP2(args):
     #Dimensions and steps
     gargs = (args.t0,args.tf,args.dt)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep(arr0,gargs,swargs,filename=args.hdf5)
+    nsweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
 def STP(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
     arr = np.ones((4,args.nx,args.ny))
-    printer = pysweep_printer(rank,master_rank)
+    printer = ccore.printer.pysweep_printer(rank,master_rank)
     X = 1
     Y = 1
     #Dimensions and steps
@@ -97,14 +97,14 @@ def STP(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep(arr,gargs,swargs,filename=args.hdf5)
+    nsweep.nsweep(arr,gargs,swargs,filename=args.hdf5)
 
 def DSTP(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
     arr = np.ones((4,args.nx,args.ny))
-    printer = pysweep_printer(rank,master_rank)
+    printer = printer.pysweep_printer(rank,master_rank)
     X = 1
     Y = 1
     #Dimensions and steps
