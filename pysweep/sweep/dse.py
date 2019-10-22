@@ -1,6 +1,6 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, os, h5py, math, GPUtil, importlib.util, ctypes, time
+import sys, os, h5py, math, GPUtil, socket
 from itertools import cycle, product, count
 #CUDA Imports
 import pycuda.driver as cuda
@@ -45,6 +45,7 @@ def dsweep_engine():
     ONE = 1
     TWO = 2
     comm = MPI.COMM_WORLD
+    print(socket.gethostname())
     #------------------INPUT DATA SETUP-------------------------$
     arr0,gargs,swargs,GS,CS,filename,exid,dType = decomp.read_input_file(comm)
     TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
