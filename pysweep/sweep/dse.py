@@ -44,19 +44,27 @@ def dsweep_engine():
     HALF = 0.5
     ONE = 1
     TWO = 2
-    #-------------MPI Set up----------------------------#
     comm = MPI.COMM_WORLD
-    processor = MPI.Get_processor_name()
-    rank = comm.Get_rank()  #current rank
-    all_ranks = comm.allgather(rank) #All ranks in simulation
-    #Getting input data
+    #------------------INPUT DATA SETUP-------------------------$
     arr0,gargs,swargs,GS,CS,filename,exid,dType = decomp.read_input_file(comm)
     TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
     sgs.TSO,sgs.OPS,sgs.BS,sgs.AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
     t0,tf,dt = gargs[:3]
     assert BS%(2*OPS)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
     BS = (BS,BS,1)
-    comm.Barrier()
+    #---------------------SWEPT VARIABLE SETUP----------------------$
+    #Splits for shared array
+    SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
+    SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    MPSS = int(BS[0]/(2*OPS)-1)
+    MOSS = 2*MPSS
+    time_steps = int((tf-t0)/dt)  #Number of time steps
+    MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
+    time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
+    #-------------MPI SETUP----------------------------#
+    processor = MPI.Get_processor_name()
+    rank = comm.Get_rank()  #current rank
+    all_ranks = comm.allgather(rank) #All ranks in simulation
     #Create individual node comm
     nodes_processors = comm.allgather((rank,processor))
     processors = tuple(zip(*nodes_processors))[1]
@@ -97,35 +105,28 @@ def dsweep_engine():
         NB = np.prod(arr0.shape[1:])/np.prod(BS)
         assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
         num_block_rows = arr0.shape[1]/BS[0]
+
         #This function splits the rows among the nodes by affinity
-        node_ids,node_row_list,rows_per_gpu = decomp.node_split(cluster_comm,rank,cluster_master,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus)
-        node_row_list = [int(x) for x in node_row_list]
-        print(rows_per_gpu)
-        #Getting nodes in front and behind current node
-        nidx = node_ids.index(rank)
-        node_rows = node_row_list[nidx]
-        bidx = node_ids.index(-1) if  - 1 >= 0 else len(node_ids)-1
-        bnode = (node_ids[bidx],node_row_list[bidx])
-        fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
-        fnode = (node_ids[fidx],node_row_list[fidx])
-    else:
-        node_row_list,node_rows,nidx,rows_per_gpu,num_gpus,gpu_rank,total_num_gpus = None,None,None,None,None,None,None
-        ranks_to_remove = []
-    node_ranks = node_comm.bcast(node_ranks)
-    #----------------------__Removing Unwanted MPI Processes------------------------#
-    node_rows,nidx,node_row_list,node_comm,comm = dcore.mpi_destruction(rank,node_ranks,node_rows,comm,ranks_to_remove,all_ranks,nidx,node_row_list)
-    if rank == node_master:
-        #Checking to ensure that there are enough
-        assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
-    # #---------------------SWEPT VARIABLE SETUP----------------------$
-    # #Splits for shared array
-    # SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
-    # SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
-    # MPSS = int(BS[0]/(2*OPS)-1)
-    # MOSS = 2*MPSS
-    # time_steps = int((tf-t0)/dt)  #Number of time steps
-    # MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
-    # time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
+        # node_ids,node_row_list,rows_per_gpu =
+        decomp.nsplit(cluster_comm,rank,cluster_master,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus,BS)
+    #     node_row_list = [int(x) for x in node_row_list]
+    #     #Getting nodes in front and behind current node
+    #     nidx = node_ids.index(rank)
+    #     node_rows = node_row_list[nidx]
+    #     bidx = node_ids.index(-1) if  - 1 >= 0 else len(node_ids)-1
+    #     bnode = (node_ids[bidx],node_row_list[bidx])
+    #     fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
+    #     fnode = (node_ids[fidx],node_row_list[fidx])
+    # else:
+    #     node_row_list,node_rows,nidx,rows_per_gpu,num_gpus,gpu_rank,total_num_gpus = None,None,None,None,None,None,None
+    #     ranks_to_remove = []
+    # node_ranks = node_comm.bcast(node_ranks)
+    # #----------------------__Removing Unwanted MPI Processes------------------------#
+    # node_rows,nidx,node_row_list,node_comm,comm = dcore.mpi_destruction(rank,node_ranks,node_rows,comm,ranks_to_remove,all_ranks,nidx,node_row_list)
+    # if rank == node_master:
+    #     #Checking to ensure that there are enough
+    #     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
+
     # #---------------------------Creating and Filling Shared Array-------------#
     # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0]),arr0.shape[2])
     # sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
@@ -133,11 +134,11 @@ def dsweep_engine():
     # #Filling shared array
     # gsc =slice(int(BS[0]*np.sum(node_row_list[:nidx])),int(BS[0]*(np.sum(node_row_list[:nidx])+node_rows)),1)
     # sarr[TSO-ONE,:,:,:] =  arr0[:,gsc,:]
-
-    #----------------Creating and disseminating blocks -------------------------#
+    #
+    # # ----------------Creating and disseminating blocks -------------------------#
     # GRB,blocks,total_cpu_block,gpu_rank = dcore.block_dissem(rank,node_master,shared_shape,rows_per_gpu,BS,num_gpus,OPS,node_ranks,gpu_rank,node_comm)
-    # print(blocks)
-    # print('-----------------------------------------')
+    # # print(blocks)
+    # # print('-----------------------------------------')
     # #------------------- Operations specifically for GPus and CPUs------------------------#
     # if GRB:
     #     # Creating cuda device and Context
@@ -159,10 +160,10 @@ def dsweep_engine():
     # #-------------------------------FIRST PYRAMID-------------------------------------------#
     # functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     # node_comm.Barrier()
-    # # if rank == node_master:
-    # #     for i in range(2,4,1):
-    # #         print('-----------------------------------------')
-    # #         printer.pm(sarr,i)
+    # if rank == node_master:
+    #     for i in range(2,4,1):
+    #         print('-----------------------------------------')
+    #         printer.pm(sarr,i)
     #
     #
     # #Clean Up - Pop Cuda Contexts and Close Pool

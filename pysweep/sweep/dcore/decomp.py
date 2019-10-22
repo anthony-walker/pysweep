@@ -119,12 +119,57 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
     return gpu_blocks, cpu_blocks, total_cpu_block
 
 
+def nsplit(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus,BS):
+    """Use this function to split data amongst nodes."""
+    #Assert that the total number of blocks is an integer
+    gpu_rows = np.ceil(num_block_rows*AF)
+    cpu_rows = num_block_rows-gpu_rows
+    block_rows = [slice() for i in range(num_block_rows)]
+    print(block_rows)
+
+    # rows_per_gpu = int(gpu_rows/total_num_gpus) if total_num_gpus > 0 else 0
+    #
+    # rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
+    # #Estimate number of rows per node
+    # node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
+    # nlst = None
+    # #Number of row correction
+    # tnr = nodes.gather((node,node_rows))
+    # cores = nodes.gather(num_cores)
+    # if node == master_node:
+    #     nlst = [x for x,y in tnr]
+    #     tnr = [y for x,y in tnr]
+    #     total_rows = np.sum(tnr)
+    #     cis = cycle(tuple(np.zeros(nodes.Get_size()-1))+(1,))
+    #     ncyc = cycle(range(0,nodes.Get_size(),1))
+    #     #If total rows are greater, reduce
+    #     min_cores = min(cores)
+    #     while total_rows > num_block_rows:
+    #         curr = next(ncyc)
+    #         if min_cores >= cores[curr]:
+    #             tnr[curr]-=1
+    #             total_rows-=1
+    #         min_cores += next(cis)
+    #     #If total rows are greater, add
+    #     max_cores = max(cores)
+    #     while total_rows < num_block_rows:
+    #         curr = next(ncyc)
+    #         if max_cores <= cores[curr]:
+    #             tnr[curr]+=1
+    #             total_rows+=1
+    #         max_cores -= next(cis)
+    # nodes.Barrier()
+    # return nodes.bcast((nlst,tnr),root=master_node)+(rows_per_gpu,)
+
+
+
 def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
     """Use this function to split data amongst nodes."""
     #Assert that the total number of blocks is an integer
     gpu_rows = np.ceil(num_block_rows*AF)
     rows_per_gpu = int(gpu_rows/total_num_gpus) if total_num_gpus > 0 else 0
     cpu_rows = num_block_rows-gpu_rows
+
     rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
     #Estimate number of rows per node
     node_rows = rows_per_gpu*num_gpus+rows_per_core*num_cores
