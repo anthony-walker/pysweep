@@ -5,7 +5,7 @@ from dcore import block, decomp, sgs
 from ccore import source
 import h5py, os
 import numpy as np
-
+from mpi4py import MPI
 
 
 def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
@@ -58,29 +58,28 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO):
     del cpu_SM
     return blocks,block_shape,GRD,garr
 
-def mpi_destruction(rank,node_ranks,node_rows,comm,ranks_to_remove,all_ranks,nidx,node_row_list,total_num_gpus,AF):
+def mpi_destruction(rank,node_ranks,node_rows,comm,ranks_to_remove,all_ranks,nidx,node_row_list):
     """Use this to destory unwanted mpi processes."""
     [all_ranks.remove(x) for x in set([x[0] for x in comm.allgather(ranks_to_remove) if x])]
     comm.Barrier()
+
     #Remaking comms
     if rank in all_ranks:
         #New Global comm
         ncg = comm.group.Incl(all_ranks)
         comm = comm.Create_group(ncg)
-        #New node comm
+        # New node comm
         node_group = comm.group.Incl(node_ranks)
         node_comm = comm.Create_group(node_group)
     else: #Ending unnecs
         MPI.Finalize()
         exit(0)
     comm.Barrier()
-    #Checking to ensure that there are enough
-    assert total_num_gpus >= comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     #Broad casting to node
     node_rows = node_comm.bcast(node_rows)
     nidx = node_comm.bcast(nidx)
     node_row_list = node_comm.bcast(node_row_list)
-    return node_rows,nidx,node_row_list,node_comm
+    return node_rows,nidx,node_row_list,node_comm,comm
 
 def block_dissem(rank,node_master,shared_shape,rows_per_gpu,BS,num_gpus,OPS,node_ranks,gpu_rank,node_comm):
     """Use this function to spread blocks to ranks."""

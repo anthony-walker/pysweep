@@ -123,7 +123,7 @@ def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_core
     """Use this function to split data amongst nodes."""
     #Assert that the total number of blocks is an integer
     gpu_rows = np.ceil(num_block_rows*AF)
-    rows_per_gpu = gpu_rows/total_num_gpus if total_num_gpus > 0 else 0
+    rows_per_gpu = int(gpu_rows/total_num_gpus) if total_num_gpus > 0 else 0
     cpu_rows = num_block_rows-gpu_rows
     rows_per_core = np.ceil(cpu_rows/total_num_cores) if num_cores > 0 else 0
     #Estimate number of rows per node

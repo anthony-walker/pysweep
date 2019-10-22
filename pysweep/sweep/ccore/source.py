@@ -28,7 +28,6 @@ def build_gpu_source(kernel_source,name):
         cuda_file = "dsweep.h"
     else:
         cuda_file = "nsweep.h"
-    print(name)
     file = inspect.getfile(build_cpu_source)
     fname = file.split("/")[-1]
     fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+cuda_file
