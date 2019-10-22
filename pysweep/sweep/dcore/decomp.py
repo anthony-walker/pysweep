@@ -1,6 +1,11 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing process management
 # and data decomposition for the swept rule.
+import h5py, ctypes
+import numpy as np
+import multiprocessing as mp
+from itertools import cycle, product
+from mpi4py import MPI
 
 def create_local_gpu_array(block_shape):
     """Use this function to create the local gpu array"""

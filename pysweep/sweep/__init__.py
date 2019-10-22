@@ -1,3 +1,3 @@
 
-from .node_sweep import nsweep
-from .dist_sweep import dsweep
+import pysweep.sweep.dist_sweep
+import pysweep.sweep.node_sweep

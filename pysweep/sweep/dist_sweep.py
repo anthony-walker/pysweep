@@ -25,7 +25,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     exid: GPU ids to exclude from the calculation.
     dType: a string data type which will be entered into numpy to obtain a datatype object
     """
-    start = timer.time()
+    start = time.time()
 
     AF = swargs[3]
     swnames = ['TSO','OPS','BS','AF']
@@ -76,5 +76,5 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     else:
         MPI.Finalize()
 
-    stop = timer.time()
+    stop = time.time()
     return stop-start

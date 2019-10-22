@@ -9,8 +9,9 @@ from pycuda.compiler import SourceModule
 #MPI imports
 from mpi4py import MPI
 #Swept imports
-import ncore as nc
-import ccore as cc
+import pysweep.sweep.ncore as nc
+import pysweep.sweep.ccore as cc
+
 
 def nsweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule
