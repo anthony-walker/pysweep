@@ -15,7 +15,7 @@ from decomposition import *
 from printer import *
 from block import *
 from source import *
-
+from dcore import *
 #MPI imports
 from mpi4py import MPI
 #Multi-processing imports
@@ -29,9 +29,6 @@ import importlib.util
 import warnings
 import time as timer
 warnings.simplefilter("ignore") #THIS IGNORES WARNINGS
-
-carr = None #MP shared array
-gts = None #Global time step
 
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
@@ -188,7 +185,6 @@ def dsweep_engine():
     total_cpu_block = node_comm.bcast(total_cpu_block)
     GRB = gpu_rank[0]
     gts = 0  #Counter for writing on the appropriate step
-
     # Operations specifically for GPus and CPUs
     if GRB:
         # Creating cuda device and Context
@@ -198,7 +194,6 @@ def dsweep_engine():
         blocks = tuple(blocks[0])
         block_shape = [i.stop-i.start for i in blocks]
         block_shape[-1] += int(2*BS[0]) #Adding 2 blocks in the column direction
-
         # Creating local GPU array with split
         GRD = (int((block_shape[TWO])/BS[ZERO]),int((block_shape[3])/BS[ONE]))   #Grid size
         #Creating constants
@@ -230,15 +225,7 @@ def dsweep_engine():
         carr[:,:,:,:] = sarr[total_cpu_block]
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     #------------------------------HDF5 File------------------------------------------#
-    filename+=".hdf5"
-    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
-    hdf_bs = hdf5_file.create_dataset("BS",(len(BS),),data=BS)
-    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+ONE,),data=(time_steps,)+arr0.shape)
-    hdf_aff = hdf5_file.create_dataset("AF",(ONE,),data=AF)
-    hdf_time = hdf5_file.create_dataset("time",(1,))
-    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+ONE,arr0.shape[ZERO],arr0.shape[ONE],arr0.shape[TWO]),dtype=dType)
-    if rank == cluster_master:
-        hdf5_data_set[0,:,:,:] = arr0[:,:,:]
+    hdf5_file = make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     cwt = 1 #Current write time
     comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
