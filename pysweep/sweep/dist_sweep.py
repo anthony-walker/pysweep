@@ -1,11 +1,9 @@
 
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, os, h5py, math, GPUtil
-import os
+import sys, os, h5py, math, GPUtil, time
 import numpy as np
 from mpi4py import MPI
-import time as timer
 
 def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     """Use this function to perform swept rule
