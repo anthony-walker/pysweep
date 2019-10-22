@@ -1,8 +1,9 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
 import sys,argparse
-import equations,decomposition
-from sweep import nsweep, dsweep, ccore
+sys.path.insert(0, './pysweep')
+import equations, analytical
+from sweep import nodesweep, distsweep, ccore
 from analytical import vortex,ahde
 import numpy as np
 from mpi4py import MPI
@@ -26,7 +27,7 @@ def SweptVortex(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep.nsweep(flux_vortex,gargs,swargs,filename=args.hdf5)
+    nodesweep.nsweep(flux_vortex,gargs,swargs,filename=args.hdf5)
 
 def StandardVortex(args):
     #Analytical properties
@@ -51,7 +52,7 @@ def SweptHDE(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
+    nodesweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
 def StandardHDE(args):
     #Analytical properties
@@ -81,7 +82,7 @@ def STP2(args):
     #Dimensions and steps
     gargs = (args.t0,args.tf,args.dt)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
+    nodesweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
 def STP(args):
     comm = MPI.COMM_WORLD
@@ -97,7 +98,7 @@ def STP(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    nsweep.nsweep(arr,gargs,swargs,filename=args.hdf5)
+    nodesweep.nsweep(arr,gargs,swargs,filename=args.hdf5)
 
 def DSTP(args):
     comm = MPI.COMM_WORLD

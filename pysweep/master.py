@@ -1,10 +1,10 @@
 #Programmer: Anthony Walker
 #This is the main file for running and testing the swept solver
 #Create arguments here for the solver and call them with pst.py
-import os
+import os,sys
+sys.path.insert(0, './pysweep')
 import numpy as np
 from notipy import NotiPy
-
 
 class controller(object):
     def __init__(self):

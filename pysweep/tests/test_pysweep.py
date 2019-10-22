@@ -137,8 +137,9 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-# test_sweep_vortex()
-# test_sweep_hde()
-# test_eqt2()
-# test_sweep_write()
-# test_block_management()
+if __name__ == "__main__":
+    test_sweep_vortex()
+    test_sweep_hde()
+    test_eqt2()
+    test_sweep_write()
+    test_block_management()

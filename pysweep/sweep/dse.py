@@ -1,6 +1,5 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-
 import sys, os, h5py, math, GPUtil, importlib.util, ctypes, time
 from itertools import cycle, product, count
 #CUDA Imports
