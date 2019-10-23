@@ -1,8 +1,11 @@
 #Programmer: Anthony Walker
 #This file contains functions necessary to implement the standard decomposition
 import numpy as np
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 from .decomp_lambda import decomp_lambda
 #MPI imports
 from mpi4py import MPI

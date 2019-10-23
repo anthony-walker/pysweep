@@ -2,8 +2,11 @@
 #This file contains all of the necessary functions for implementing the swept rule.
 from .dcore import sgs, decomp
 #CUDA Imports
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 import numpy as np
 
 def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):

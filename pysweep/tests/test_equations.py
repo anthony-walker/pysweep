@@ -11,8 +11,11 @@ import matplotlib.animation as animation
 from mpl_toolkits import mplot3d
 from master import controller
 #Cuda
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 #C
 from ctypes import *
 #From PySweep

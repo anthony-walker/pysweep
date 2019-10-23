@@ -4,8 +4,11 @@
 import os, sys, h5py, math, GPUtil, time, importlib.util
 import numpy as np
 #CUDA Imports
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 #MPI imports
 from mpi4py import MPI
 #Swept imports

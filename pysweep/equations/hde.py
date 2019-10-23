@@ -3,8 +3,11 @@
 # equation with RK2
 
 import numpy as np
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 #----------------------------------Globals-------------------------------------#
 alpha = 0
 dtdx2 = 0

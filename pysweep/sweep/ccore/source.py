@@ -3,8 +3,11 @@
 #Other imports
 import numpy as np
 #Cuda imports
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 #System imports
 import os.path as op
 import inspect

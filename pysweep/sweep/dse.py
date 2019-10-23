@@ -3,8 +3,11 @@
 import sys, os, h5py, math, GPUtil, socket
 from itertools import cycle, product, count
 #CUDA Imports
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 #Dsweep imports
 from dcore import dcore,decomp,functions,sgs
 from ccore import source, printer
@@ -90,20 +93,26 @@ def dsweep_engine():
             node_id = np.arange(0,cluster_comm.Get_size(),1,dtype=np.intc)
         node_id = cluster_comm.scatter(node_id)
         #Getting GPU information
-        node_info,total_num_gpus,num_gpus = dcore.get_gpu_info(node_id,cluster_comm,AF,exid,processors)
+        node_info,total_num_gpus,num_gpus,gpu_rank = dcore.get_gpu_info(node_id,cluster_comm,AF,exid,processors,node_comm.Get_size())
         ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
+        [gpu_rank.append((False,None)) for i in range(len(node_ranks)-len(gpu_rank))]
         #Testing ranks and number of gpus to ensure simulation is viable
         assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
         assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
     else:
+        total_num_gpus,node_info,gpu_rank = None,None,None
         ranks_to_remove = []
-
+    #Broadcasting
+    total_num_gpus = comm.bcast(total_num_gpus)
+    node_info = comm.bcast(node_info)
     node_ranks = node_comm.bcast(node_ranks)
     #----------------------__Removing Unwanted MPI Processes------------------------#
-    # node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
-    # if rank == node_master:
-    #     #Checking to ensure that there are enough
-    #     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
+    node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
+    gpu_rank = node_comm.scatter(gpu_rank)
+
+    if rank == node_master:
+        #Checking to ensure that there are enough
+        assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     # #Broad casting to node
     # node_rows = node_comm.bcast(node_rows)
     # nidx = node_comm.bcast(nidx)

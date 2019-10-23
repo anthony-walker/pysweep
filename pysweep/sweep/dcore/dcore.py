@@ -21,11 +21,12 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     return hdf5_file
 
-def get_gpu_info(node_id,cluster_comm,AF,exid,processors):
+def get_gpu_info(node_id,cluster_comm,AF,exid,processors,ns):
     """Use this function to split data amongst nodes."""
     #Assert that the total number of blocks is an integer
     if AF>0:
-        gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
+        lim = ns if AF==1 else ns-1
+        gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=lim) #getting devices by load
         gpu_rank = [(True,id) for id in gpu_rank]
         num_gpus = len(gpu_rank)
     else:
@@ -34,7 +35,9 @@ def get_gpu_info(node_id,cluster_comm,AF,exid,processors):
     total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
     node_info = cluster_comm.allgather((node_id,num_gpus))
     node_info = sorted(node_info, key = lambda x: x[1]) #Sort based on num gpus
-    return node_info,total_num_gpus,num_gpus
+    return node_info,total_num_gpus,num_gpus,gpu_rank
+
+
 def find_remove_ranks(node_ranks,AF,num_gpus):
     """Use this function to find ranks that need removed."""
     ranks_to_remove = list()

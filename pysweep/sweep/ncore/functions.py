@@ -2,8 +2,11 @@
 #This file contains all of the necessary functions for implementing the swept rule.
 import numpy as np
 import sys
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    print(e)
 from itertools import repeat
 from .mplambda import sweep_lambda
 from .block import rebuild_blocks
