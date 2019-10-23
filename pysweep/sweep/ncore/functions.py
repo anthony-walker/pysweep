@@ -6,7 +6,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 from itertools import repeat
 from .mplambda import sweep_lambda
 from .block import rebuild_blocks

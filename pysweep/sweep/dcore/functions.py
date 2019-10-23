@@ -6,7 +6,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 import numpy as np
 
 def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):

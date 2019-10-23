@@ -15,7 +15,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 #C
 from ctypes import *
 #From PySweep

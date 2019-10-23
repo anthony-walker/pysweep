@@ -7,7 +7,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 #----------------------------------Globals-------------------------------------#
 gamma = 0
 dtdx = 0

@@ -7,7 +7,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 #System imports
 import os.path as op
 import inspect

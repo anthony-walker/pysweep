@@ -6,7 +6,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 
 def step(state,iidx,ts,gts):
     """This is the method that will be called by the swept solver.

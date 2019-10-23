@@ -5,7 +5,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 from .decomp_lambda import decomp_lambda
 #MPI imports
 from mpi4py import MPI

@@ -19,9 +19,12 @@ import numpy as np
 from collections import deque
 
 #CUDA Imports
-import pycuda.driver as cuda
-import pycuda.autoinit  #Cor debugging only
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    import pycuda.autoinit  #Cor debugging only
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    pass
 # import pycuda.gpuarray as gpuarray
 
 #MPI imports

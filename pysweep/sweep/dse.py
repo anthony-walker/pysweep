@@ -111,7 +111,6 @@ def dsweep_engine():
     #----------------------__Removing Unwanted MPI Processes------------------------#
     node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
     gpu_rank = node_comm.scatter(gpu_rank)
-
     if rank == node_master:
         #Checking to ensure that there are enough
         assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
