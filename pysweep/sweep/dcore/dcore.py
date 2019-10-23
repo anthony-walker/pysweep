@@ -3,7 +3,7 @@
 #This file is for global variable initialization
 from dcore import block, decomp, sgs
 from ccore import source
-import h5py, os
+import h5py, os, GPUtil
 import numpy as np
 from mpi4py import MPI
 
@@ -20,6 +20,28 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
     if rank == cluster_master:
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     return hdf5_file
+
+def get_gpu_info(node_id,cluster_comm,AF,exid,processors):
+    """Use this function to split data amongst nodes."""
+    #Assert that the total number of blocks is an integer
+    if AF>0:
+        gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
+        gpu_rank = [(True,id) for id in gpu_rank]
+        num_gpus = len(gpu_rank)
+    else:
+        gpu_rank = []
+        num_gpus = 0
+    total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
+    node_info = cluster_comm.allgather((node_id,num_gpus))
+    node_info = sorted(node_info, key = lambda x: x[1]) #Sort based on num gpus
+    return node_info,total_num_gpus,num_gpus
+def find_remove_ranks(node_ranks,AF,num_gpus):
+    """Use this function to find ranks that need removed."""
+    ranks_to_remove = list()
+    while len(node_ranks) > num_gpus+(1-int(AF)):
+        ranks_to_remove.append(node_ranks.pop())
+    return ranks_to_remove
+
 
 def cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS,total_cpu_block,):
     """Use this function to execute core cpu only processes"""
@@ -58,11 +80,10 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO):
     del cpu_SM
     return blocks,block_shape,GRD,garr
 
-def mpi_destruction(rank,node_ranks,node_rows,comm,ranks_to_remove,all_ranks,nidx,node_row_list):
+def mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks):
     """Use this to destory unwanted mpi processes."""
     [all_ranks.remove(x) for x in set([x[0] for x in comm.allgather(ranks_to_remove) if x])]
     comm.Barrier()
-
     #Remaking comms
     if rank in all_ranks:
         #New Global comm
@@ -75,11 +96,7 @@ def mpi_destruction(rank,node_ranks,node_rows,comm,ranks_to_remove,all_ranks,nid
         MPI.Finalize()
         exit(0)
     comm.Barrier()
-    #Broad casting to node
-    node_rows = node_comm.bcast(node_rows)
-    nidx = node_comm.bcast(nidx)
-    node_row_list = node_comm.bcast(node_row_list)
-    return node_rows,nidx,node_row_list,node_comm,comm
+    return node_comm,comm
 
 def block_dissem(rank,node_master,shared_shape,rows_per_gpu,BS,num_gpus,OPS,node_ranks,gpu_rank,node_comm):
     """Use this function to spread blocks to ranks."""
