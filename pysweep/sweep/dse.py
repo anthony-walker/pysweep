@@ -91,6 +91,8 @@ def dsweep_engine():
         #Giving each node an id
         if cluster_master == rank:
             node_id = np.arange(0,cluster_comm.Get_size(),1,dtype=np.intc)
+        else:
+            node_id = None
         node_id = cluster_comm.scatter(node_id)
         #Getting GPU information
         node_info,total_num_gpus,num_gpus,gpu_rank = dcore.get_gpu_info(node_id,cluster_comm,AF,exid,processors,node_comm.Get_size())

@@ -2,7 +2,7 @@ from pysweep.sweep.distsweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
-    nx = ny = 36
+    nx = ny = 360
     bs = 12
     t0 = 0
     tf = 0.1
