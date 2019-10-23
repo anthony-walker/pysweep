@@ -7,7 +7,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e)
+    pass
 #Dsweep imports
 from dcore import dcore,decomp,functions,sgs
 from ccore import source, printer
@@ -104,20 +104,18 @@ def dsweep_engine():
     else:
         total_num_gpus,node_info,gpu_rank = None,None,None
         ranks_to_remove = []
-    #Broadcasting
+    #Broadcasting gpu information
     total_num_gpus = comm.bcast(total_num_gpus)
-    node_info = comm.bcast(node_info)
     node_ranks = node_comm.bcast(node_ranks)
     #----------------------__Removing Unwanted MPI Processes------------------------#
     node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
     gpu_rank = node_comm.scatter(gpu_rank)
+
+    #Checking to ensure that there are enough
+    assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     if rank == node_master:
-        #Checking to ensure that there are enough
-        assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
-    # #Broad casting to node
-    # node_rows = node_comm.bcast(node_rows)
-    # nidx = node_comm.bcast(nidx)
-    # node_row_list = node_comm.bcast(node_row_list)
+        print(node_info)
+
 
     #Get total number of blocks
     total_num_gpus = node_comm

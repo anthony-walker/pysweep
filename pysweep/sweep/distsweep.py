@@ -69,7 +69,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     proc_mult = comm.bcast(proc_mult,root=master_rank)
     comm.Barrier()
     num_procs = int(proc_mult*comm.Get_size())
-    Spawning MPI processes
+    # Spawning MPI processes
     if rank == master_rank:
         MPI.COMM_SELF.Spawn(sys.executable,args=['./pysweep/sweep/dse.py'],maxprocs=num_procs)
     else:
