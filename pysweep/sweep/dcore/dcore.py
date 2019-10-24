@@ -21,23 +21,48 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     return hdf5_file
 
-def get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,exid,processors,ns):
+def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,arr_shape):
     """Use this function to split data amongst nodes."""
     #Assert that the total number of blocks is an integer
+    tnc = cluster_comm.Get_size()
     if AF>0:
         lim = ns if AF==1 else ns-1
         gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=lim) #getting devices by load
-        gpu_rank = [(True,id) for id in gpu_rank]
         num_gpus = len(gpu_rank)
     else:
         gpu_rank = []
         num_gpus = 0
-    gpus = cluster_comm.allgather(gpu_rank)
-    print(gpus)
-    total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
-    node_info = cluster_comm.allgather((node_id,num_gpus))
-    node_info = sorted(node_info, key = lambda x: x[1]) #Sort based on num gpus
-    return node_info,total_num_gpus,num_gpus,gpu_rank
+    j = np.arange(tnc+1,0,-1,dtype=np.intc) if AF < 1 else np.zeros(tnc,dtype=np.intc)
+    nids,ngl = zip(*[(0,0)]+cluster_comm.allgather((nid,num_gpus)))
+    i = [0]+[ngl[i]+sum(ngl[:i]) if ngl[i]>0 else 0 for i in range(1,len(ngl))]
+    # node_info = list(zip(i,j))
+    print(i,j)
+    tng = np.sum(ngl)
+    NB = np.prod(arr_shape[1:])/np.prod(BS)
+    NR = arr_shape[1]/BS[0]
+    assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
+    GNR = np.ceil(NR*AF)
+    CNR = NR-GNR
+    k = (GNR-GNR%tng)/tng
+    n = GNR%tng
+    m = tng-n
+    assert (k+1)*n+k*m == GNR, "GPU: Problem with decomposition."
+    kc = (CNR-CNR%tnc)/tnc
+    nc = CNR%tnc
+    mc = tnc-nc
+    assert (kc+1)*nc+kc*mc == CNR
+
+    x = i[nid]
+    y = j[nid]
+    print(kc,nc,mc)
+    print(y,nc)
+    print(mc,y)
+    Rg = (k+1)*n+k*(x-m) if x > n else (k+1)*x
+    Rc = (kc+1)*nc+kc*(y-mc) if y > nc else (kc+1)*y
+    print(Rg,Rc)
+    # node_info = cluster_comm.allgather((nid,num_gpus))
+    # node_info = sorted(node_info, key = lambda x: x[1]) #Sort based on num gpus
+    # return node_info,total_num_gpus,num_gpus,gpu_rank
 
 
 def find_remove_ranks(node_ranks,AF,num_gpus):

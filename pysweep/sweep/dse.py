@@ -90,35 +90,33 @@ def dsweep_engine():
     if node_master == rank:
         #Giving each node an id
         if cluster_master == rank:
-            node_id = np.arange(0,cluster_comm.Get_size(),1,dtype=np.intc)
+            node_id = np.arange(1,cluster_comm.Get_size()+1,1,dtype=np.intc)
         else:
             node_id = None
         node_id = cluster_comm.scatter(node_id)
         #Getting GPU information
-        node_info,total_num_gpus,num_gpus,gpu_rank = dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,exid,processors,node_comm.Get_size())
-        ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
-        [gpu_rank.append((False,None)) for i in range(len(node_ranks)-len(gpu_rank))]
-        #Testing ranks and number of gpus to ensure simulation is viable
-        assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
-        assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
+        # node_info,total_num_gpus,num_gpus,gpu_rank =
+        dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,BS,exid,processors,node_comm.Get_size(),arr0.shape)
+        # ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
+        # [gpu_rank.append(None) for i in range(len(node_ranks)-len(gpu_rank))]
+        # #Testing ranks and number of gpus to ensure simulation is viable
+        # assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
+        # assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
     else:
-        total_num_gpus,node_info,gpu_rank = None,None,None
+        total_num_gpus,node_info,gpu_rank,node_id = None,None,None,None
         ranks_to_remove = []
-    #Broadcasting gpu information
-    total_num_gpus = comm.bcast(total_num_gpus)
-    node_ranks = node_comm.bcast(node_ranks)
-    #----------------------__Removing Unwanted MPI Processes------------------------#
-    node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
-    gpu_rank = node_comm.scatter(gpu_rank)
-    #Checking to ensure that there are enough
-    assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
-    if rank == node_master:
-        print(node_info)
-    #Get total number of blocks
-    total_num_gpus = node_comm
-    NB = np.prod(arr0.shape[1:])/np.prod(BS)
-    NR = arr0.shape[1]/BS[0]
-    assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
+    # #Broadcasting gpu information
+    # total_num_gpus = comm.bcast(total_num_gpus)
+    # node_ranks = node_comm.bcast(node_ranks)
+    # node_id = node_comm.bcast(node_id)
+    # print(gpu_rank,node_id,node_info)
+    # #----------------------__Removing Unwanted MPI Processes------------------------#
+    # node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
+    # gpu_rank = node_comm.scatter(gpu_rank)
+    # decomp.nsplit(rank,node_master,node_comm,total_num_gpus,AF,BS,arr0.shape)
+    # #Checking to ensure that there are enough
+    # assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
+
 
     #------------------------Getting Avaliable Architecture and Decomposing Data-------------------------------#
     # dcore.get_gpu_info(node_master,cluster_master,rank,cluster_comm,AF,exid,processors,node_ranks)

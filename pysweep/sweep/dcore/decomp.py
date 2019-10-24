@@ -118,11 +118,18 @@ def create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,ops):
     return gpu_blocks, cpu_blocks, total_cpu_block
 
 
-def nsplit(rank,cluster_comm,AF,BS,exid,processors):
+def nsplit(rank,node_master,node_comm,total_num_gpus,AF,BS,arr_shape):
     """Use this function to split data amongst nodes."""
-    num_cpus = 1
-
-
+    NB = np.prod(arr_shape[1:])/np.prod(BS)
+    NR = arr_shape[1]/BS[0]
+    assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
+    GNR = np.ceil(NR*AF)
+    CNR = NR-GNR
+    k = (GNR-GNR%tng)/tng
+    n = GNR%tng
+    m = tng-n
+    assert (k+1)*n+k*m == GNR
+    
 
 
 def node_split(nodes,node,master_node,num_block_rows,AF,total_num_cores,num_cores,total_num_gpus,num_gpus):
