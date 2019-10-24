@@ -32,11 +32,11 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     else:
         gpu_rank = []
         num_gpus = 0
-    j = np.arange(tnc+1,0,-1,dtype=np.intc) if AF < 1 else np.zeros(tnc,dtype=np.intc)
+    j = np.arange(0,tnc+1,1,dtype=np.intc) if AF < 1 else np.zeros(tnc,dtype=np.intc)
     nids,ngl = zip(*[(0,0)]+cluster_comm.allgather((nid,num_gpus)))
-    i = [0]+[ngl[i]+sum(ngl[:i]) if ngl[i]>0 else 0 for i in range(1,len(ngl))]
+    i = [0]+[ngl[i]+sum(ngl[:i]) for i in range(1,len(ngl))]
+    # if ngl[i]>0 else 0
     # node_info = list(zip(i,j))
-    print(i,j)
     tng = np.sum(ngl)
     NB = np.prod(arr_shape[1:])/np.prod(BS)
     NR = arr_shape[1]/BS[0]
@@ -50,19 +50,19 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     kc = (CNR-CNR%tnc)/tnc
     nc = CNR%tnc
     mc = tnc-nc
-    assert (kc+1)*nc+kc*mc == CNR
-
-    x = i[nid]
-    y = j[nid]
-    print(kc,nc,mc)
-    print(y,nc)
-    print(mc,y)
-    Rg = (k+1)*n+k*(x-m) if x > n else (k+1)*x
-    Rc = (kc+1)*nc+kc*(y-mc) if y > nc else (kc+1)*y
-    print(Rg,Rc)
-    # node_info = cluster_comm.allgather((nid,num_gpus))
-    # node_info = sorted(node_info, key = lambda x: x[1]) #Sort based on num gpus
-    # return node_info,total_num_gpus,num_gpus,gpu_rank
+    assert (kc+1)*nc+kc*mc == CNR, "CPU: Problem with decomposition."
+    GRF = lambda x: (k+1)*n+k*(x-n) if x > n else (k+1)*x
+    CRF = lambda y: (kc)*mc+(kc+1)*(y-mc) if y > mc else (kc)*y
+    # print(GRF(i[nid-1]),CRF(j[nid]))
+    gL = GRF(i[nid-1])
+    gU = GRF(i[nid])
+    cL = CRF(j[nid-1])
+    cU = CRF(j[nid])
+    rLow = gL+cL
+    rHigh= gU+cU
+    gMag = gU-gL
+    cMag = cU-cL
+    return gpu_rank,tng,num_gpus,(rLow,rHigh,gMag,cMag)
 
 
 def find_remove_ranks(node_ranks,AF,num_gpus):
