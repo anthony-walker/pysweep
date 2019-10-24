@@ -140,7 +140,7 @@ def dsweep_engine():
         blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     #------------------------------HDF5 File------------------------------------------#
-    hdf5_file = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
+    # hdf5_file = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     cwt = 1 #Current write time
     comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
@@ -157,7 +157,7 @@ def dsweep_engine():
         cuda_context.pop()
 
     comm.Barrier()
-    hdf5_file.close()
+    # hdf5_file.close()
 
 
 
