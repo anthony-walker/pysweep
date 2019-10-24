@@ -115,18 +115,17 @@ def dsweep_engine():
 
     #Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
-
-    # #---------------------------Creating and Filling Shared Array-------------#
-    # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
-    # sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
-    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
-    # #Filling shared array
-    # if rank == node_master:
-    #     sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
-    # #Making blocks match array other dimensions
-    # bsls = [slice(0,i,1) for i in shared_shape]
-    # blocks = (bsls[0],bsls[1],blocks,bsls[3])
-    # GRB = True if gpu_rank is not None else False
+    #---------------------------Creating and Filling Shared Array-------------#
+    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
+    sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
+    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
+    #Filling shared array
+    if rank == node_master:
+        sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
+    #Making blocks match array other dimensions
+    bsls = [slice(0,i,1) for i in shared_shape]
+    blocks = (bsls[0],bsls[1],blocks,bsls[3])
+    GRB = True if gpu_rank is not None else False
     # ------------------- Operations specifically for GPus and CPUs------------------------#
     # if GRB:
     #     # Creating cuda device and context
