@@ -95,7 +95,7 @@ def dsweep_engine():
             node_id = None
         node_id = cluster_comm.scatter(node_id)
         #Getting GPU information
-        node_info,total_num_gpus,num_gpus,gpu_rank = dcore.get_gpu_info(node_id,cluster_comm,AF,exid,processors,node_comm.Get_size())
+        node_info,total_num_gpus,num_gpus,gpu_rank = dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,exid,processors,node_comm.Get_size())
         ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
         [gpu_rank.append((False,None)) for i in range(len(node_ranks)-len(gpu_rank))]
         #Testing ranks and number of gpus to ensure simulation is viable
@@ -110,13 +110,10 @@ def dsweep_engine():
     #----------------------__Removing Unwanted MPI Processes------------------------#
     node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
     gpu_rank = node_comm.scatter(gpu_rank)
-
     #Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     if rank == node_master:
         print(node_info)
-
-
     #Get total number of blocks
     total_num_gpus = node_comm
     NB = np.prod(arr0.shape[1:])/np.prod(BS)

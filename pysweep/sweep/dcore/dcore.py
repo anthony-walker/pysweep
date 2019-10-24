@@ -21,7 +21,7 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     return hdf5_file
 
-def get_gpu_info(node_id,cluster_comm,AF,exid,processors,ns):
+def get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,exid,processors,ns):
     """Use this function to split data amongst nodes."""
     #Assert that the total number of blocks is an integer
     if AF>0:
@@ -32,6 +32,8 @@ def get_gpu_info(node_id,cluster_comm,AF,exid,processors,ns):
     else:
         gpu_rank = []
         num_gpus = 0
+    gpus = cluster_comm.allgather(gpu_rank)
+    print(gpus)
     total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
     node_info = cluster_comm.allgather((node_id,num_gpus))
     node_info = sorted(node_info, key = lambda x: x[1]) #Sort based on num gpus

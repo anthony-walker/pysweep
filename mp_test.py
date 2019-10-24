@@ -21,7 +21,7 @@ import os
 #     sarr[val,:,:] = val
 #
 # main_test()
-nx = ny = 12*13
+nx = ny = 12*37
 BS = (12,12,1)
 t0 = 0
 tf = 0.1
