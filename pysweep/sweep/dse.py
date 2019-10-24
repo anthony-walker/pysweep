@@ -127,36 +127,36 @@ def dsweep_engine():
     blocks = (bsls[0],bsls[1],blocks,bsls[3])
     GRB = True if gpu_rank is not None else False
     # ------------------- Operations specifically for GPus and CPUs------------------------#
-    # if GRB:
-    #     # Creating cuda device and context
-    #     cuda.init()
-    #     cuda_device = cuda.Device(gpu_rank)
-    #     cuda_context = cuda_device.make_context()
-    #     block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
-    #     mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
-    # else:
-    #     GRD,block_shape,garr = None,None,None
-    #     blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
-    #     mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
-    #------------------------------HDF5 File------------------------------------------#
-    # hdf5_file = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
+    if GRB:
+        # Creating cuda device and context
+        cuda.init()
+        cuda_device = cuda.Device(gpu_rank)
+        cuda_context = cuda_device.make_context()
+        block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
+        mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
+    else:
+        GRD,block_shape,garr = None,None,None
+        blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
+        mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
+    # ------------------------------HDF5 File------------------------------------------#
+    hdf5_file = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     cwt = 1 #Current write time
-    # comm.Barrier() #Ensure all processes are prepared to solve
-    #-------------------------------SWEPT RULE---------------------------------------------#
-    # pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
-    #-------------------------------FIRST PYRAMID-------------------------------------------#
-    # functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    # node_comm.Barrier()
-    # if rank == node_master:
-    #     for i in range(2,3,1):
-    #         print('-----------------------------------------')
-    #         printer.pm(sarr,i)
-    #Clean Up - Pop Cuda Contexts and Close Pool
-    # if GRB:
-    #     cuda_context.pop()
+    comm.Barrier() #Ensure all processes are prepared to solve
+    # -------------------------------SWEPT RULE---------------------------------------------#
+    pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
+    # -------------------------------FIRST PYRAMID-------------------------------------------#
+    functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    node_comm.Barrier()
+    if rank == node_master:
+        for i in range(2,3,1):
+            print('-----------------------------------------')
+            printer.pm(sarr,i)
+    # Clean Up - Pop Cuda Contexts and Close Pool
+    if GRB:
+        cuda_context.pop()
 
-    # comm.Barrier()
-    # hdf5_file.close()
+    comm.Barrier()
+    hdf5_file.close()
 
 
 
