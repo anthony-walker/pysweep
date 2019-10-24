@@ -116,47 +116,47 @@ def dsweep_engine():
     #Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
 
-    #---------------------------Creating and Filling Shared Array-------------#
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
-    sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
-    ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
-    #Filling shared array
-    if rank == node_master:
-        sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
-    #Making blocks match array other dimensions
-    bsls = [slice(0,i,1) for i in shared_shape]
-    blocks = (bsls[0],bsls[1],blocks,bsls[3])
-    GRB = True if gpu_rank is not None else False
+    # #---------------------------Creating and Filling Shared Array-------------#
+    # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
+    # sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
+    # ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
+    # #Filling shared array
+    # if rank == node_master:
+    #     sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
+    # #Making blocks match array other dimensions
+    # bsls = [slice(0,i,1) for i in shared_shape]
+    # blocks = (bsls[0],bsls[1],blocks,bsls[3])
+    # GRB = True if gpu_rank is not None else False
     # ------------------- Operations specifically for GPus and CPUs------------------------#
-    if GRB:
-        # Creating cuda device and context
-        cuda.init()
-        cuda_device = cuda.Device(gpu_rank)
-        cuda_context = cuda_device.make_context()
-        block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
-        mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
-    else:
-        GRD,block_shape,garr = None,None,None
-        blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
-        mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
+    # if GRB:
+    #     # Creating cuda device and context
+    #     cuda.init()
+    #     cuda_device = cuda.Device(gpu_rank)
+    #     cuda_context = cuda_device.make_context()
+    #     block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
+    #     mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
+    # else:
+    #     GRD,block_shape,garr = None,None,None
+    #     blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
+    #     mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     #------------------------------HDF5 File------------------------------------------#
     # hdf5_file = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     cwt = 1 #Current write time
-    comm.Barrier() #Ensure all processes are prepared to solve
+    # comm.Barrier() #Ensure all processes are prepared to solve
     #-------------------------------SWEPT RULE---------------------------------------------#
-    pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
+    # pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     #-------------------------------FIRST PYRAMID-------------------------------------------#
-    functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    node_comm.Barrier()
-    if rank == node_master:
-        for i in range(2,3,1):
-            print('-----------------------------------------')
-            printer.pm(sarr,i)
+    # functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    # node_comm.Barrier()
+    # if rank == node_master:
+    #     for i in range(2,3,1):
+    #         print('-----------------------------------------')
+    #         printer.pm(sarr,i)
     #Clean Up - Pop Cuda Contexts and Close Pool
-    if GRB:
-        cuda_context.pop()
+    # if GRB:
+    #     cuda_context.pop()
 
-    comm.Barrier()
+    # comm.Barrier()
     # hdf5_file.close()
 
 
