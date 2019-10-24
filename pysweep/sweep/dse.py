@@ -113,48 +113,6 @@ def dsweep_engine():
     gpu_rank = decomp.nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr0.shape,gpu_rank)
     #Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
-    print(gpu_rank)
-
-    #------------------------Getting Avaliable Architecture and Decomposing Data-------------------------------#
-    # dcore.get_gpu_info(node_master,cluster_master,rank,cluster_comm,AF,exid,processors,node_ranks)
-    # decomp.nsplit(node_master,cluster_master,rank,cluster_comm,AF,BS,exid,processors,node_ranks,arr0.shape)
-    # if node_master == rank:
-    #     if AF>0:
-    #         gpu_rank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=exid,limit=1e8) #getting devices by load
-    #         gpu_rank = [(True,id) for id in gpu_rank]
-    #         num_gpus = len(gpu_rank)
-    #     else:
-    #         gpu_rank = []
-    #         num_gpus = 0
-    #     num_cores -= num_gpus
-    #     ranks_to_remove = list()
-    #     #Finding ranks to remove - keeps 1 for GPU operations
-    #     while len(node_ranks) > num_gpus+(1-int(AF)):
-    #         ranks_to_remove.append(node_ranks.pop())
-    #     total_num_gpus = np.sum(cluster_comm.allgather(num_gpus))
-    #     #Testing ranks and number of gpus to ensure simulation is viable
-    #     assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
-    #     assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
-    #     #Get total number of blocks
-    #     NB = np.prod(arr0.shape[1:])/np.prod(BS)
-    #     assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
-    #     num_block_rows = arr0.shape[1]/BS[0]
-
-        #This function splits the rows among the nodes by affinity
-        # node_ids,node_row_list,rows_per_gpu =
-
-    #     node_row_list = [int(x) for x in node_row_list]
-    #     #Getting nodes in front and behind current node
-    #     nidx = node_ids.index(rank)
-    #     node_rows = node_row_list[nidx]
-    #     bidx = node_ids.index(-1) if  - 1 >= 0 else len(node_ids)-1
-    #     bnode = (node_ids[bidx],node_row_list[bidx])
-    #     fidx = node_ids.index(+1) if  + 1 < len(node_ids) else 0
-    #     fnode = (node_ids[fidx],node_row_list[fidx])
-    # else:
-    #     node_row_list,node_rows,nidx,rows_per_gpu,num_gpus,gpu_rank,total_num_gpus = None,None,None,None,None,None,None
-    #     ranks_to_remove = []
-    # node_ranks = node_comm.bcast(node_ranks)
 
     # #---------------------------Creating and Filling Shared Array-------------#
     # shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(node_rows*BS[0]),arr0.shape[2])

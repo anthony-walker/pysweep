@@ -33,10 +33,9 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
         gpu_rank = []
         num_gpus = 0
     j = np.arange(0,tnc+1,1,dtype=np.intc) if AF < 1 else np.zeros(tnc,dtype=np.intc)
-    nids,ngl = zip(*[(0,0)]+cluster_comm.allgather((nid,num_gpus)))
+    ranks,nids,ngl = zip(*[(0,0)]+cluster_comm.allgather((rank,nid,num_gpus)))
+    print(ranks)
     i = [0]+[ngl[i]+sum(ngl[:i]) for i in range(1,len(ngl))]
-    # if ngl[i]>0 else 0
-    # node_info = list(zip(i,j))
     tng = np.sum(ngl)
     NB = np.prod(arr_shape[1:])/np.prod(BS)
     NR = arr_shape[1]/BS[0]
