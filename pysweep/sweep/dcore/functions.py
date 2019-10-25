@@ -30,10 +30,10 @@ def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
         print(sgs.carr.shape)
-        print('--------------------------')
-        for x in cblocks:
-            print(x)
-        print('--------------------------')
+        # print('--------------------------')
+        # for x in cblocks:
+        #     print(x)
+        # print('--------------------------')
         # res = mpi_pool.map(dCPU_UpPyramid,cblocks)
         # mpi_pool.map(dCPU_Ybridge,xblocks)
 
