@@ -133,7 +133,6 @@ def dsweep_engine():
         cuda.init()
         cuda_device = cuda.Device(gpu_rank)
         cuda_context = cuda_device.make_context()
-        print(blocks)
         block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
         mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
     else:
@@ -150,10 +149,10 @@ def dsweep_engine():
     # -------------------------------FIRST PYRAMID-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
-    # if rank == node_master:
-    #     for i in range(2,4,1):
-    #         print('-----------------------------------------')
-    #         printer.pm(sarr,i)
+    if rank == node_master:
+        for i in range(2,4,1):
+            print('-----------------------------------------')
+            printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
