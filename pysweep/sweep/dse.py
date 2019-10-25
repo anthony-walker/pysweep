@@ -150,7 +150,7 @@ def dsweep_engine():
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     if rank == node_master:
-        for i in range(2,4,1):
+        for i in range(3,4,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
