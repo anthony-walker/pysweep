@@ -80,11 +80,12 @@ def read_input_file(comm):
     return arr0,gargs,swargs,GS,CS,filename,exid,dType
 
 
-def create_cpu_blocks(total_cpu_block,BS):
+def create_cpu_blocks(total_cpu_block,BS,shared_shape):
     """Use this function to create blocks."""
     row_range = np.arange(0,total_cpu_block[2].stop-total_cpu_block[2].start,BS[1],dtype=np.intc)
     column_range = np.arange(total_cpu_block[3].start,total_cpu_block[3].stop,BS[1],dtype=np.intc)
-    ntcb = (total_cpu_block[0],total_cpu_block[1],slice(0,total_cpu_block[2].stop-total_cpu_block[2].start,1),total_cpu_block[3])
+    xslice = slice(shared_shape[2]-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2],1)
+    ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,total_cpu_block[3])
     return [(total_cpu_block[0],total_cpu_block[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)],ntcb
 
 def create_escpu_blocks(cpu_blocks,shared_shape,BS):
