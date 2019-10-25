@@ -32,7 +32,7 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     else:
         gpu_rank = []
         num_gpus = 0
-    j = np.arange(0,tnc+1,1,dtype=np.intc) if AF < 1 else np.zeros(tnc,dtype=np.intc)
+    j = np.arange(0,tnc+1,1,dtype=np.intc) if AF < 1 else np.zeros(tnc+1,dtype=np.intc)
     ranks,nids,ngl = zip(*[(None,0,0)]+cluster_comm.allgather((rank,nid,num_gpus)))
     ranks = list(ranks)
     ranks[0] = ranks[-1] #Set first rank to last rank
