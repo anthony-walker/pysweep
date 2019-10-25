@@ -85,7 +85,7 @@ def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs,MPSS):
     sgs.down_sets = block.create_dist_down_sets(BS,OPS)
     sgs.oct_sets = sgs.down_sets+sgs.up_sets
     sgs.y_sets,sgs.x_sets = block.create_dist_bridge_sets(BS,OPS,MPSS)
-    print(sarr.shape)
+    print(sarr.shape,total_cpu_block)
     sgs.carr = decomp.create_shared_pool_array(sarr[total_cpu_block].shape)
     sgs.carr[:,:,:,:] = sarr[total_cpu_block]
     return blocks,total_cpu_block
