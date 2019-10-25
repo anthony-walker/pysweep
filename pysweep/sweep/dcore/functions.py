@@ -29,10 +29,16 @@ def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
-        res = mpi_pool.map(dCPU_UpPyramid,cblocks)
-        mpi_pool.map(dCPU_Ybridge,xblocks)
+        print(sgs.carr.shape)
+        print('--------------------------')
+        for x in cblocks:
+            print(x)
+        print('--------------------------')
+        # res = mpi_pool.map(dCPU_UpPyramid,cblocks)
+        # mpi_pool.map(dCPU_Ybridge,xblocks)
+
         #Copy result to MPI shared process array
-        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        # sarr[total_cpu_block] = sgs.carr[:,:,:,:]
 
 def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
     """
@@ -55,17 +61,21 @@ def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
-        mpi_pool.map(dCPU_UpPyramid,cblocks)
-        mpi_pool.map(dCPU_Ybridge,xblocks)
+        print(sgs.carr.shape)
+        print('--------------------------')
+        for x in cblocks:
+            print(x)
+        print('--------------------------')
+        # mpi_pool.map(dCPU_UpPyramid,cblocks)
+        # mpi_pool.map(dCPU_Ybridge,xblocks)
         #Copy result to MPI shared process array
-        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        # sarr[total_cpu_block] = sgs.carr[:,:,:,:]
 
 
 def dCPU_UpPyramid(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
     ct = sgs.gts
-    print(block)
     for ts,swept_set in enumerate(sgs.up_sets,start=sgs.TSO-1):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
