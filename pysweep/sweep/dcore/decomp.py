@@ -39,6 +39,12 @@ def create_shared_pool_array(shared_shape):
     sarr = sarr.reshape(shared_shape)
     return sarr
 
+# def create_shared_array(sarr):
+#    """Use this to create shared memory array, requires 3.8 which has yet to be released"""
+#     shm = mp.shared_memory.SharedMemory(create=True,size=sarr.nbytes)
+#     return np.ndarray(sarr.shape,dtype=sarr.dtype,buffer=shm.buf)
+
+
 def create_shared_mpi_array(comm,arr_shape,dType,arr_bytes):
     """Use this function to create shared memory arrays for node communication."""
     itemsize = int(dType.itemsize)

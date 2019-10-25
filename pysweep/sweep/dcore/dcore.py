@@ -63,7 +63,7 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     rHigh= gU+cU
     gMag = gU-gL
     cMag = cU-cL
-    return gpu_rank,tng,num_gpus,(rLow,rHigh,gMag,cMag),(ranks[nid-1],ranks[nid+1])
+    return gpu_rank,tng,num_gpus,(rLow,rHigh,gMag,cMag),(ranks[nid-1],ranks[nid+1]),GNR,CNR
 
 
 def find_remove_ranks(node_ranks,AF,num_gpus):
@@ -103,6 +103,7 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO):
     TIMES = VARS*NV
     const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
     garr = decomp.create_local_gpu_array(block_shape)
+    # print(block_shape)
     #Building CUDA source code
     sgs.SM = source.build_gpu_source(GS,os.path.basename(__file__))
     source.swept_constant_copy(sgs.SM,const_dict)

@@ -96,12 +96,13 @@ def dsweep_engine():
         node_id = cluster_comm.scatter(node_id)
         #Getting GPU information
         # node_info,total_num_gpus,num_gpus,gpu_rank =
-        gpu_rank,total_num_gpus, num_gpus, node_info, comranks = dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,BS,exid,processors,node_comm.Get_size(),arr0.shape)
+        gpu_rank,total_num_gpus, num_gpus, node_info, comranks, GNR,CNR = dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,BS,exid,processors,node_comm.Get_size(),arr0.shape)
         ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
         [gpu_rank.append(None) for i in range(len(node_ranks)-len(gpu_rank))]
         #Testing ranks and number of gpus to ensure simulation is viable
         assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
         assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
+        assert total_num_gpus <= GNR if AF > 0 else True, "Not enough rows for the number of GPUS, added more GPU rows, increase affinity, or exclude GPUs."
     else:
         total_num_gpus,node_info,gpu_rank,node_id,num_gpus = None,None,None,None,None
         ranks_to_remove = []
@@ -144,11 +145,12 @@ def dsweep_engine():
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
+    # print(garr)
     # -------------------------------FIRST PYRAMID-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     # if rank == node_master:
-    #     for i in range(2,3,1):
+    #     for i in range(2,4,1):
     #         print('-----------------------------------------')
     #         printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
