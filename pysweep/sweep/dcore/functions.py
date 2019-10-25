@@ -65,6 +65,7 @@ def dCPU_UpPyramid(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
     ct = sgs.gts
+    print(block)
     for ts,swept_set in enumerate(sgs.up_sets,start=sgs.TSO-1):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
