@@ -29,7 +29,7 @@ def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
-        print(sgs.carr.shape)
+        # print(sgs.carr.shape)
         # print('--------------------------')
         # for x in cblocks:
         #     print(x)

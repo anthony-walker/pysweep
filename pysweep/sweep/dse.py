@@ -133,6 +133,7 @@ def dsweep_engine():
         cuda.init()
         cuda_device = cuda.Device(gpu_rank)
         cuda_context = cuda_device.make_context()
+        print(blocks)
         block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
         mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
     else:
