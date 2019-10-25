@@ -77,7 +77,8 @@ def find_remove_ranks(node_ranks,AF,num_gpus):
 
 def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs,MPSS):
     """Use this function to execute core cpu only processes"""
-    blocks = decomp.create_escpu_blocks(decomp.create_cpu_blocks(total_cpu_block,BS),shared_shape,BS)
+    blocks,total_cpu_block = decomp.create_cpu_blocks(total_cpu_block,BS)
+    blocks = decomp.create_escpu_blocks(blocks,shared_shape,BS)
     sgs.SM = source.build_cpu_source(CS) #Building Python source code
     sgs.SM.set_globals(GRB,sgs.SM,*gargs)
     #Creating sets for cpu calculation

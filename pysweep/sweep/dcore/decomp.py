@@ -84,7 +84,8 @@ def create_cpu_blocks(total_cpu_block,BS):
     """Use this function to create blocks."""
     row_range = np.arange(0,total_cpu_block[2].stop-total_cpu_block[2].start,BS[1],dtype=np.intc)
     column_range = np.arange(total_cpu_block[3].start,total_cpu_block[3].stop,BS[1],dtype=np.intc)
-    return [(total_cpu_block[0],total_cpu_block[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)]
+    ntcb = (total_cpu_block[0],total_cpu_block[1],slice(0,total_cpu_block[2].stop-total_cpu_block[2].start,1),total_cpu_block[3])
+    return [(total_cpu_block[0],total_cpu_block[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)],ntcb
 
 def create_escpu_blocks(cpu_blocks,shared_shape,BS):
     """Use this function to create shift blocks and edge blocks."""
