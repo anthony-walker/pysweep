@@ -2,7 +2,7 @@ from pysweep.sweep.distsweep import dsweep
 import numpy as np
 
 if __name__ == "__main__":
-    nx = ny = 120
+    nx = ny = 48
     bs = 12
     t0 = 0
     tf = 0.1
@@ -20,10 +20,10 @@ if __name__ == "__main__":
     Y = 1
     tso = 2
     ops = 2
-    aff = 0.5 #Dimensions and steps
+    aff = 0.25 #Dimensions and steps
     dx = X/nx
     dy = Y/ny
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./pysweep/equations/eqt.h","./pysweep/equations/eqt.py")
-    dsweep(arr,gargs,swargs,filename="test",exid=[])
+    dsweep(arr,gargs,swargs,filename="test",exid=[1])

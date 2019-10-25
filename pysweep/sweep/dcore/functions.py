@@ -29,7 +29,7 @@ def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
-        mpi_pool.map(dCPU_UpPyramid,cblocks)
+        res = mpi_pool.map(dCPU_UpPyramid,cblocks)
         mpi_pool.map(dCPU_Ybridge,xblocks)
         #Copy result to MPI shared process array
         sarr[total_cpu_block] = sgs.carr[:,:,:,:]
