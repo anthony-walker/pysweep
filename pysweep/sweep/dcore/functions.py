@@ -9,6 +9,7 @@ except Exception as e:
     pass
 import numpy as np
 
+
 def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
@@ -65,7 +66,6 @@ def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
         #Copy result to MPI shared process array
         # sarr[total_cpu_block] = sgs.carr[:,:,:,:]
 
-
 def dCPU_UpPyramid(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
@@ -82,3 +82,17 @@ def dCPU_Ybridge(block):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
+
+def send_forward(NMB,cluster_comm,comranks,sarr,spx):
+    """Use this function to communicate data between nodes"""
+    if NMB:
+        buff = np.copy(sarr[:,:,-spx:,:])
+        buffer = cluster_comm.sendrecv(sendobj=buff,dest=comranks[1],source=comranks[0])
+        cluster_comm.Barrier()
+        sarr[:,:,spx:,:] = sarr[:,:,:-spx,:] #Shift sarr data by spx
+        sarr[:,:,:spx,:] = buffer[:,:,:,:]
+
+
+def send_backward(cluster_comm,comranks,sarr,spx):
+    """Use this function to communicate data between nodes"""
+    print(spx)

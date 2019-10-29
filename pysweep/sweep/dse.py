@@ -57,7 +57,7 @@ def dsweep_engine():
     BS = (BS,BS,1)
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
-    SPLITX = int(BS[ZERO]/TWO)+OPS   #Split computation shift - add OPS
+    SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
     SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
     MPSS = int(BS[0]/(2*OPS)-1)
     MOSS = 2*MPSS
@@ -76,6 +76,7 @@ def dsweep_engine():
     node_group = comm.group.Incl(node_ranks)
     node_comm = comm.Create_group(node_group)
     node_master = node_ranks[0]
+    NMB = rank == node_master
     #Create cluster comm
     cluster_ranks = list(set(comm.allgather(node_master)))
     cluster_master = cluster_ranks[0]
@@ -87,7 +88,7 @@ def dsweep_engine():
     num_cpus = 1 #Each rank will always have 1 cpu
     num_cores = os.cpu_count()
     total_num_cores = num_cores*total_num_cpus #Assumes all nodes have the same number of cores in CPU
-    if node_master == rank:
+    if NMB:
         #Giving each node an id
         if cluster_master == rank:
             node_id = np.arange(1,cluster_comm.Get_size()+1,1,dtype=np.intc)
@@ -119,7 +120,7 @@ def dsweep_engine():
     sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Filling shared array
-    if rank == node_master:
+    if NMB:
         sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
     #Making blocks match array other dimensions
     bsls = [slice(0,i,1) for i in shared_shape]
@@ -147,7 +148,9 @@ def dsweep_engine():
     # -------------------------------FIRST PYRAMID-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
-    if rank == node_master:
+    functions.send_forward(NMB,cluster_comm,comranks,sarr,SPLITX)
+    node_comm.Barrier()
+    if NMB:
         for i in range(3,4,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
