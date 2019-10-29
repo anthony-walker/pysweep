@@ -95,7 +95,6 @@ def dsweep_engine():
             node_id = None
         node_id = cluster_comm.scatter(node_id)
         #Getting GPU information
-        # node_info,total_num_gpus,num_gpus,gpu_rank =
         gpu_rank,total_num_gpus, num_gpus, node_info, comranks, GNR,CNR = dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,BS,exid,processors,node_comm.Get_size(),arr0.shape)
         ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
         [gpu_rank.append(None) for i in range(len(node_ranks)-len(gpu_rank))]
@@ -113,7 +112,6 @@ def dsweep_engine():
     #----------------------__Removing Unwanted MPI Processes------------------------#
     node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
     gpu_rank,blocks = decomp.nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr0.shape,gpu_rank)
-
     #Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     #---------------------------Creating and Filling Shared Array-------------#
