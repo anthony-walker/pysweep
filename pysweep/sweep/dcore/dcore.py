@@ -44,8 +44,8 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     assert (NB).is_integer(), "Provided array dimensions is not divisible by the specified block size."
     GNR = np.ceil(NR*AF)
     CNR = NR-GNR
-    k = (GNR-GNR%tng)/tng
-    n = GNR%tng
+    k = (GNR-GNR%tng)/tng if tng!=0 else 0.0
+    n = GNR%tng if tng!=0 else 0.0
     m = tng-n
     assert (k+1)*n+k*m == GNR, "GPU: Problem with decomposition."
     kc = (CNR-CNR%tnc)/tnc
@@ -54,7 +54,6 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     assert (kc+1)*nc+kc*mc == CNR, "CPU: Problem with decomposition."
     GRF = lambda x: (k+1)*n+k*(x-n) if x > n else (k+1)*x
     CRF = lambda y: (kc)*mc+(kc+1)*(y-mc) if y > mc else (kc)*y
-    # print(GRF(i[nid-1]),CRF(j[nid]))
     gL = GRF(i[nid-1])
     gU = GRF(i[nid])
     cL = CRF(j[nid-1])

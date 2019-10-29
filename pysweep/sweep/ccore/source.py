@@ -11,14 +11,14 @@ except Exception as e:
 #System imports
 import os.path as op
 import inspect
-import importlib
+import importlib.util as iu
 
 def build_cpu_source(cpu_source):
     """Use this function to build source module from cpu code."""
     module_name = cpu_source.split("/")[-1]
     module_name = module_name.split(".")[0]
-    spec = importlib.util.spec_from_file_location(module_name, cpu_source)
-    source_mod = importlib.util.module_from_spec(spec)
+    spec = iu.spec_from_file_location(module_name, cpu_source)
+    source_mod = iu.module_from_spec(spec)
     spec.loader.exec_module(source_mod)
     return source_mod
 
