@@ -48,7 +48,8 @@ def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
         arr_gpu = cuda.mem_alloc(garr.nbytes)
         garr = decomp.copy_s_to_g(sarr,garr,blocks,BS)
         cuda.memcpy_htod(arr_gpu,garr)
-        SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        SM.get_function("XBridge")(arr_gpu,np.int32(gts),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
+        SM.get_function("Octahedron")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
         SM.get_function("YBridge")(arr_gpu,np.int32(gts),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(garr,arr_gpu)
@@ -56,15 +57,10 @@ def UpPrism(sarr,garr,blocks,up_sets,x_sets,gts,pargs,mpi_pool,total_cpu_block):
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
         cblocks,xblocks = zip(*blocks)
-        print(sgs.carr.shape)
-        print('--------------------------')
-        for x in cblocks:
-            print(x)
-        print('--------------------------')
-        # mpi_pool.map(dCPU_UpPyramid,cblocks)
-        # mpi_pool.map(dCPU_Ybridge,xblocks)
+        mpi_pool.map(dCPU_UpPyramid,cblocks)
+        mpi_pool.map(dCPU_Ybridge,xblocks)
         #Copy result to MPI shared process array
-        # sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
 
 def dCPU_UpPyramid(block):
     """Use this function to build the Up Pyramid."""
@@ -83,6 +79,22 @@ def dCPU_Ybridge(block):
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
 
+def dCPU_Xbridge(block):
+    """Use this function to build the XBridge."""
+    ct = sgs.gts
+    for ts,swept_set in enumerate(sgs.y_sets,start=sgs.TSO-1):
+        #Calculating Step
+        sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
+        ct+=1
+
+def dCPU_Octahedron(block):
+    """Use this function to build the XBridge."""
+    ct = sgs.gts
+    for ts,swept_set in enumerate(sgs.y_sets,start=sgs.TSO-1):
+        #Calculating Step
+        sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
+        ct+=1
+
 def send_forward(NMB,cluster_comm,comranks,sarr,spx):
     """Use this function to communicate data between nodes"""
     if NMB:
@@ -91,7 +103,6 @@ def send_forward(NMB,cluster_comm,comranks,sarr,spx):
         cluster_comm.Barrier()
         sarr[:,:,spx:,:] = sarr[:,:,:-spx,:] #Shift sarr data forward by spx
         sarr[:,:,:spx,:] = buffer[:,:,:,:]
-
 
 def send_backward(NMB,cluster_comm,comranks,sarr,spx):
     """Use this function to communicate data between nodes"""
