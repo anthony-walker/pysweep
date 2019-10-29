@@ -155,13 +155,16 @@ def dsweep_engine():
     functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
     node_comm.Barrier()
 
-    functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    functions.UpPrismForward(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
-    # functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+    functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+    node_comm.Barrier()
+    #ADD SWEPT WRITE STEP HERE
+    # functions.UpPrismBackward(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     # node_comm.Barrier()
     # print(MPSS)
     if NMB:
-        for i in range(4,6,1):
+        for i in range(1,5,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool

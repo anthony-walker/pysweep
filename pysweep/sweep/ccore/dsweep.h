@@ -305,6 +305,66 @@ YBridge(float *state, int gts)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
+YBT(float *state, int gts)
+{
+    //Creating flattened shared array ptr (x,y,v) length
+    extern __shared__ float shared_state[];    //Shared state specified externally
+    shared_state_clear(shared_state);
+    __syncthreads();
+    //Other quantities for indexing
+    int tidx = threadIdx.x+OPS;
+    int tidy = threadIdx.y+OPS;
+    int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
+    int gid = get_bgid()+6+(MPSS+1)*TIMES; //global index
+    //Creating swept boundaries
+    int lx = OPS; //Lower x swept bound
+    int ux = blockDim.x-OPS; //upper x
+    int ly = blockDim.y/2-OPS; // Lower y swept bound
+    int uy = blockDim.y/2+OPS; //upper y
+    //Communicating interior points for TSO data and calculation data
+    for (int i = 0; i < NV; i++)
+    {
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+        shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
+    }
+    __syncthreads(); //Sync threads here to ensure all initial values are copied
+    for (int k = 0; k < MPSS; k++)
+    {
+        step(shared_state,sgid,gts);
+        // Solving step function
+        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
+        {
+            //Ensures steps are done prior to communication
+            for (int j = 0; j < NV; j++)
+            {
+                // Place values back in original matrix
+                state[gid+j*VARS+(k+1)*TIMES]=shared_state[sgid+j*SGIDS];
+            }
+        }
+        __syncthreads();
+        for (int j = 0; j < NV; j++)
+        {
+            //Copy latest step
+            shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
+            //Copy TSO Step Down
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+        }
+        gts += 1;   //Update gts
+        //Update swept bounds
+        lx+=OPS;
+        ux-=OPS;
+        ly-=OPS;
+        uy+=OPS;
+        __syncthreads(); //Sync threads here to ensure all initial values are copied
+    }
+
+}
+
+/*
+    Use this function to create and return the GPU Y-Bridge
+*/
+__global__ void
+__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 XBridge(float *state, int gts)
 {
     //Creating flattened shared array ptr (x,y,v) length
@@ -373,10 +433,10 @@ Octahedron(float *state, int gts)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
-    int gid = get_gid()+TSO*TIMES; //global index
+    int gid = get_bgid()+(TSO-1)*TIMES; //global index
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
-     // bool test_bool = threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x==0 && blockIdx.y==0;
+
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
     //Creating swept boundaries
     int lx =(blockDim.x+TOPS)/TWO-OPS; //lower x
@@ -390,7 +450,7 @@ Octahedron(float *state, int gts)
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     //Calculate Down Pyramid - Down Step
-    for (int k = 0; k <= MDSS; k++)
+    for (int k = 0; k < MDSS; k++)
     {
         step(shared_state,sgid,gts);
         // Solving step function
@@ -429,7 +489,7 @@ Octahedron(float *state, int gts)
     ux = blockDim.x+OPS; //upper x
     uy = blockDim.y+OPS; //upper y
     //Swept loop
-    for (int k = MDSS+ONE; k < MOSS; k++)
+    for (int k = MDSS; k < MOSS; k++)
     {
         //Update swept bounds - It is first here so it does not do the full base
         ux -= OPS;
