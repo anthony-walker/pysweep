@@ -151,6 +151,10 @@ def dsweep_engine():
     functions.send_forward(NMB,cluster_comm,comranks,sarr,SPLITX)
     node_comm.Barrier()
     if NMB:
+        sarr[:,:,:,:] += rank+1
+    node_comm.Barrier()
+    functions.send_backward(NMB,cluster_comm,comranks,sarr,SPLITX)
+    if NMB:
         for i in range(3,4,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)

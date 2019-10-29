@@ -83,16 +83,21 @@ def dCPU_Ybridge(block):
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
 
-def send_forward(NMB,cluster_comm,comranks,sgarr,spx):
+def send_forward(NMB,cluster_comm,comranks,sarr,spx):
     """Use this function to communicate data between nodes"""
     if NMB:
         buff = np.copy(sarr[:,:,-spx:,:])
         buffer = cluster_comm.sendrecv(sendobj=buff,dest=comranks[1],source=comranks[0])
         cluster_comm.Barrier()
-        sarr[:,:,spx:,:] = sarr[:,:,:-spx,:] #Shift sarr data by spx
+        sarr[:,:,spx:,:] = sarr[:,:,:-spx,:] #Shift sarr data forward by spx
         sarr[:,:,:spx,:] = buffer[:,:,:,:]
 
 
-def send_backward(cluster_comm,comranks,sarr,spx):
+def send_backward(NMB,cluster_comm,comranks,sarr,spx):
     """Use this function to communicate data between nodes"""
-    print(spx)
+    if NMB:
+        buff = np.copy(sarr[:,:,:spx,:])
+        buffer = cluster_comm.sendrecv(sendobj=buff,dest=comranks[0],source=comranks[1])
+        cluster_comm.Barrier()
+        sarr[:,:,:-spx,:] = sarr[:,:,spx:,:] #Shift sarr backward data by spx
+        sarr[:,:,-spx:,:] = buffer[:,:,:,:]
