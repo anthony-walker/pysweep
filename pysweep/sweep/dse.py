@@ -145,13 +145,13 @@ def dsweep_engine():
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
-    # print(garr)
+
     # -------------------------------FIRST PRISM-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
 
     #-------------------------------SWEPT LOOP--------------------------------------------#
-
+    # for i in range(MGST):
     functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
     node_comm.Barrier()
 
