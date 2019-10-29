@@ -60,6 +60,7 @@ def dsweep_engine():
     SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
     SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
     MPSS = int(BS[0]/(2*OPS)-1)
+    sgs.MPSS = MPSS
     MOSS = 2*MPSS
     time_steps = int((tf-t0)/dt)  #Number of time steps
     MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
@@ -104,7 +105,7 @@ def dsweep_engine():
         assert total_num_gpus > 0 if AF > 0 else True, "There are no avaliable GPUs"
         assert total_num_gpus <= GNR if AF > 0 else True, "Not enough rows for the number of GPUS, added more GPU rows, increase affinity, or exclude GPUs."
     else:
-        total_num_gpus,node_info,gpu_rank,node_id,num_gpus = None,None,None,None,None
+        total_num_gpus,node_info,gpu_rank,node_id,num_gpus,comranks = None,None,None,None,None,None
         ranks_to_remove = []
     #Broadcasting gpu information
     total_num_gpus = comm.bcast(total_num_gpus)
@@ -145,13 +146,22 @@ def dsweep_engine():
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     # print(garr)
-    # -------------------------------FIRST PYRAMID-------------------------------------------#
+    # -------------------------------FIRST PRISM-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
-    functions.send_forward(NMB,cluster_comm,comranks,sarr,SPLITX)
+
+    #-------------------------------SWEPT LOOP--------------------------------------------#
+
+    functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
     node_comm.Barrier()
+
+    functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    node_comm.Barrier()
+    # functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+    # node_comm.Barrier()
+    # print(MPSS)
     if NMB:
-        for i in range(3,4,1):
+        for i in range(4,6,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool

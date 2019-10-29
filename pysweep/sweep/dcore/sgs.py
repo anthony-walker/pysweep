@@ -5,5 +5,5 @@ def init_globals():
     #Setting global variables
     global carr,OPS,TSO,AF,gts,up_sets, down_sets, oct_sets, x_sets, y_sets,SM
     gts = 0
-    carr,OPS,TSO,AF=None,None,None,None
+    carr,OPS,TSO,AF,MPSS=None,None,None,None,None
     up_sets, down_sets, oct_sets, x_sets, y_sets,SM=None,None,None,None,None,None
