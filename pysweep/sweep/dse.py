@@ -3,11 +3,11 @@
 import sys, os, h5py, math, GPUtil, socket
 from itertools import cycle, product, count
 #CUDA Imports
-# try:
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
-# except Exception as e:
-#     pass
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    pass
 #Dsweep imports
 from dcore import dcore,decomp,functions,sgs
 from ccore import source, printer
