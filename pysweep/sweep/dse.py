@@ -164,7 +164,7 @@ def dsweep_engine():
     # node_comm.Barrier()
     # print(MPSS)
     if NMB:
-        for i in range(1,5,1):
+        for i in range(3,5,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
