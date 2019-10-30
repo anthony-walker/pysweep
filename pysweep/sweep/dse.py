@@ -170,7 +170,7 @@ def dsweep_engine():
     decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
     if NMB:
         i = 0
-        for i in range(i,i+2,1):
+        for i in range(i,i+1,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
