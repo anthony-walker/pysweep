@@ -19,7 +19,7 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
     hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+1,arr0.shape[0],arr0.shape[1],arr0.shape[2]),dtype=dType)
     if rank == cluster_master:
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
-    return hdf5_file
+    return hdf5_file, hdf5_data_set
 
 def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,arr_shape):
     """Use this function to split data amongst nodes."""
@@ -129,22 +129,3 @@ def mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks):
         exit(0)
     comm.Barrier()
     return node_comm,comm
-
-def block_dissem(rank,node_master,shared_shape,rows_per_gpu,BS,num_gpus,OPS,node_ranks,gpu_rank,node_comm):
-    """Use this function to spread blocks to ranks."""
-    #Creating blocks to be solved
-    if rank==node_master:
-        gpu_blocks,cpu_blocks,total_cpu_block = decomp.create_blocks(shared_shape,rows_per_gpu,BS,num_gpus,OPS)
-        gpu_ranks = node_ranks[:num_gpus]
-        cpu_ranks = node_ranks[num_gpus:]
-        blocks = np.array_split(gpu_blocks,num_gpus) if gpu_blocks else gpu_blocks
-        blocks.append(cpu_blocks) if cpu_blocks else None
-        gpu_rank += [(False,None) for i in range(len(cpu_ranks))]
-        node_data = zip(blocks,gpu_rank)
-    else:
-        node_data = None
-        total_cpu_block = None
-    blocks,gpu_rank =  node_comm.scatter(node_data)
-    total_cpu_block = node_comm.bcast(total_cpu_block)
-    GRB = gpu_rank[0]
-    return GRB,blocks,total_cpu_block,gpu_rank

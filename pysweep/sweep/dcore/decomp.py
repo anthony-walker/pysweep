@@ -6,7 +6,7 @@ import numpy as np
 import multiprocessing as mp
 from itertools import cycle, product
 from mpi4py import MPI
-
+from dcore import sgs
 
 def create_local_gpu_array(block_shape):
     """Use this function to create the local gpu array"""
@@ -108,6 +108,24 @@ def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank):
         gpu_rank = list(zip(gpu_rank,gbs))
     gpu_rank = node_comm.scatter(gpu_rank)
     return gpu_rank
+
+def swept_write(cwt,NMB,GRB,sarr,hdf_data,gsc,gts,TSO,MPSS,MOSS,node_comm,total_cpu_block):
+    """Use this function to write to the hdf file and shift the shared array
+        # data after writing."""
+    if NMB:
+        i1,i2,i3=gsc #Unpack global tuple
+        for si,i in enumerate(range(gts,gts+MPSS,1),start=TSO):
+            if i%TSO==0:
+                hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
+                cwt+=1
+        nte = MPSS+TSO-2
+        nte2 = sarr.shape[0]-nte
+        sarr[:nte2,:,:,:] = sarr[nte:,:,:,:]
+        sarr[nte2:,:,:,:] = 0
+    node_comm.Barrier()
+    sgs.gts +=MPSS
+    if not GRB:
+        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
 
 def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,TSO,IEP):
     """Use this function to write to the hdf file and shift the shared array

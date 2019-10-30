@@ -122,8 +122,10 @@ def dsweep_engine():
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Filling shared array
     if NMB:
-        print(node_info)
-        sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
+        gsc = (slice(0,arr0.shape[1],1),slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),slice(0,arr0.shape[2],1))
+        sarr[TSO-ONE,:,:,:] =  arr0[gsc]
+    else:
+        gsc = None
     #Making blocks match array other dimensions
     bsls = [slice(0,i,1) for i in shared_shape]
     blocks = (bsls[0],bsls[1],blocks,bsls[3])
@@ -141,8 +143,7 @@ def dsweep_engine():
         blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     # ------------------------------HDF5 File------------------------------------------#
-    hdf5_file = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
-    cwt = 1 #Current write time
+    hdf5_file, hdf5_data = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
@@ -150,26 +151,28 @@ def dsweep_engine():
     # -------------------------------FIRST PRISM-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
-
+    cwt = 1
     #-------------------------------SWEPT LOOP--------------------------------------------#
-    # for i in range(MGST):
+    for i in range(MGST):
+        functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+        functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+        node_comm.Barrier()
+        functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+        decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
+        functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+        node_comm.Barrier()
+        decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
+    #Down Pyramid Prism and Last Write
     functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-    node_comm.Barrier()
-
-    functions.UpPrismForward(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-    node_comm.Barrier()
-    print(MPSS+TSO)
-
-    #ADD SWEPT WRITE STEP HERE
-    # functions.UpPrismBackward(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    # node_comm.Barrier()
-    # print(MPSS)
-    # if NMB:
-    #     for i in range(4,5,1):
-    #         print('-----------------------------------------')
-    #         printer.pm(sarr,i)
+    decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
+    if NMB:
+        i = 0
+        for i in range(i,i+2,1):
+            print('-----------------------------------------')
+            printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
