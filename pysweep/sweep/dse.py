@@ -169,7 +169,7 @@ def dsweep_engine():
     functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
     decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
     if NMB:
-        i = 0
+        i = 1
         for i in range(i,i+1,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
