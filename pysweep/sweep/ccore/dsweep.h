@@ -29,7 +29,6 @@ __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max thr
 
 //!!(@#
 
-
 /*
     Use this function to get the shared id
 */
@@ -58,83 +57,83 @@ __device__ int get_bgid()
 /*
     Use this function for testing points by thread indices
 */
-__device__ void test_gid(int tdx,int tdy)
-{
-    if (tdx == threadIdx.x && tdy == threadIdx.y)
-    {
-        int bid = blockIdx.x + blockIdx.y * gridDim.x;
-        int M = gridDim.y*blockDim.y+2*OPS;
-        int gid = M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
-        printf("%d\n", gid);
-    }
-}
+// __device__ void test_gid(int tdx,int tdy)
+// {
+//     if (tdx == threadIdx.x && tdy == threadIdx.y)
+//     {
+//         int bid = blockIdx.x + blockIdx.y * gridDim.x;
+//         int M = gridDim.y*blockDim.y+2*OPS;
+//         int gid = M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
+//         printf("%d\n", gid);
+//     }
+// }
 
 /*
     Use this function to print the shared array
 */
 
-__device__
-void pint(int myInt,bool test_bool)
-{
-    __syncthreads();
-    if (test_bool) {
-        printf("%d\n",myInt);
-    }
-    __syncthreads();
-}
+// __device__
+// void pint(int myInt,bool test_bool)
+// {
+//     __syncthreads();
+//     if (test_bool) {
+//         printf("%d\n",myInt);
+//     }
+//     __syncthreads();
+// }
 
-__device__
-void print_sarr(float * shared_state,bool test_bool,int smod)
-{
-    int bdx = blockDim.x+OPS;
-    int bdy = blockDim.y+OPS;
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
-    int sgid = get_sgid(tidx,tidy)+smod*STS; //Shared global index
-    int id;
-    __syncthreads();
-    if (test_bool)
-    {
-      printf("%s\n", "---------------------------------------");
-        for (int i = 0; i < blockDim.x+2*OPS; i++)
-        {   printf("%s","[" );
-            for (int j = 0; j < blockDim.y+2*OPS; j++)
-            {
-                id = sgid+(i-OPS)*(bdx+OPS)+j-OPS;
-                printf("%0.1f, ",shared_state[id],id);
-            }
-            printf("%s\n","]" );
-        }
-        printf("%s\n", "---------------------------------------");
-    }
-    __syncthreads();
-}
+// __device__
+// void print_sarr(float * shared_state,bool test_bool,int smod)
+// {
+//     int bdx = blockDim.x+OPS;
+//     int bdy = blockDim.y+OPS;
+//     int tidx = threadIdx.x+OPS;
+//     int tidy = threadIdx.y+OPS;
+//     int sgid = get_sgid(tidx,tidy)+smod*STS; //Shared global index
+//     int id;
+//     __syncthreads();
+//     if (test_bool)
+//     {
+//       printf("%s\n", "---------------------------------------");
+//         for (int i = 0; i < blockDim.x+2*OPS; i++)
+//         {   printf("%s","[" );
+//             for (int j = 0; j < blockDim.y+2*OPS; j++)
+//             {
+//                 id = sgid+(i-OPS)*(bdx+OPS)+j-OPS;
+//                 printf("%0.1f, ",shared_state[id],id);
+//             }
+//             printf("%s\n","]" );
+//         }
+//         printf("%s\n", "---------------------------------------");
+//     }
+//     __syncthreads();
+// }
 
-__device__
-void print_state(float * state,bool test_bool,int tmod)
-{
-    int bdy = blockDim.y*(gridDim.y)+2*OPS;
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
-    int gid = get_gid()+tmod*TIMES; //global index
-    int id;
-    __syncthreads();
-    if (test_bool)
-    {
-      printf("%s\n", "---------------------------------------");
-        for (int i = 0; i < blockDim.x; i++)
-        {   printf("%s","[" );
-            for (int j = 0; j < blockDim.y; j++)
-            {
-                id = gid+i*(bdy)+j;
-                printf("%0.1f, ",state[id],id);
-            }
-            printf("%s\n","]" );
-        }
-        printf("%s\n", "---------------------------------------");
-    }
-    __syncthreads();
-}
+// __device__
+// void print_state(float * state,bool test_bool,int tmod)
+// {
+//     int bdy = blockDim.y*(gridDim.y)+2*OPS;
+//     int tidx = threadIdx.x+OPS;
+//     int tidy = threadIdx.y+OPS;
+//     int gid = get_gid()+tmod*TIMES; //global index
+//     int id;
+//     __syncthreads();
+//     if (test_bool)
+//     {
+//       printf("%s\n", "---------------------------------------");
+//         for (int i = 0; i < blockDim.x; i++)
+//         {   printf("%s","[" );
+//             for (int j = 0; j < blockDim.y; j++)
+//             {
+//                 id = gid+i*(bdy)+j;
+//                 printf("%0.1f, ",state[id],id);
+//             }
+//             printf("%s\n","]" );
+//         }
+//         printf("%s\n", "---------------------------------------");
+//     }
+//     __syncthreads();
+// }
 
 /*
     Use this function to communicate edges more effectively
@@ -315,7 +314,7 @@ YBT(float *state, int gts)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
-    int gid = get_bgid()+6+(MPSS+1)*TIMES; //global index
+    int gid = get_bgid()+blockDim.x/2+(MPSS+1)*TIMES; //global index
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ux = blockDim.x-OPS; //upper x

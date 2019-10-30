@@ -58,7 +58,7 @@ def dsweep_engine():
     #---------------------SWEPT VARIABLE SETUP----------------------$
     #Splits for shared array
     SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
-    SPLITY = int(BS[ONE]/TWO)+OPS   #Split computation shift
+    SPLITY = int(BS[ONE]/TWO)   #Split computation shift
     MPSS = int(BS[0]/(2*OPS)-1)
     sgs.MPSS = MPSS
     MOSS = 2*MPSS
@@ -122,6 +122,7 @@ def dsweep_engine():
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Filling shared array
     if NMB:
+        print(node_info)
         sarr[TSO-ONE,:,:,:] =  arr0[:,slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),:]
     #Making blocks match array other dimensions
     bsls = [slice(0,i,1) for i in shared_shape]
@@ -159,14 +160,16 @@ def dsweep_engine():
     node_comm.Barrier()
     functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
     node_comm.Barrier()
+    print(MPSS+TSO)
+
     #ADD SWEPT WRITE STEP HERE
     # functions.UpPrismBackward(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     # node_comm.Barrier()
     # print(MPSS)
-    if NMB:
-        for i in range(3,5,1):
-            print('-----------------------------------------')
-            printer.pm(sarr,i)
+    # if NMB:
+    #     for i in range(4,5,1):
+    #         print('-----------------------------------------')
+    #         printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
