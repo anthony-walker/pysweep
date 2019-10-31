@@ -134,7 +134,7 @@ def dCPU_DownPyramid(block):
     #Removing elements for swept step
     for ts, swept_set in enumerate(sgs.down_sets,start=sgs.TSO-1):
         #Calculating Step
-        block = SM.step(block,swept_set,ts,ct)
+        sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
 
 def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_block):

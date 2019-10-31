@@ -530,7 +530,7 @@ DownPyramid(float *state, int gts)
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
-    int gid = get_gid()+TSO*TIMES; //global index
+    int gid = get_bgid()+(TSO-1)*TIMES; //global index
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
@@ -546,6 +546,7 @@ DownPyramid(float *state, int gts)
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
+    // printf("%d\n",MDSS );
     for (int k = 0; k <= MDSS; k++)
     {
         step(shared_state,sgid,gts);
