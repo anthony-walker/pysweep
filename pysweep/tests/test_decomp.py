@@ -132,7 +132,7 @@ def test_decomp_vortex(args=(2,0.01,40,0,10,10,4)):
         estr += "--hdf5 " + decomp_file + pts +time_str
         os.system(estr)
 
-def test_decomp_hde(args=(8, 60, 0.5, 10, 0.24, 5, 12, 4)):
+def test_decomp_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 10)):
     savepath = "./decomp_hde_plot"
     decomp_file = "\"./pysweep/tests/data/decomp_hde\""
     sfp = "./pysweep/tests/data/decomp_hde.hdf5"
@@ -152,3 +152,6 @@ def test_decomp_hde(args=(8, 60, 0.5, 10, 0.24, 5, 12, 4)):
         estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./pysweep/equations/hde.h\" -c \"./pysweep/equations/hde.py\" "
         estr += "--hdf5 " + decomp_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
+
+if __name__ == "__main__":
+    test_decomp_hde()

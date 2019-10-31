@@ -4,7 +4,7 @@ import numpy as np
 if __name__ == "__main__":
     # nx = ny = 120
     ny = 12
-    nx = 48
+    nx = 60
     bs = 12
     t0 = 0
     tf = 0.1

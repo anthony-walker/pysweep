@@ -129,7 +129,7 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-def test_dsweep_hde(args=(8, 60, 0.5, 10, 0.24, 5, 12, 3)):
+def test_dsweep_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 3)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./pysweep/tests/data/dswept_hde\""
     sfp = "./pysweep/tests/data/dswept_hde.hdf5"
