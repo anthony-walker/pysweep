@@ -1,13 +1,13 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
 import sys, os, h5py, math, GPUtil, socket
-from itertools import cycle, product, count
+from itertools import cycle
 #CUDA Imports
 try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    pass
+    print(e+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 #Dsweep imports
 from dcore import dcore,decomp,functions,sgs
 from ccore import source, printer
@@ -16,7 +16,6 @@ from mpi4py import MPI
 #Multi-processing imports
 import multiprocessing as mp
 import numpy as np
-
 
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
@@ -64,7 +63,7 @@ def dsweep_engine():
     MOSS = 2*MPSS
     time_steps = int((tf-t0)/dt)  #Number of time steps
     MGST = int(TSO*(time_steps-MPSS)/(MPSS)+1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
-    time_steps = MPSS*MGST/TSO+1 #Number of time steps - Add 1 for initial conditions
+    time_steps = int(MPSS*(MGST+1)/TSO+1) #Number of time steps - Add 1 for initial conditions
 
     #-------------MPI SETUP----------------------------#
     processor = socket.gethostname()
@@ -170,6 +169,9 @@ def dsweep_engine():
         cuda_context.pop()
     comm.Barrier()
     hdf5_file.close()
+    #Removing input file.
+    if NMB:
+        os.system("rm "+"input_file.hdf5")
 #Statement to execute dsweep
 dsweep_engine()
 #Statement to finalize MPI processes

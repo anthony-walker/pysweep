@@ -1,18 +1,23 @@
 #Programmer: Anthony Walker
-from test_decomp import *
-from test_pysweep import *
-from test_figures import *
+import sys, os
+sys.path.insert(0, './pysweep')
+import test_decomp
+import test_pysweep
+import test_figures
+
 #Use this file to implement multiple functions from test files
 if __name__ == "__main__":
     tf = 8
     npx=npy=40
+    BS = 10
     aff = 0.75
     X=Y=10
     Fo = 0.24
     dt = Fo*(X/npx)**2
     alpha = 5
     dt = Fo*(X/npx)**2/alpha
-
-    test_sweep_hde()
-    test_decomp_hde()
-    comp_gif()
+    args1=(tf,npx,aff,X,Fo,alpha,BS,1)
+    args2=(tf,npx,aff,X,Fo,alpha,BS,4)
+    test_pysweep.test_dsweep_hde(args1)
+    test_decomp.test_decomp_hde(args2)
+    test_figures.comp_gif()

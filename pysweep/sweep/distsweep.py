@@ -1,7 +1,7 @@
 
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, os, h5py, math, GPUtil, time
+import sys, h5py, GPUtil, time
 import numpy as np
 from mpi4py import MPI
 
@@ -38,9 +38,9 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     master_rank = 0
     #Making sure arr0 has correct data type
     arr0 = arr0.astype(dType)
-
     #Create input file
-    hdf5_file = h5py.File("input_file.hdf5", 'w', driver='mpio', comm=comm)
+    ifn = "input_file.hdf5"
+    hdf5_file = h5py.File(ifn, 'w', driver='mpio', comm=comm)
     hdf5_file.create_dataset("arr0",arr0.shape,data=arr0)
     hdf5_file.create_dataset("swargs",(len(swargs[:-2]),),data=swargs[:-2])
     hdf5_file.create_dataset("gargs",(len(gargs),),data=gargs[:])
@@ -74,6 +74,5 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
         MPI.COMM_SELF.Spawn(sys.executable,args=['./pysweep/sweep/dse.py'],maxprocs=num_procs)
     else:
         MPI.Finalize()
-
     stop = time.time()
     return stop-start

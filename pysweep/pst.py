@@ -1,16 +1,15 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
 import sys,argparse
-sys.path.insert(0, './pysweep')
-import equations, analytical
 from sweep import nodesweep, distsweep, ccore
 from analytical import vortex,ahde
+from decomposition import decomp
 import numpy as np
 from mpi4py import MPI
 
 def AnalyticalVortex(args):
     """Use this function to create analytical vortex data."""
-    cvics = vics()
+    cvics = vortex.vics()
     cvics.Shu(args.gamma)
     #Creating initial vortex from analytical code
     create_vortex_data(cvics,args.nx,args.nx,times=np.arange(args.t0,args.tf,args.dt),filepath="./",filename=args.hdf5)
@@ -31,17 +30,17 @@ def SweptVortex(args):
 
 def StandardVortex(args):
     #Analytical properties
-    cvics = vics()
+    cvics = vortex.vics()
     cvics.Shu(args.gamma)
     #Dimensions and steps
     dx = 2*cvics.L/args.nx
     dy = 2*cvics.L/args.ny
     #Creating initial vortex from analytical code
-    flux_vortex = cvics.Shu(gamma,args.nx).flux[0]
+    flux_vortex = cvics.Shu(args.gamma,args.nx).flux[0]
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    decomp(flux_vortex,gargs,swargs,filename=args.hdf5)
+    decomp.decomp(flux_vortex,gargs,swargs,filename=args.hdf5)
 
 def SweptHDE(args):
     #Analytical properties
@@ -54,6 +53,17 @@ def SweptHDE(args):
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
     nodesweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
 
+def DSHDE(args):
+    #Analytical properties
+    arr0 = ahde.TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
+    #Dimensions and steps
+    dx = args.X/args.nx
+    dy = args.Y/args.ny
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
+    swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
+    distsweep.dsweep(arr0,gargs,swargs,filename=args.hdf5)
+
 def StandardHDE(args):
     #Analytical properties
     arr0 = ahde.TIC(args.nx,args.ny,args.X,args.Y,args.R,args.TH,args.TL)[0,:,:,:]
@@ -63,7 +73,7 @@ def StandardHDE(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.alpha)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    decomp(arr0,gargs,swargs,filename=args.hdf5)
+    decomp.decomp(arr0,gargs,swargs,filename=args.hdf5)
 
 def STP2(args):
 
@@ -114,14 +124,14 @@ def DSTP(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    dist_sweep(arr,gargs,swargs,filename=args.hdf5)
+    distsweep.dsweep(arr,gargs,swargs,filename=args.hdf5)
 
 def DTP(args):
     comm = MPI.COMM_WORLD
     master_rank = 0
     rank = comm.Get_rank()  #current rank
     arr = np.ones((4,args.nx,args.ny))
-    printer = pysweep_printer(rank,master_rank)
+    printer = ccore.printer.pysweep_printer(rank,master_rank)
     X = 1
     Y = 1
     #Dimensions and steps
@@ -130,11 +140,11 @@ def DTP(args):
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
     swargs = (args.tso,args.ops,args.block,args.affinity,args.gpu,args.cpu)
-    decomp(arr,gargs,swargs,filename=args.hdf5)
+    decomp.decomp(arr,gargs,swargs,filename=args.hdf5)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    fmap = {'swept_vortex' : SweptVortex,
+    fmap = {'DSHDE':DSHDE,'swept_vortex' : SweptVortex,
                     'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
                                     'standard_hde' : StandardHDE, "stest":STP, "stest2":STP2,
                                     "dtest":DTP, "dstest":DSTP, "analytical":AnalyticalVortex}

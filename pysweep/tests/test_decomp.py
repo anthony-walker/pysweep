@@ -1,19 +1,9 @@
 #Programmer: Anthony Walker
 #Use the functions in this file to test the decomposition code.
 import sys, os, h5py
+sys.path.insert(0, './pysweep')
 import numpy as np
-import matplotlib as mpl
-mpl.use("tkAgg")
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gsc
-from matplotlib import cm
-from collections.abc import Iterable
-import matplotlib.animation as animation
-from mpl_toolkits import mplot3d
-from master import controller
-from analytical import *
-from equations import *
-from decomp import *
+from decomposition import decomp_functions
 
 def test_reg_edge_comm(args=None):
     """Use this function to test the communication"""
@@ -68,9 +58,9 @@ def test_decomp(args=None):
             shared_shape = sarr.shape
 
             regions = (slice(0,tsarr,1),slice(0,v,1),slice(OPS,OPS+2*x,1),slice(OPS,OPS+2*x,1))
-            regions = (create_read_region(regions,OPS),regions) #Creating read region
-            brs = create_boundary_regions(regions[1],shared_shape,OPS)
-            reg_edge_comm(sarr,OPS,brs,regions[1])
+            regions = (decomp_functions.create_read_region(regions,OPS),regions) #Creating read region
+            brs = decomp_functions.create_boundary_regions(regions[1],shared_shape,OPS)
+            decomp_functions.reg_edge_comm(sarr,OPS,brs,regions[1])
             carr = np.copy(sarr[regions[0]])
             ssb = np.zeros((2,v,BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
             WR = regions[1]
@@ -82,8 +72,8 @@ def test_decomp(args=None):
             hregion = (WR[1],slice(WR[2].start-OPS,WR[2].stop-OPS,1),slice(WR[3].start-OPS,WR[3].stop-OPS,1))
             hdf5_data_set[0,hregion[0],hregion[1],hregion[2]] = sarr[TSO-1,WR[1],WR[2],WR[3]]
             #Source mods
-            g_mod_2D = build_gpu_source("./src/equations/eqt.h")
-            c_mod_2D = build_cpu_source("./src/equations/eqt.py")
+            g_mod_2D = decomp_functions.build_gpu_source("./pysweep/equations/eqt.h")
+            c_mod_2D = decomp_functions.build_cpu_source("./pysweep/equations/eqt.py")
             #Setting globals
             c_mod_2D.set_globals(True,g_mod_2D,*(t0,tf,dt,dx,dy,gamma))
             c_mod_2D.set_globals(False,c_mod_2D,*(t0,tf,dt,dx,dy,gamma))
@@ -114,8 +104,8 @@ def test_decomp(args=None):
             hdf5_file.close()
 
 def test_decomp_write(args=None):
-    estr = "mpiexec -n 4 python ./src/pst.py dtest "
-    estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./src/equations/eqt.h\" -c \"./src/equations/eqt.py\" "
+    estr = "mpiexec -n 4 python ./pysweep/pst.py dtest "
+    estr += "-b 10 -o 2 --tso 2 -a 0.5 -g \"./pysweep/equations/eqt.h\" -c \"./pysweep/equations/eqt.py\" "
     estr += "--hdf5 \"./dtest\" -nx 40 -ny 40"
     os.system(estr)
     test_file = "./dtest.hdf5"
@@ -126,8 +116,8 @@ def test_decomp_write(args=None):
     os.system("rm "+test_file)
 
 def test_decomp_vortex(args=(2,0.01,40,0,10,10,4)):
-    decomp_file = "\"./tests/data/decomp_vortex\""
-    sfp = "./tests/data/decomp_vortex.hdf5"
+    decomp_file = "\"./pysweep/tests/data/decomp_vortex\""
+    sfp = "./pysweep/tests/data/decomp_vortex.hdf5"
     os.system("rm "+sfp)
     tf,dt,npx,aff,X,blks,nps = args
     npy=npx
@@ -137,18 +127,17 @@ def test_decomp_vortex(args=(2,0.01,40,0,10,10,4)):
 
     if not os.path.isfile(sfp):
     #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python ./src/pst.py standard_vortex "
-        estr += "-b "+str(blks)+" -o 2 --tso 2 -a "+str(aff)+" -g \"./src/equations/euler.h\" -c \"./src/equations/euler.py\" "
+        estr = "mpiexec -n "+str(nps)+" python ./pysweep/pst.py standard_vortex "
+        estr += "-b "+str(blks)+" -o 2 --tso 2 -a "+str(aff)+" -g \"./pysweep/equations/euler.h\" -c \"./pysweep/equations/euler.py\" "
         estr += "--hdf5 " + decomp_file + pts +time_str
         os.system(estr)
 
-
 def test_decomp_hde(args=(8,40,0.75,10,0.24,5,10,4)):
     savepath = "./decomp_hde_plot"
-    decomp_file = "\"./tests/data/decomp_hde\""
-    sfp = "./tests/data/decomp_hde.hdf5"
-    afp = "./tests/data/analyt_hde0.hdf5"
-    analyt_file = "\"./tests/data/analyt_hde\""
+    decomp_file = "\"./pysweep/tests/data/decomp_hde\""
+    sfp = "./pysweep/tests/data/decomp_hde.hdf5"
+    afp = "./pysweep/tests/data/analyt_hde0.hdf5"
+    analyt_file = "\"./pysweep/tests/data/analyt_hde\""
     os.system("rm "+sfp)
     tf,npx,aff,X,Fo,alpha,blks,nps = args
     npy=npx
@@ -159,16 +148,7 @@ def test_decomp_hde(args=(8,40,0.75,10,0.24,5,10,4)):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python ./src/pst.py standard_hde "
-        estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./src/equations/hde.h\" -c \"./src/equations/hde.py\" "
+        estr = "mpiexec -n "+str(nps)+" python ./pysweep/pst.py standard_hde "
+        estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./pysweep/equations/hde.h\" -c \"./pysweep/equations/hde.py\" "
         estr += "--hdf5 " + decomp_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
-
-
-
-# test_decomp_hde()
-# test_decomp()
-# test_decomp_write()
-test_decomp_vortex()
-# notifier.fcn = test_decomp_vortex
-# notifier.run()

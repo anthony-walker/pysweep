@@ -10,7 +10,7 @@ from matplotlib import cm
 from collections.abc import Iterable
 import matplotlib.animation as animation
 from mpl_toolkits import mplot3d
-from master import controller
+from sweep.ncore import block
 
 def OCT_Fig():
     ops = 1
@@ -20,10 +20,10 @@ def OCT_Fig():
     shape = (ts,npx+bsx/2,npx+bsx/2)
     bs = (bsx,bsx,1)
 
-    upsets = create_up_sets(bs,ops)
-    downsets = create_down_sets(bs,ops)
+    upsets = block.create_up_sets(bs,ops)
+    downsets = block.create_down_sets(bs,ops)
     octsets = downsets+upsets[1:]
-    bridge_sets, bridge_slices = create_bridge_sets(bs,ops,len(upsets))
+    bridge_sets, bridge_slices = block.create_bridge_sets(bs,ops,len(upsets))
     time_set = np.arange(0,len(upsets))
     colors = ['blue','red','green','orange']
     # --------------------------- UpPyramid  Phase----------------------------
@@ -134,8 +134,6 @@ def OctPhase(ax,shape,npx,bsx,upsets,colors):
         lh.set_alpha(1)
         lh.set_color(colors[i])
         lh.set_edgecolor('black')
-
-
 
 def OctPlot(fig,shape,npx,bsx,upsets,colors,ops,elev,bridge_sets,alpha=0.25):
     """This is the first communication phase"""

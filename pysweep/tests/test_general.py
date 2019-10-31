@@ -1,19 +1,19 @@
 #Programmer: Anthony Walker
-#This file contains test that pertain to both decomp and swept solvers
-import sys, os
-import numpy as np
-import matplotlib as mpl
-mpl.use("tkAgg")
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gsc
-from matplotlib import cm
-from collections.abc import Iterable
-import matplotlib.animation as animation
-from mpl_toolkits import mplot3d
-from master import controller
-from analytical import *
-from equations import *
-from decomp import *
+# #This file contains test that pertain to both decomp and swept solvers
+# import sys, os
+# import numpy as np
+# import matplotlib as mpl
+# mpl.use("tkAgg")
+# import matplotlib.pyplot as plt
+# import matplotlib.gridspec as gsc
+# from matplotlib import cm
+# from collections.abc import Iterable
+# import matplotlib.animation as animation
+# from mpl_toolkits import mplot3d
+# from master import controller
+# from analytical import *
+# from equations import *
+# from decomp import *
 
 def test_comparison():
     """Use this function to compare the values obtain during a run of both solvers"""

@@ -1,20 +1,15 @@
 #Programmer: Anthony Walker
 #Use this file to generate figures for the 2D swept paper
 import sys, os, h5py
+sys.path.insert(0, './pysweep')
 import numpy as np
 import matplotlib as mpl
 mpl.use("tkAgg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gsc
 from matplotlib import cm
-from collections.abc import Iterable
 import matplotlib.animation as animation
-from mpl_toolkits import mplot3d
-from master import controller
-from node_sweep import *
-from shape_plots import *
-from data_plots import *
-
+from sweep.ncore.mplambda import sweep_lambda
 
 def myContour(args):
     i,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata=args
@@ -35,11 +30,9 @@ def set_lims(fig,axes):
         ax.set_ylabel("Y")
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(lim1[i],lim2[i],10))
 
-
-
 def comp_gif(filename="vsdc0.gif"):
-    decomp_file = "/home/walkanth/pysweep/tests/data/decomp_vortex.hdf5"
-    swept_file =  "/home/walkanth/pysweep/tests/data/swept_vortex.hdf5"
+    decomp_file = "./pysweep/tests/data/dswept_hde.hdf5"
+    swept_file =  "./pysweep/tests/data/decomp_hde.hdf5"
     #Opening the data files
     decomp_hdf5 = h5py.File(decomp_file, 'r')
     swept_hdf5 = h5py.File(swept_file, 'r')
@@ -105,4 +98,4 @@ def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept
     #Closing files
     swept_hdf5.close()
 
-OCT_Fig()
+comp_gif("hdec.gif")

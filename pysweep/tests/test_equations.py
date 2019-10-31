@@ -1,27 +1,16 @@
 #Programmer: Anthony Walker
 import sys, os
 import numpy as np
-import matplotlib as mpl
-mpl.use("tkAgg")
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gsc
-from matplotlib import cm
-from collections.abc import Iterable
-import matplotlib.animation as animation
-from mpl_toolkits import mplot3d
-from master import controller
+sys.path.insert(0, './pysweep')
+from sweep.ccore import source
+from analytical.ahde import TIC
 #Cuda
 try:
     import pycuda.driver as cuda
+    import pycuda.autoinit
     from pycuda.compiler import SourceModule
 except Exception as e:
     pass
-#C
-from ctypes import *
-#From PySweep
-from analytical import *
-from equations import *
-from decomp import *
 
 def test_flux():
     """Use this function to test the python version of the euler code.
@@ -52,24 +41,19 @@ def test_flux():
     P = np.zeros(5)
     P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
-    source_mod_2D = build_cpu_source("./src/equations/euler.py")
+    source_mod_2D = source.build_cpu_source("./pysweep/equations/euler.py")
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
-    source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
+    source_mod_1D = source.build_cpu_source("./pysweep/equations/euler1D.py")
     iidx = (0,slice(0,4,1),2,2)
     #Testing Flux
     dfdx,dfdy = source_mod_2D.dfdxy(num_test,iidx)
     df = source_mod_1D.fv5p(Qx,P)[2]
-    print(df)
-    print(dfdx)
-    print(dfdy)
     assert np.isclose(df[1],dfdx[1])
     assert np.isclose(df[1],dfdy[2])
     assert np.isclose(df[0],dfdx[0])
     assert np.isclose(df[0],dfdy[0])
     assert np.isclose(df[2],dfdx[3])
     assert np.isclose(df[2],dfdy[3])
-
-test_flux()
 
 def test_RK2_CPU():
     """Use this function to test the python version of the euler code.
@@ -99,9 +83,9 @@ def test_RK2_CPU():
     P = np.zeros(5)
     P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
-    source_mod_2D = build_cpu_source("./src/equations/euler.py")
+    source_mod_2D = source.build_cpu_source("./pysweep/equations/euler.py")
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
-    source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
+    source_mod_1D = source.build_cpu_source("./pysweep/equations/euler1D.py")
     iidx = (2,2),
     #Testing RK2 step 1
     f1d = source_mod_1D.RK2S1(Qx,P)
@@ -137,8 +121,8 @@ def test_RK2_GPU():
     TSO = 2
     num_test = np.zeros((3,v,x,x),dtype=np.float32)
 
-    g_mod_2D = build_gpu_source("./src/equations/euler.h")
-    c_mod_2D = build_cpu_source("./src/equations/euler.py")
+    g_mod_2D = source.build_gpu_source("/home/walkanth/pysweep/pysweep/equations/euler.h",__name__)
+    c_mod_2D = source.build_cpu_source("./pysweep/equations/euler.py")
     c_mod_2D.set_globals(True,g_mod_2D,*(t0,tf,dt,dx,dy,gamma))
     gpu_fcn = g_mod_2D.get_function("test_step")
     NV = v
@@ -147,7 +131,7 @@ def test_RK2_GPU():
     VARS =  x*x
     TIMES = VARS*NV
     const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":ops,"TSO":TSO,"STS":STS})
-    swept_constant_copy(g_mod_2D,const_dict)
+    source.swept_constant_copy(g_mod_2D,const_dict)
     #Test x direction
     for i in range(int(x/2)):
         for j in range(x):
@@ -168,7 +152,7 @@ def test_RK2_GPU():
     P = np.zeros(5)
     P[:] = [1,1,0.1,0.1,0.1]
     # #Get source module
-    source_mod_1D = build_cpu_source("./src/equations/euler1D.py")
+    source_mod_1D = source.build_cpu_source("./pysweep/equations/euler1D.py")
     f1d = source_mod_1D.RK2S1(Qx,P)
     assert np.isclose(f1d[2,1], num_test[0,1,4,4])
     #Test y direction
@@ -200,7 +184,12 @@ def test_hde_cpu():
     lt =10
 
     state = TIC(npx,npy,X,X,R,Th,Tl,lt)
-    SM = build_cpu_source("./src/equations/hde.py")
+    SM = source.build_cpu_source("./pysweep/equations/hde.py")
     SM.set_globals(False,SM,*(t0,tf,dt,dx,dy,alpha))
     iidx = [(i,j) for i in range(ops,npx-ops,1) for j in range(ops,npy-ops,1)]
     state = SM.step(state,iidx,0,0)
+
+test_flux()
+test_RK2_GPU()
+test_RK2_CPU()
+test_hde_cpu()
