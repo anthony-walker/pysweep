@@ -167,7 +167,10 @@ def dsweep_engine():
     functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-    decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
+    #Do LastPrism Here then Write all of the remaining data
+    # functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    # decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
+
     if NMB:
         i = 1
         for i in range(i,i+1,1):
