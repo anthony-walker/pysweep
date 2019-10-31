@@ -3,7 +3,7 @@ import numpy as np
 
 if __name__ == "__main__":
     # nx = ny = 120
-    ny = 12
+    ny = 120
     nx = 120
     bs = 12
     t0 = 0

@@ -141,9 +141,9 @@ def test_dsweep_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 1)):
     npy=npx
     Y=X
     dt = Fo*(X/npx)**2/alpha
+    tf = 1000*dt
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
-
     if not os.path.isfile(sfp):
         #Create data using solver
         estr = "mpiexec -n "+str(nps)+"--hostfile=sub-nodes python ./pysweep/pst.py DSHDE "
