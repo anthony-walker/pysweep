@@ -109,37 +109,17 @@ def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank):
     gpu_rank = node_comm.scatter(gpu_rank)
     return gpu_rank
 
-def swept_write(cwt,NMB,GRB,sarr,hdf_data,gsc,gts,TSO,MPSS,MOSS,node_comm,total_cpu_block):
+def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS,total_cpu_block):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
-    if NMB:
-        i1,i2,i3=gsc #Unpack global tuple
-        for si,i in enumerate(range(gts,gts+MPSS,1),start=TSO):
-            if i%TSO==0:
-                hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
-                cwt+=1
-        nte = MPSS+TSO-2
-        nte2 = sarr.shape[0]-nte
-        sarr[:nte2,:,:,:] = sarr[nte:,:,:,:]
-        sarr[nte2:,:,:,:] = 0
-    node_comm.Barrier()
-    sgs.gts +=MPSS
-    if not GRB:
-        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
-
-def hdf_swept_write(cwt,wb,shared_arr,reg,hdf_set,hr,MPSS,TSO,IEP):
-    """Use this function to write to the hdf file and shift the shared array
-        # data after writing."""
-
-    wb+=IEP
-    for carr in shared_arr[TSO+IEP:MPSS+TSO]:
-        if (wb)%TSO==0:
-            hdf_set[cwt,hr[0],hr[1],hr[2]]=carr[reg[1],reg[2],reg[3]]
+    i1,i2,i3=gsc #Unpack global tuple
+    for si,i in enumerate(range(gts,gts+MPSS,1),start=TSO):
+        if i%TSO==0:
+            hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
             cwt+=1
-        wb += 1
-    #Data is shifted and TSO steps are kept at the begining
-    nte = shared_arr.shape[0]+1-(MPSS)
-    shared_arr[:nte,reg[1],reg[2],reg[3]] = shared_arr[MPSS-1:,reg[1],reg[2],reg[3]]
-    shared_arr[nte:,reg[1],reg[2],reg[3]] = 0
-    #Do edge comm after this function
-    return cwt,wb+1
+    nte = MPSS+TSO-2
+    nte2 = sarr.shape[0]-nte
+    sarr[:nte2,:,:,:] = sarr[nte:,:,:,:]
+    sarr[nte2:,:,:,:] = 0
+    sgs.gts +=MPSS
+    return cwt

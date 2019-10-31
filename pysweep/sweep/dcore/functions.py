@@ -137,7 +137,7 @@ def dCPU_DownPyramid(block):
         block = SM.step(block,swept_set,ts,ct)
         ct+=1
 
-def send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_block):
+def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_block):
     """Use this function to communicate data between nodes"""
     if NMB:
         buff = np.copy(sarr[:,:,-spx:,:])
@@ -149,7 +149,21 @@ def send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_bloc
     if not GRB:
         sgs.carr[:,:,:,:] = sarr[total_cpu_block]
 
-def send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_block):
+def send_forward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,total_cpu_block):
+    """Use this function to communicate data between nodes"""
+    if NMB:
+        cwt = decomp.swept_write(cwt,sarr,hdf5_data,gsc,sgs.gts,sgs.TSO,sgs.MPSS,total_cpu_block)
+        buff = np.copy(sarr[:,:,-spx:,:])
+        buffer = cluster_comm.sendrecv(sendobj=buff,dest=comranks[1],source=comranks[0])
+        cluster_comm.Barrier()
+        sarr[:,:,spx:,:] = sarr[:,:,:-spx,:] #Shift sarr data forward by spx
+        sarr[:,:,:spx,:] = buffer[:,:,:,:]
+    node_comm.Barrier()
+    if not GRB:
+        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
+    return cwt
+
+def send_backward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,total_cpu_block):
     """Use this function to communicate data between nodes"""
     if NMB:
         buff = np.copy(sarr[:,:,:spx,:])
@@ -157,6 +171,8 @@ def send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_blo
         cluster_comm.Barrier()
         sarr[:,:,:-spx,:] = sarr[:,:,spx:,:] #Shift sarr backward data by spx
         sarr[:,:,-spx:,:] = buffer[:,:,:,:]
+        cwt = decomp.swept_write(cwt,sarr,hdf5_data,gsc,sgs.gts,sgs.TSO,sgs.MPSS,total_cpu_block)
     node_comm.Barrier() #Make sure sarr is shifted before filling carr
     if not GRB:
         sgs.carr[:,:,:,:] = sarr[total_cpu_block]
+    return cwt

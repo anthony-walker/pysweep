@@ -63,7 +63,7 @@ def dsweep_engine():
     sgs.MPSS = MPSS
     MOSS = 2*MPSS
     time_steps = int((tf-t0)/dt)  #Number of time steps
-    MGST = int(TSO*(time_steps)/(MOSS)-1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
+    MGST = int(TSO*(time_steps-MPSS)/(MPSS))  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
     time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
     #-------------MPI SETUP----------------------------#
     processor = socket.gethostname()
@@ -148,32 +148,25 @@ def dsweep_engine():
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
 
-    # -------------------------------FIRST PRISM-------------------------------------------#
+    # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
+    functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+
     cwt = 1
     #-------------------------------SWEPT LOOP--------------------------------------------#
+    step = cycle([functions.send_backward,functions.send_forward])
     for i in range(MGST):
-        functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
         functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
         node_comm.Barrier()
-        functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-        decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
-        functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-        node_comm.Barrier()
-        decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
-    #Down Pyramid Prism and Last Write
-    functions.send_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-    functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    node_comm.Barrier()
-    functions.send_backward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+        cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
     #Do LastPrism Here then Write all of the remaining data
     # functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    # decomp.swept_write(cwt,NMB,GRB,sarr,hdf5_data,gsc,sgs.gts,TSO,MPSS,MOSS,node_comm,total_cpu_block)
+    # next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
 
     if NMB:
         i = 1
-        for i in range(i,i+1,1):
+        for i in range(i,i+3,1):
             print('-----------------------------------------')
             printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
