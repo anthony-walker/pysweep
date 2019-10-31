@@ -7,7 +7,7 @@ try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
 except Exception as e:
-    print(e+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 #Dsweep imports
 from dcore import dcore,decomp,functions,sgs
 from ccore import source, printer
