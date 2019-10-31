@@ -98,4 +98,5 @@ def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept
     #Closing files
     swept_hdf5.close()
 
-comp_gif("hdec.gif")
+if __name__ == "__main__":
+    comp_gif("hdec.gif")
