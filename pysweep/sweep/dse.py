@@ -63,8 +63,9 @@ def dsweep_engine():
     sgs.MPSS = MPSS
     MOSS = 2*MPSS
     time_steps = int((tf-t0)/dt)  #Number of time steps
-    MGST = int(TSO*(time_steps-MPSS)/(MPSS))  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
-    time_steps = int((MGST*(MOSS)/TSO)+MPSS) #Updating time steps
+    MGST = int(TSO*(time_steps-MPSS)/(MPSS)+1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
+    time_steps = MPSS*MGST/TSO+1 #Number of time steps - Add 1 for initial conditions
+
     #-------------MPI SETUP----------------------------#
     processor = socket.gethostname()
     rank = comm.Get_rank()  #current rank
@@ -164,22 +165,11 @@ def dsweep_engine():
     functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
-    # 
-    # if NMB:
-    #     i = 1
-    #     for i in range(i,i+1,1):
-    #         print('-----------------------------------------')
-    #         printer.pm(sarr,i)
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
-
     comm.Barrier()
     hdf5_file.close()
-
-
-
-
 #Statement to execute dsweep
 dsweep_engine()
 #Statement to finalize MPI processes

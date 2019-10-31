@@ -3,8 +3,8 @@ import numpy as np
 
 if __name__ == "__main__":
     # nx = ny = 120
-    ny = 24
-    nx = 120
+    ny = 12
+    nx = 24
     bs = 12
     t0 = 0
     tf = 0.1
@@ -28,4 +28,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,gamma)
     swargs = (tso,ops,bs,aff,"./pysweep/equations/eqt.h","./pysweep/equations/eqt.py")
-    dsweep(arr,gargs,swargs,filename="test",exid=[])
+    dsweep(arr,gargs,swargs,filename="test",exid=[1])
