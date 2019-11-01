@@ -204,8 +204,8 @@ UpPyramid(float *state, int gts)
     int uy = blockDim.y-OPS; //upper y
     //Communicating interior points for TSO data and calculation data
     //UpPyramid Always starts on predictor so no if needed here
-    shared_state_fill(shared_state,state,ZERO,(TSO-ONE));
-    shared_state_fill(shared_state,state,ONE,(TSO-ONE));
+    shared_state_fill(shared_state,state,ZERO,(TSO));
+    shared_state_fill(shared_state,state,ONE,(TSO));
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     //Swept loop
     for (int k = 0; k < MPSS; k++)

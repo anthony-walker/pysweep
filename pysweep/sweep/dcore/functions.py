@@ -24,7 +24,7 @@ def FirstPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
         garr = decomp.copy_s_to_g(sarr,garr,blocks,BS)
         cuda.memcpy_htod(arr_gpu,garr)
         SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
-        SM.get_function("YBridge")(arr_gpu,np.int32(gts),np.int32(sgs.TSO-1),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
+        # SM.get_function("YBridge")(arr_gpu,np.int32(gts),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(garr,arr_gpu)
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
@@ -91,7 +91,7 @@ def dCPU_UpPyramid(block):
     """Use this function to build the Up Pyramid."""
     #UpPyramid of Swept Step
     ct = sgs.gts
-    for ts,swept_set in enumerate(sgs.up_sets,start=sgs.TSO-1):
+    for ts,swept_set in enumerate(sgs.up_sets,start=sgs.TSO):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
@@ -99,7 +99,7 @@ def dCPU_UpPyramid(block):
 def dCPU_Ybridge(block):
     """Use this function to build the XBridge."""
     ct = sgs.gts
-    for ts,swept_set in enumerate(sgs.y_sets,start=sgs.TSO-1):
+    for ts,swept_set in enumerate(sgs.y_sets,start=sgs.TSO):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
@@ -107,7 +107,7 @@ def dCPU_Ybridge(block):
 def dCPU_YBT(block): #Phase 2 Y bridge
     """Use this function to build the XBridge."""
     ct = sgs.gts
-    for ts,swept_set in enumerate(sgs.y_sets,start=sgs.MPSS+1):
+    for ts,swept_set in enumerate(sgs.y_sets,start=sgs.MPSS+sgs.TSO):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
@@ -115,7 +115,7 @@ def dCPU_YBT(block): #Phase 2 Y bridge
 def dCPU_Xbridge(block):
     """Use this function to build the XBridge."""
     ct = sgs.gts
-    for ts,swept_set in enumerate(sgs.x_sets,start=sgs.TSO-1):
+    for ts,swept_set in enumerate(sgs.x_sets,start=sgs.TSO):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
@@ -123,7 +123,7 @@ def dCPU_Xbridge(block):
 def dCPU_Octahedron(block):
     """Use this function to build the XBridge."""
     ct = sgs.gts
-    for ts,swept_set in enumerate(sgs.oct_sets,start=sgs.TSO-1):
+    for ts,swept_set in enumerate(sgs.oct_sets,start=sgs.TSO):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1
@@ -132,7 +132,7 @@ def dCPU_DownPyramid(block):
     """Use this function to build the Down Pyramid."""
     ct = sgs.gts
     #Removing elements for swept step
-    for ts, swept_set in enumerate(sgs.down_sets,start=sgs.TSO-1):
+    for ts, swept_set in enumerate(sgs.down_sets,start=sgs.TSO):
         #Calculating Step
         sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
         ct+=1

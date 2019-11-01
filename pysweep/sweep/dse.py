@@ -147,24 +147,34 @@ def dsweep_engine():
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
-
+    node_comm.Barrier()
     # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    node_comm.Barrier()
+    if NMB:
+        i=1
+        for j in range(i,i+3):
+            print("----------------------------")
+            printer.pm(sarr,j)
     node_comm.Barrier()
     functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
 
     cwt = 1
-    #-------------------------------SWEPT LOOP--------------------------------------------#
-    step = cycle([functions.send_backward,functions.send_forward])
-    for i in range(MGST):
-        functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-        node_comm.Barrier()
-        cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
-    #Do LastPrism Here then Write all of the remaining data
-    functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    node_comm.Barrier()
-    next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
-    
+
+    # -------------------------------SWEPT LOOP--------------------------------------------#
+    # step = cycle([functions.send_backward,functions.send_forward])
+    # for i in range(MGST):
+    #     functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    #     node_comm.Barrier()
+    #     cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
+    # #Do LastPrism Here then Write all of the remaining data
+    # functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+    # node_comm.Barrier()
+    # next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
+    #
+
+
+
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()

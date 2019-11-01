@@ -114,12 +114,11 @@ def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS,total_cpu_block):
         # data after writing."""
     i1,i2,i3=gsc #Unpack global tuple
     for si,i in enumerate(range(gts,gts+MPSS,1),start=TSO):
-        if i%TSO!=0:
+        if i%TSO==0:
             hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
             cwt+=1
-    nte = MPSS+TSO-2
-    nte2 = sarr.shape[0]-nte
-    sarr[:nte2,:,:,:] = sarr[nte:,:,:,:]
-    sarr[nte2:,:,:,:] = 0
+    nte = sarr.shape[0]-MPSS
+    sarr[:nte,:,:,:] = sarr[MPSS:,:,:,:]
+    sarr[nte:,:,:,:] = 0
     sgs.gts +=MPSS
     return cwt
