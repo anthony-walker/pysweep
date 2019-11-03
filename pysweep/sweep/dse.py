@@ -112,10 +112,10 @@ def dsweep_engine():
     node_ranks = node_comm.bcast(node_ranks)
     node_info = node_comm.bcast(node_info)
     #----------------------__Removing Unwanted MPI Processes------------------------#
-    print(rank,ranks_to_remove)
+    # print(rank,ranks_to_remove)
     node_comm,comm = dcore.mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks)
-    print("After")
-    print(rank,ranks_to_remove)
+    # print("After")
+    # print(rank,ranks_to_remove)
     # gpu_rank,blocks = decomp.nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr0.shape,gpu_rank)
     #Checking to ensure that there are enough
     # assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
