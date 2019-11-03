@@ -146,7 +146,7 @@ def test_dsweep_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 3)):
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n "+str(nps)+"  python ./pysweep/pst.py DSHDE "
+        estr = "mpiexec -n "+str(nps)+" --hostfile=sub-nodes  python ./pysweep/pst.py DSHDE "
         estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./pysweep/equations/hde.h\" -c \"./pysweep/equations/hde.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
