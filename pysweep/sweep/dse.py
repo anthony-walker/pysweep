@@ -73,6 +73,7 @@ def dsweep_engine():
     nodes_processors = comm.allgather((rank,processor))
     processors = tuple(zip(*nodes_processors))[1]
     node_ranks = [n for n,p in nodes_processors if p==processor]
+    print(node_ranks)
     processors = set(processors)
     node_group = comm.group.Incl(node_ranks)
     node_comm = comm.Create_group(node_group)
