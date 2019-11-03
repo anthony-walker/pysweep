@@ -164,7 +164,8 @@ def dsweep_engine():
     functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
-
+    if NMB:
+        printer.pm(sarr,1)
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()

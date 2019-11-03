@@ -16,15 +16,20 @@ def step(state,iidx,ts,gts):
     gts - a step counter that allows implementation of the scheme
     """
     half = 0.5
+    TSO = 2
     vSlice = slice(0,state.shape[1],1)
     for idx,idy in iidx:
-        ntidx = (ts+1,vSlice,idx,idy)  #next step index
-        cidx = (ts,vSlice,idx,idy)
-        pidx = (ts-1,vSlice,idx,idy) #next step index
-        if (gts+1)%2==0: #Corrector
-            state[ntidx] = (state[pidx])
-        else:
-            state[ntidx] = (state[cidx])
+        ntidx = (ts,vSlice,idx,idy)  #next step index
+        cidx = (ts-1,vSlice,idx,idy)
+        eidx = (ts-1,vSlice,idx+1,idy)
+        widx = (ts-1,vSlice,idx-1,idy)
+        nidx = (ts-1,vSlice,idx,idy+1)
+        sidx = (ts-1,vSlice,idx,idy-1)
+        pidx = (ts-TSO,vSlice,idx,idy) #next step index
+        if (gts)%TSO==0: #Corrector
+            state[ntidx] = (state[pidx])+2
+        else: #Predictor
+            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4+1
     return state
 
 def set_globals(gpu,source_mod,*args):

@@ -129,7 +129,7 @@ def test_sweep_hde(args=(8,40,1,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-def test_dsweep_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 3)):
+def test_dsweep_hde(args=(8, 120, 0, 10, 0.24, 5, 12, 1)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./pysweep/tests/data/dswept_hde\""
     sfp = "./pysweep/tests/data/dswept_hde.hdf5"
@@ -141,12 +141,12 @@ def test_dsweep_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 3)):
     npy=npx
     Y=X
     dt = Fo*(X/npx)**2/alpha
-    tf = 500*dt
+    tf = 100*dt
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" --hostfile=sub-nodes python ./pysweep/pst.py DSHDE "
+        estr = "mpiexec -n "+str(nps)+"  python ./pysweep/pst.py DSHDE "
         estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./pysweep/equations/hde.h\" -c \"./pysweep/equations/hde.py\" "
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)

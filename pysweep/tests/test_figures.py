@@ -53,7 +53,9 @@ def comp_gif(filename="vsdc0.gif"):
     fig = plt.figure()
 
     ax1 = plt.subplot(gs[0,0])
+    ax1.set_title("Swept")
     ax2 = plt.subplot(gs[0,1])
+    ax2.set_title("Decomp")
     ax3 = plt.subplot(gs[1,:])
     set_lims(fig,(ax1,ax2,ax3))
 
@@ -64,7 +66,7 @@ def comp_gif(filename="vsdc0.gif"):
     #Closing files
     swept_hdf5.close()
 
-def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept_vortex.gif",idx=0):
+def create_hdf_gif(swept_file = "./pysweep/tests/data/dswept_hde.hdf5",filename="shde.gif",idx=0):
     #Opening the data files
     swept_hdf5 = h5py.File(swept_file, 'r')
     tsdata = swept_hdf5['data'][:,idx,:,:]
@@ -99,4 +101,5 @@ def create_hdf_gif(swept_file = "./tests/data/swept_vortex.hdf5",filename="swept
     swept_hdf5.close()
 
 if __name__ == "__main__":
-    comp_gif("hdec.gif")
+    # comp_gif("hdec.gif")
+    create_hdf_gif()

@@ -3,8 +3,8 @@ import numpy as np
 
 if __name__ == "__main__":
     # nx = ny = 120
-    ny = 12
-    nx = 36
+    ny = 24
+    nx = 24
     bs = 12
     t0 = 0
     gamma = 1.4
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     X = 10
     Y = 10
     tso = 2
-    ops = 2
+    ops = 1
     aff = 0.5 #Dimensions and steps
     dx = X/nx
     dy = Y/ny
@@ -27,8 +27,8 @@ if __name__ == "__main__":
     dt = Fo*(X/nx)**2/alpha
     tf = dt*100
     tf = 0.1
-    dt = 0.02
+    dt = 0.01
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,alpha)
-    swargs = (tso,ops,bs,aff,"./pysweep/equations/eqt.h","./pysweep/equations/eqt.py")
+    swargs = (tso,ops,bs,aff,"./pysweep/equations/eqt2.h","./pysweep/equations/eqt2.py")
     dsweep(arr,gargs,swargs,filename="test",exid=[1])

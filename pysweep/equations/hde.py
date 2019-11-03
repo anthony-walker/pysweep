@@ -22,9 +22,10 @@ def step(state,iidx,ts,gts):
     """
     half = 0.5
     vs = slice(0,state.shape[1],1)
+    TSO = 2
     for idx,idy in iidx:
         dT = d2Tdxy(state,(ts,vs,idx,idy))
-        if (gts+1)%2==0:   #Corrector step
+        if (gts)%TSO==0:   #Corrector step
             state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dT
         else: #Predictor step
             state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*dT
