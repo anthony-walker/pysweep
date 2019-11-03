@@ -4,7 +4,7 @@ import numpy as np
 if __name__ == "__main__":
     # nx = ny = 120
     ny = 12
-    nx = 12
+    nx = 36
     bs = 12
     t0 = 0
     gamma = 1.4
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     Y = 10
     tso = 2
     ops = 2
-    aff = 1 #Dimensions and steps
+    aff = 0.5 #Dimensions and steps
     dx = X/nx
     dy = Y/ny
     alpha = 5

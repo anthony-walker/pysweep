@@ -547,7 +547,7 @@ DownPyramid(float *state, int gts)
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     // printf("%d\n",MDSS );
-    for (int k = 0; k <= MDSS; k++)
+    for (int k = 0; k < MDSS; k++)
     {
         step(shared_state,sgid,gts);
         // Solving step function
