@@ -29,7 +29,7 @@ def step(state,iidx,ts,gts):
         if (gts)%TSO==0: #Corrector
             state[ntidx] = (state[pidx])+2
         else: #Predictor
-            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4+1
+            state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4+2
     return state
 
 def set_globals(gpu,source_mod,*args):
