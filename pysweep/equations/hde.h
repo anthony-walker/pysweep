@@ -32,7 +32,7 @@ void step(float *shared_state, int idx, int gts)
     float dT;
     d2Tdxy(dT,shared_state,idx);
     __syncthreads();
-    if ((gts+1)%TSO==0) //Corrector step
+    if ((gts)%TSO==0) //Corrector step
     {
       shared_state[idx]=shared_state[idx-STS]+dT;
     }

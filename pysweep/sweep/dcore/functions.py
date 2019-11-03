@@ -76,7 +76,7 @@ def LastPrism(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
         garr = decomp.copy_s_to_g(sarr,garr,blocks,BS)
         cuda.memcpy_htod(arr_gpu,garr)
         SM.get_function("XBridge")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
-        SM.get_function("DownPyramid")(arr_gpu,np.int32(gts),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
+        SM.get_function("DownPyramid")(arr_gpu,np.int32(gts),np.int32(sgs.TSO-1),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(garr,arr_gpu)
         sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]

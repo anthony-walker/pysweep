@@ -143,7 +143,7 @@ def test_decomp_hde(args=(8, 120, 1, 10, 0.24, 5, 12, 10)):
     npy=npx
     Y=X
     dt = Fo*(X/npx)**2/alpha
-    tf = 500*dt
+    tf = 1000*dt
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
