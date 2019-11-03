@@ -69,7 +69,7 @@ def find_remove_ranks(node_ranks,AF,num_gpus):
     """Use this function to find ranks that need removed."""
     ranks_to_remove = list()
     # node_ranks = [node_ranks[0]] if AF == 0 else node_ranks
-    
+
     while len(node_ranks) > num_gpus+(1-int(AF)):
         ranks_to_remove.append(node_ranks.pop())
     return ranks_to_remove

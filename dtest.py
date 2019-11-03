@@ -5,8 +5,8 @@ from pysweep.analytical.ahde import TIC
 
 if __name__ == "__main__":
     # nx = ny = 120
-    ny = 24
-    nx = 24
+    ny = 120
+    nx = 120
     bs = 12
     t0 = 0
     gamma = 1.4
@@ -33,4 +33,4 @@ if __name__ == "__main__":
     #Changing arguments
     gargs = (t0,tf,dt,dx,dy,alpha)
     swargs = (tso,ops,bs,aff,"./pysweep/equations/hde.h","./pysweep/equations/hde.py")
-    dsweep(arr,gargs,swargs,filename="test",exid=[1])
+    dsweep(arr,gargs,swargs,filename="test",exid=[])
