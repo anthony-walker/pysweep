@@ -128,5 +128,6 @@ def mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks):
         print(rank)
         MPI.Finalize()
         exit(0)
+    print(rank)
     comm.Barrier()
     return node_comm,comm
