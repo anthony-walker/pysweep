@@ -22,7 +22,7 @@ if __name__ == "__main__":
     Y = 10
     tso = 2
     ops = 1
-    aff = 0 #Dimensions and steps
+    aff = 0.5 #Dimensions and steps
     dx = X/nx
     dy = Y/ny
     alpha = 5
