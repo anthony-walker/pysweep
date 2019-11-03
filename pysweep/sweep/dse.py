@@ -99,6 +99,7 @@ def dsweep_engine():
         #Getting GPU information
         gpu_rank,total_num_gpus, num_gpus, node_info, comranks, GNR,CNR = dcore.get_gpu_info(rank,cluster_master,node_id,cluster_comm,AF,BS,exid,processors,node_comm.Get_size(),arr0.shape)
         ranks_to_remove = dcore.find_remove_ranks(node_ranks,AF,num_gpus)
+        print(rank,ranks_to_remove)
         [gpu_rank.append(None) for i in range(len(node_ranks)-len(gpu_rank))]
         #Testing ranks and number of gpus to ensure simulation is viable
         assert total_num_gpus < comm.Get_size() if AF < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
