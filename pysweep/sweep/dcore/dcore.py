@@ -125,6 +125,7 @@ def mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks):
         node_group = comm.group.Incl(node_ranks)
         node_comm = comm.Create_group(node_group)
     else: #Ending unnecs
+        print(rank)
         MPI.Finalize()
         exit(0)
     comm.Barrier()
