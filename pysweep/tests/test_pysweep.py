@@ -141,7 +141,7 @@ def test_dsweep_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 3)):
     npy=npx
     Y=X
     dt = Fo*(X/npx)**2/alpha
-    tf = 100*dt
+    tf = 500*dt
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
     if not os.path.isfile(sfp):
