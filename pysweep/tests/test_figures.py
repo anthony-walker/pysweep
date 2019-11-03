@@ -31,8 +31,8 @@ def set_lims(fig,axes):
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(lim1[i],lim2[i],10))
 
 def comp_gif(filename="vsdc0.gif"):
-    decomp_file = "./pysweep/tests/data/dswept_hde.hdf5"
-    swept_file =  "./pysweep/tests/data/decomp_hde.hdf5"
+    decomp_file = "./pysweep/tests/data/decomp_hde.hdf5"
+    swept_file =  "./pysweep/tests/data/dswept_hde.hdf5"
     #Opening the data files
     decomp_hdf5 = h5py.File(decomp_file, 'r')
     swept_hdf5 = h5py.File(swept_file, 'r')
@@ -101,5 +101,5 @@ def create_hdf_gif(swept_file = "./pysweep/tests/data/dswept_hde.hdf5",filename=
     swept_hdf5.close()
 
 if __name__ == "__main__":
-    # comp_gif("hdec.gif")
-    create_hdf_gif()
+    comp_gif("hdec.gif")
+    # create_hdf_gif()
