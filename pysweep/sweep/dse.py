@@ -151,22 +151,23 @@ def dsweep_engine():
     # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
+    functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+
+    cwt = 1
+
+    # -------------------------------SWEPT LOOP--------------------------------------------#
+    step = cycle([functions.send_backward,functions.send_forward])
+    for i in range(MGST):
+        functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
+        node_comm.Barrier()
+        cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
+
     if NMB:
         i=1
         for j in range(i,i+3):
             print("----------------------------")
             printer.pm(sarr,j)
     node_comm.Barrier()
-    functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-
-    cwt = 1
-
-    # -------------------------------SWEPT LOOP--------------------------------------------#
-    # step = cycle([functions.send_backward,functions.send_forward])
-    # for i in range(MGST):
-    #     functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    #     node_comm.Barrier()
-    #     cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
     # #Do LastPrism Here then Write all of the remaining data
     # functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     # node_comm.Barrier()

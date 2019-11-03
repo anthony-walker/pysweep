@@ -204,8 +204,8 @@ UpPyramid(float *state, int gts)
     int uy = blockDim.y-OPS; //upper y
     //Communicating interior points for TSO data and calculation data
     //UpPyramid Always starts on predictor so no if needed here
-    shared_state_fill(shared_state,state,ZERO,(TSO));
-    shared_state_fill(shared_state,state,ONE,(TSO));
+    shared_state_fill(shared_state,state,ZERO,(TSO-1));
+    shared_state_fill(shared_state,state,ONE,(TSO-1));
     __syncthreads(); //Sync threads here to ensure all initial values are copied
     //Swept loop
     for (int k = 0; k < MPSS; k++)
@@ -226,7 +226,7 @@ UpPyramid(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
         //Update swept bounds
@@ -262,7 +262,7 @@ YBridge(float *state, int gts)
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-((gts-1)%TSO)*TIMES]; //Initial time step
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
@@ -285,7 +285,7 @@ YBridge(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
         //Update swept bounds
@@ -323,7 +323,7 @@ YBT(float *state, int gts)
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-((gts-1)%TSO)*TIMES]; //Initial time step
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
@@ -346,7 +346,7 @@ YBT(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
         //Update swept bounds
@@ -383,7 +383,7 @@ XBridge(float *state, int gts)
     //Communicating interior points for TSO data and calculation data
     for (int i = 0; i < NV; i++)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-((gts-1)%TSO)*TIMES]; //Initial time step
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
@@ -406,7 +406,7 @@ XBridge(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
         //Update swept bounds
@@ -444,7 +444,7 @@ Octahedron(float *state, int gts)
     int uy = (blockDim.y+TOPS)/TWO+OPS; //upper y
     for (int i = 0; i < NV; i++)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-((gts-1)%TSO)*TIMES]; //Initial time step
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
@@ -470,7 +470,7 @@ Octahedron(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
         //Update swept bounds
@@ -512,7 +512,7 @@ Octahedron(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
     }
@@ -542,7 +542,7 @@ DownPyramid(float *state, int gts)
     int uy = (blockDim.y+TOPS)/TWO+OPS; //upper y
     for (int i = 0; i < NV; i++)
     {
-        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step
+        shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-((gts-1)%TSO)*TIMES]; //Initial time step
         shared_state[sgid+i*SGIDS] = state[gid+i*VARS]; //Initial time step
     }
     __syncthreads(); //Sync threads here to ensure all initial values are copied
@@ -568,7 +568,7 @@ DownPyramid(float *state, int gts)
             //Copy latest step
             shared_state[sgid+j*SGIDS] = state[gid+j*VARS+(k+1)*TIMES];
             //Copy TSO Step Down
-            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-gts%TSO)*TIMES];
+            shared_state[sgid+j*SGIDS-STS] = state[gid+j*VARS+(k-(gts-1)%TSO)*TIMES];
         }
         gts += 1;   //Update gts
         //Update swept bounds
