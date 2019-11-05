@@ -74,22 +74,22 @@ def read_input_file(comm):
     return arr0,gargs,swargs,GS,CS,filename,exid,dType
 
 
-def create_cpu_blocks(total_cpu_block,BS,shared_shape):
+def create_cpu_blocks(total_cpu_block,BS,shared_shape,ops):
     """Use this function to create blocks."""
     row_range = np.arange(0,total_cpu_block[2].stop-total_cpu_block[2].start,BS[1],dtype=np.intc)
     column_range = np.arange(total_cpu_block[3].start,total_cpu_block[3].stop,BS[1],dtype=np.intc)
-    xslice = slice(shared_shape[2]-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2],1)
+    xslice = slice(shared_shape[2]-ops-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2]-ops,1)
     ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,total_cpu_block[3])
     return [(total_cpu_block[0],total_cpu_block[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)],ntcb
 
 
-def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank):
+def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank,ops):
     """Use this function to split data amongst nodes."""
     if rank == node_master:
         start,stop,gm,cm = node_info
         gstop = start+gm
         g = np.linspace(start,gstop,num_gpus+1,dtype=np.intc)
-        gbs = [slice(int(g[i]*BS[0]),int(g[i+1]*BS[0]),1) for i in range(num_gpus)]+[slice(int(gstop*BS[0]),int(stop*BS[0]),1)]
+        gbs = [slice(int(g[i]*BS[0]+ops),int(g[i+1]*BS[0]+ops),1) for i in range(num_gpus)]+[slice(int(gstop*BS[0]+ops),int(stop*BS[0]+ops),1)]
         gpu_rank = list(zip(gpu_rank,gbs))
     gpu_rank = node_comm.scatter(gpu_rank)
     return gpu_rank

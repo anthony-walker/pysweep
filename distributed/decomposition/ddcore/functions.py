@@ -10,7 +10,7 @@ except Exception as e:
 import numpy as np
 
 
-def decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
+def Decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -20,29 +20,24 @@ def decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
     #Splitting between cpu and gpu
     if GRB:
-        arr_gpu = cuda.mem_alloc(garr.nbytes)
-        garr = decomp.copy_s_to_g(sarr,garr,blocks,BS)
-        cuda.memcpy_htod(arr_gpu,garr)
-        SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
-        SM.get_function("YBridge")(arr_gpu,np.int32(gts),grid=(GRD[0],GRD[1]-1), block=BS,shared=ssb)
-        cuda.Context.synchronize()
-        cuda.memcpy_dtoh(garr,arr_gpu)
-        sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
+        pass
+        # arr_gpu = cuda.mem_alloc(garr.nbytes)
+        # garr = decomp.copy_s_to_g(sarr,garr,blocks,BS)
+        # cuda.memcpy_htod(arr_gpu,garr)
+        # SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        # cuda.Context.synchronize()
+        # cuda.memcpy_dtoh(garr,arr_gpu)
+        # sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
     else:   #CPUs do this
-        cblocks,xblocks = zip(*blocks)
-        mpi_pool.map(dCPU_UpPyramid,cblocks)
-        mpi_pool.map(dCPU_Ybridge,xblocks)
+        mpi_pool.map(dCPU_Decomp,blocks)
         #Copy result to MPI shared process array
         sarr[total_cpu_block] = sgs.carr[:,:,:,:]
 
-def dCPU_decomposition(block):
+def dCPU_Decomp(block):
     """Use this function to build the Up Pyramid."""
-    #UpPyramid of Swept Step
+    #Calculating Step
     ct = sgs.gts
-    for ts,swept_set in enumerate(sgs.up_sets,start=sgs.TSO):
-        #Calculating Step
-        sgs.carr[block] = sgs.SM.step(sgs.carr[block],swept_set,ts,ct)
-        ct+=1
+    sgs.carr[block] = sgs.SM.step(sgs.carr[block],sgs.dset,1,ct)
 
 def send_edges(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,total_cpu_block):
     """Use this function to communicate data between nodes"""
