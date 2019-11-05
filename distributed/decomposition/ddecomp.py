@@ -1,7 +1,7 @@
 
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, h5py, GPUtil, time
+import sys, h5py, GPUtil,os
 import numpy as np
 from mpi4py import MPI
 
@@ -25,8 +25,6 @@ def ddecomp(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     exid: GPU ids to exclude from the calculation.
     dType: a string data type which will be entered into numpy to obtain a datatype object
     """
-    start = time.time()
-
     AF = swargs[3]
     swnames = ['TSO','OPS','BS','AF']
     #Getting GPU info
@@ -71,8 +69,8 @@ def ddecomp(arr0,gargs,swargs,filename ="results",exid=[],dType='float32'):
     num_procs = int(proc_mult*comm.Get_size())
     # Spawning MPI processes
     if rank == master_rank:
-        MPI.COMM_SELF.Spawn(sys.executable,args=['./pysweep/distributed/sweep/dece.py'],maxprocs=num_procs)
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'dece.py')
+        MPI.COMM_SELF.Spawn(sys.executable,args=[path],maxprocs=num_procs)
     else:
         MPI.Finalize()
-    stop = time.time()
-    return stop-start
+        exit(0)

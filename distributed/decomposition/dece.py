@@ -10,7 +10,7 @@ except Exception as e:
     print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 #Dsweep imports
 from ddcore import dcore,decomp,functions,sgs
-from cdcore import source, printer
+from ccore import source, printer
 #MPI imports
 from mpi4py import MPI
 #Multi-processing imports
@@ -107,13 +107,14 @@ def decomp_engine():
     # Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     #---------------------------Creating and Filling Shared Array-------------#
-    shared_shape = (TSO+1,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
+    shared_shape = (TSO+1,arr0.shape[0],int(sum(node_info[2:])*BS[0]+2*OPS),arr0.shape[2]+2*OPS)
     sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Filling shared array
     if NMB:
         gsc = (slice(0,arr0.shape[1],1),slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),slice(0,arr0.shape[2],1))
-        sarr[TSO-ONE,:,:,:] =  arr0[gsc]
+        sarr[TSO-ONE,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
+        
     else:
         gsc = None
     #Making blocks match array other dimensions
@@ -130,7 +131,7 @@ def decomp_engine():
         mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
     else:
         GRD,block_shape,garr = None,None,None
-        blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
+        blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs)
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     # ------------------------------HDF5 File------------------------------------------#
     hdf5_file, hdf5_data = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
@@ -140,8 +141,7 @@ def decomp_engine():
     node_comm.Barrier()
     cwt = 1
 
-
-
+    print(total_cpu_block)
 
 
 

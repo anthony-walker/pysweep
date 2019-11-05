@@ -1,7 +1,7 @@
 
 #Programmer: Anthony Walker
 #This file is for global variable initialization
-from dcore import block, decomp, sgs
+from ddcore import block, decomp, sgs
 from ccore import source
 import h5py, os, GPUtil
 import numpy as np
@@ -15,7 +15,7 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
     hdf_bs = hdf5_file.create_dataset("BS",(len(BS),),data=BS)
     hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,),data=(time_steps,)+arr0.shape)
     hdf_aff = hdf5_file.create_dataset("AF",(1,),data=AF)
-    hdf_time = hdf5_file.create_dataset("time",(1,))
+    hdf_time = hdf5_file.create_dataset("time",(1,),data=0.0)
     hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+1,arr0.shape[0],arr0.shape[1],arr0.shape[2]),dtype=dType)
     if rank == cluster_master:
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
@@ -75,10 +75,9 @@ def find_remove_ranks(node_ranks,AF,num_gpus):
     return ranks_to_remove
 
 
-def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs,MPSS):
+def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs):
     """Use this function to execute core cpu only processes"""
     blocks,total_cpu_block = decomp.create_cpu_blocks(total_cpu_block,BS,shared_shape)
-    blocks = decomp.create_escpu_blocks(blocks,shared_shape,BS)
     sgs.SM = source.build_cpu_source(CS) #Building Python source code
     sgs.SM.set_globals(GRB,sgs.SM,*gargs)
     #Creating sets for cpu calculation

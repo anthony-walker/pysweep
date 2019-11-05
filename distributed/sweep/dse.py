@@ -1,6 +1,6 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, os, h5py, math, GPUtil, socket
+import sys, os, h5py, math, GPUtil, socket, time
 from itertools import cycle
 #CUDA Imports
 try:
@@ -16,6 +16,8 @@ from mpi4py import MPI
 #Multi-processing imports
 import multiprocessing as mp
 import numpy as np
+
+
 
 def dsweep_engine():
     # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
@@ -38,6 +40,8 @@ def dsweep_engine():
     filename: Name of the output file excluding hdf5
     exid: GPU ids to exclude from the calculation.
     """
+    #Starting timer
+    start = time.time()
     #Setting global variables
     sgs.init_globals()
     #Local Constants
@@ -143,7 +147,7 @@ def dsweep_engine():
         blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     # ------------------------------HDF5 File------------------------------------------#
-    hdf5_file, hdf5_data = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
+    hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
@@ -168,11 +172,13 @@ def dsweep_engine():
     if GRB:
         cuda_context.pop()
     comm.Barrier()
+    hdf_time[0] = time.time()-start
     hdf5_file.close()
     #Removing input file.
     if NMB:
         os.system("rm "+"input_file.hdf5")
 #Statement to execute dsweep
 dsweep_engine()
+
 #Statement to finalize MPI processes
 MPI.Finalize()

@@ -6,7 +6,7 @@ import numpy as np
 import multiprocessing as mp
 from itertools import cycle, product
 from mpi4py import MPI
-from dcore import sgs
+from ddcore import sgs
 
 def create_local_gpu_array(block_shape):
     """Use this function to create the local gpu array"""
@@ -82,21 +82,6 @@ def create_cpu_blocks(total_cpu_block,BS,shared_shape):
     ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,total_cpu_block[3])
     return [(total_cpu_block[0],total_cpu_block[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)],ntcb
 
-def create_escpu_blocks(cpu_blocks,shared_shape,BS):
-    """Use this function to create shift blocks and edge blocks."""
-    #This handles edge blocks in the y direction
-    shift = int(BS[1]/2)
-    #Creating shift blocks and edges
-    shift_blocks = [(block[0],block[1],block[2],slice(block[3].start+shift,block[3].stop+shift,1)) for block in cpu_blocks]
-    for i,block in enumerate(shift_blocks):
-        if block[3].start < 0:
-            new_block = (block[0],block[0],block[2],np.arange(block[3].start,block[3].stop))
-            shift_blocks[i] = new_block
-        elif block[3].stop > shared_shape[3]:
-            ny = np.concatenate((np.arange(block[3].start,block[3].stop-shift),np.arange(0,shift,1)))
-            new_block = (block[0],block[0],block[2],ny)
-            shift_blocks[i] = new_block
-    return list(zip(cpu_blocks,shift_blocks))
 
 def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank):
     """Use this function to split data amongst nodes."""
