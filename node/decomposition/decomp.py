@@ -36,7 +36,7 @@ import ctypes
 #GPU Utility Imports
 import GPUtil
 #Decomp functions
-import node.decomposition.decomp_functions as dcf
+from . import decomp_functions as dcf
 #Testing
 import time as timer
 
@@ -82,7 +82,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     #-----------------------------INITIAL SPLIT OF DOMAIN------------------------------------#
     if rank == master_rank:
         #Determining the split between gpu and cpu
-        gpu_slices,cpu_slices = get_affinity_slices(AF,BS,arr0.shape)
+        gpu_slices,cpu_slices = dcf.get_affinity_slices(AF,BS,arr0.shape)
         #Getting gpus
         if AF>0:
             gpu_rank = GPUtil.getAvailable(order = 'load',excludeID=exid,limit=1e8) #getting devices by load
@@ -134,7 +134,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     #-----------------------SHARED [ARRAY] CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
     shared_shape = (3,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
-    shared_arr = create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
+    shared_arr = dcf.create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Fill shared array and communicate initial boundaries
     if rank == master_rank:
@@ -146,16 +146,16 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     if gpu_rank[0]:
         gri = gpu_comm.Get_rank()
         cri = None
-        regions = create_write_region(gpu_comm,gri,gpu_master,num_gpus,BS,arr0.shape,gpu_slices,shared_shape[0],OPS)
+        regions = dcf.create_write_region(gpu_comm,gri,gpu_master,num_gpus,BS,arr0.shape,gpu_slices,shared_shape[0],OPS)
     else:
         cri = cpu_comm.Get_rank()
         gri = None
-        regions = create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
-    regions = (create_read_region(regions,OPS),regions) #Creating read region
-    brs = create_boundary_regions(regions[1],shared_shape,OPS)
+        regions = dcf.create_write_region(cpu_comm,cri,cpu_master,num_cpus,BS,arr0.shape,cpu_slices,shared_shape[0],OPS)
+    regions = (dcf.create_read_region(regions,OPS),regions) #Creating read region
+    brs = dcf.create_boundary_regions(regions[1],shared_shape,OPS)
     comm.Barrier()
 
-    reg_edge_comm(shared_arr,OPS,brs,regions[1])
+    dcf.reg_edge_comm(shared_arr,OPS,brs,regions[1])
     comm.Barrier()
     #Communicate edges
     local_array = np.copy(shared_arr[regions[0]])
@@ -197,15 +197,15 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
         TIMES = VARS*NV
         const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":OPS,"TSO":TSO,"STS":STS})
         #Building CUDA source code
-        source_mod = build_gpu_source(GS)
-        decomp_constant_copy(source_mod,const_dict)
-        cpu_source_mod = build_cpu_source(CS)   #Building cpu source for set_globals
+        source_mod = dcf.build_gpu_source(GS)
+        dcf.decomp_constant_copy(source_mod,const_dict)
+        cpu_source_mod = dcf.build_cpu_source(CS)   #Building cpu source for set_globals
         cpu_source_mod.set_globals(gpu_rank[0],source_mod,*gargs)
         del cpu_source_mod
         decomp_set = None
     else:
-        source_mod = build_cpu_source(CS) #Building Python source code
-        decomp_set = create_decomp_sets(shared_arr[regions[0]].shape,OPS)
+        source_mod = dcf.build_cpu_source(CS) #Building Python source code
+        decomp_set = dcf.create_decomp_sets(shared_arr[regions[0]].shape,OPS)
         source_mod.set_globals(gpu_rank[0],source_mod,*gargs)
         grid_size = None
     #------------------------------HDF5 File------------------------------------------#
@@ -228,7 +228,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     #Solving loop
     for i in range(0, TSO*(time_steps)):
         local_array = np.copy(shared_arr[regions[0]])
-        decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],decomp_set,shared_arr,OPS,i,TSO,ssb)
+        dcf.decomposition(source_mod,local_array, gpu_rank[0], BS, grid_size,regions[ONE],decomp_set,shared_arr,OPS,i,TSO,ssb)
         comm.Barrier()
         #Writing Data after it has been shifted
         if (i+1)%TSO==0:
@@ -238,12 +238,8 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
             ct+=1
         np.copyto(shared_arr[1,wr[1],wr[2],wr[3]],shared_arr[2,wr[1],wr[2],wr[3]])
         shared_arr[2,wr[1],wr[2],wr[3]] = 0
-        reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
+        dcf.reg_edge_comm(shared_arr,OPS,brs,regions[ONE])
         comm.Barrier()
-        # if rank == master_rank:
-        #     pm(shared_arr,1)
-        #     input()
-        # comm.Barrier()
     #Final barrier
     comm.Barrier()
     #CUDA clean up - One of the last steps

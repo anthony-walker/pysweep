@@ -3,7 +3,7 @@
 import sys, os, h5py
 sys.path.insert(0, './pysweep')
 import numpy as np
-from decomposition import decomp_functions
+from node.decomposition import decomp_functions
 
 def test_reg_edge_comm(args=None):
     """Use this function to test the communication"""
