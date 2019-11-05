@@ -12,8 +12,8 @@ except Exception as e:
 #MPI imports
 from mpi4py import MPI
 #Swept imports
-from sweep.ncore import decomp,functions,mplambda,block,regions
-from sweep.ccore import source, printer
+from node.sweep.ncore import decomp,functions,mplambda,block,regions
+from node.sweep.ccore import source, printer
 
 def nsweep(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=[]):
     """Use this function to perform swept rule

@@ -33,11 +33,10 @@ from mpi4py import MPI
 #Multiprocessing Imports
 import multiprocessing as mp
 import ctypes
-
 #GPU Utility Imports
 import GPUtil
 #Decomp functions
-from .decomp_functions import *
+import node.decomposition.decomp_functions as dcf
 #Testing
 import time as timer
 
