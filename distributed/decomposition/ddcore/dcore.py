@@ -82,15 +82,11 @@ def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs,MPSS):
     sgs.SM = source.build_cpu_source(CS) #Building Python source code
     sgs.SM.set_globals(GRB,sgs.SM,*gargs)
     #Creating sets for cpu calculation
-    sgs.up_sets = block.create_dist_up_sets(BS,OPS)
-    sgs.down_sets = block.create_dist_down_sets(BS,OPS)
-    sgs.oct_sets = sgs.down_sets+sgs.up_sets
-    sgs.y_sets,sgs.x_sets = block.create_dist_bridge_sets(BS,OPS,MPSS)
     sgs.carr = decomp.create_shared_pool_array(sarr[total_cpu_block].shape)
     sgs.carr[:,:,:,:] = sarr[total_cpu_block]
     return blocks,total_cpu_block
 
-def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO):
+def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO):
     """Use this function to execute core gpu only processes"""
     block_shape = [i.stop-i.start for i in blocks]
     block_shape[-1] += int(2*BS[0]) #Adding 2 blocks in the column direction
@@ -102,12 +98,10 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO):
     STS = SGIDS*NV #Shared time shift
     VARS =  block_shape[2]*(block_shape[3])
     TIMES = VARS*NV
-    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+    const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"OPS":OPS,"TSO":TSO,"STS":STS})
     garr = decomp.create_local_gpu_array(block_shape)
-    # print(block_shape)
     #Building CUDA source code
-    sgs.SM = source.build_gpu_source(GS,os.path.basename(__file__))
-    source.swept_constant_copy(sgs.SM,const_dict)
+    sgs.SM = source.build_gpu_source(GS)
     cpu_SM = source.build_cpu_source(CS)   #Building cpu source for set_globals
     cpu_SM.set_globals(GRB,sgs.SM,*gargs)
     del cpu_SM

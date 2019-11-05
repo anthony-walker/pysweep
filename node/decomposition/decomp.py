@@ -133,7 +133,7 @@ def decomp(arr0,gargs,swargs,dType=np.dtype('float32'),filename ="results",exid=
     time_steps = int((tf-t0)/dt)+ONE  #Number of time steps +ONE becuase initial time step
     #-----------------------SHARED [ARRAY] CREATION----------------------#
     #Create shared process array for data transfer  - TWO is added to shared shaped for IC and First Step
-    shared_shape = (3,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
+    shared_shape = (TSO+1,arr0.shape[ZERO],arr0.shape[ONE]+TOPS,arr0.shape[TWO]+TOPS)
     shared_arr = dcf.create_CPU_sarray(comm,shared_shape,dType,np.prod(shared_shape)*dType.itemsize)
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Fill shared array and communicate initial boundaries

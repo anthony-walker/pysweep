@@ -107,7 +107,7 @@ def decomp_engine():
     # Checking to ensure that there are enough
     assert total_num_gpus >= node_comm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
     #---------------------------Creating and Filling Shared Array-------------#
-    shared_shape = (MOSS+TSO+ONE,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
+    shared_shape = (TSO+1,arr0.shape[0],int(sum(node_info[2:])*BS[0]),arr0.shape[2])
     sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,np.zeros(shared_shape).nbytes)
     ssb = np.zeros((2,arr0.shape[ZERO],BS[0]+2*OPS,BS[1]+2*OPS),dtype=dType).nbytes
     #Filling shared array
@@ -126,7 +126,7 @@ def decomp_engine():
         cuda.init()
         cuda_device = cuda.Device(gpu_rank)
         cuda_context = cuda_device.make_context()
-        block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO)
+        block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO)
         mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
     else:
         GRD,block_shape,garr = None,None,None
@@ -135,24 +135,16 @@ def decomp_engine():
     # ------------------------------HDF5 File------------------------------------------#
     hdf5_file, hdf5_data = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     comm.Barrier() #Ensure all processes are prepared to solve
-    # -------------------------------SWEPT RULE---------------------------------------------#
+    # -------------------------------Standard Decomposition---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     node_comm.Barrier()
-    # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
-    functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    node_comm.Barrier()
-    functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
     cwt = 1
-    # -------------------------------SWEPT LOOP--------------------------------------------#
-    step = cycle([functions.send_backward,functions.send_forward])
-    for i in range(MGST):
-        functions.UpPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-        node_comm.Barrier()
-        cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
-    #Do LastPrism Here then Write all of the remaining data
-    functions.LastPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-    node_comm.Barrier()
-    next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,total_cpu_block)
+
+
+
+
+
+
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()
