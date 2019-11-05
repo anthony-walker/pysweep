@@ -149,7 +149,7 @@ def test_decomp_hde(args=(8, 120, 0.5, 10, 0.24, 5, 12, 10)):
 
     if not os.path.isfile(sfp):
         #Create data using solver
-        estr = "mpiexec -n "+str(nps)+"--hostfile=decomp-nodes python ./pysweep/pst.py standard_hde "
+        estr = "mpiexec -n "+str(nps)+" python ./pysweep/pst.py standard_hde "
         estr += "-b "+str(blks)+" -o 1 --tso 2 -a "+str(aff)+" -g \"./pysweep/equations/hde.h\" -c \"./pysweep/equations/hde.py\" "
         estr += "--hdf5 " + decomp_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)

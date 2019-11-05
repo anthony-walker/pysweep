@@ -2,7 +2,7 @@
 import sys, os
 import numpy as np
 sys.path.insert(0, './pysweep')
-from sweep.ccore import source
+from node.sweep.ccore import source
 from analytical.ahde import TIC
 #Cuda
 try:

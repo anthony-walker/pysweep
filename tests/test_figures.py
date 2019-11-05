@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gsc
 from matplotlib import cm
 import matplotlib.animation as animation
-from sweep.ncore.mplambda import sweep_lambda
+from node.sweep.ncore.mplambda import sweep_lambda
 
 def myContour(args):
     i,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata=args
@@ -66,7 +66,7 @@ def comp_gif(filename="vsdc0.gif"):
     #Closing files
     swept_hdf5.close()
 
-def create_hdf_gif(swept_file = "./pysweep/tests/data/dswept_hde.hdf5",filename="shde.gif",idx=0):
+def create_hdf_gif(swept_file = "./pysweep/tests/data/swept_hde.hdf5",filename="shde.gif",idx=0):
     #Opening the data files
     swept_hdf5 = h5py.File(swept_file, 'r')
     tsdata = swept_hdf5['data'][:,idx,:,:]
@@ -101,5 +101,5 @@ def create_hdf_gif(swept_file = "./pysweep/tests/data/dswept_hde.hdf5",filename=
     swept_hdf5.close()
 
 if __name__ == "__main__":
-    comp_gif("hdec.gif")
-    # create_hdf_gif()
+    # comp_gif("hdec.gif")
+    create_hdf_gif()

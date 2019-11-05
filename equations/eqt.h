@@ -46,7 +46,7 @@ void step(float * shared_state, int idx, int gts)
 
    __syncthreads();
 
-  if ((gts)%TSO==0) //Corrector step
+  if ((gts+1)%TSO==0) //Corrector step
   {
       // printf("%s\n", "C");
       for (int i = 0; i < NVC; i++)

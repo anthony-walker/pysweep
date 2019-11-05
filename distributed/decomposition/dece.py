@@ -54,17 +54,7 @@ def decomp_engine():
     t0,tf,dt = gargs[:3]
     assert BS%(2*OPS)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
     BS = (BS,BS,1)
-    #---------------------SWEPT VARIABLE SETUP----------------------$
-    #Splits for shared array
-    SPLITX = int(BS[ZERO]/TWO)   #Split computation shift - add OPS
-    SPLITY = int(BS[ONE]/TWO)   #Split computation shift
-    MPSS = int(BS[0]/(2*OPS)-1)
-    sgs.MPSS = MPSS
-    MOSS = 2*MPSS
     time_steps = int((tf-t0)/dt)  #Number of time steps
-    MGST = int(TSO*(time_steps-MPSS)/(MPSS)+1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
-    time_steps = int(MPSS*(MGST+1)/TSO+1) #Number of time steps - Add 1 for initial conditions
-
     #-------------MPI SETUP----------------------------#
     processor = MPI.Get_processor_name()
     rank = comm.Get_rank()  #current rank

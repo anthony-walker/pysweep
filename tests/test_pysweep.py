@@ -107,7 +107,7 @@ def test_sweep_vortex(args=(1,0.01,40,0,10,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str
         os.system(estr)
 
-def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
+def test_sweep_hde(args=(8,40,0.75,10,0.24,5,10,4)):
     savepath = "./swept_hde_plot"
     swept_file = "\"./pysweep/tests/data/swept_hde\""
     sfp = "./pysweep/tests/data/swept_hde.hdf5"
@@ -120,6 +120,7 @@ def test_sweep_hde(args=(8,40,0.5,10,0.24,5,10,4)):
     Y=X
     dt = Fo*(X/npx)**2/alpha
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
+    tf = 100*dt
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
     if not os.path.isfile(sfp):

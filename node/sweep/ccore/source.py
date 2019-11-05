@@ -22,15 +22,12 @@ def build_cpu_source(cpu_source):
     spec.loader.exec_module(source_mod)
     return source_mod
 
-def build_gpu_source(kernel_source,name):
+def build_gpu_source(kernel_source):
     """Use this function to build the given and swept source module together.
     """
     #GPU Swept Calculations
     #----------------Reading In Source Code-------------------------------#
-    if 'dc' in name:
-        cuda_file = "dsweep.h"
-    else:
-        cuda_file = "nsweep.h"
+    cuda_file = "nsweep.h"
     file = inspect.getfile(build_cpu_source)
     fname = file.split("/")[-1]
     fpath = op.abspath(inspect.getabsfile(build_cpu_source))[:-len(fname)]+cuda_file

@@ -24,11 +24,11 @@ def step(state,iidx,ts,gts):
     vs = slice(0,state.shape[1],1)
     TSO = 2
     for idx,idy in iidx:
-        dT = d2Tdxy(state,(ts-1,vs,idx,idy))
-        if (gts)%TSO==0:   #Corrector step
-            state[ts,vs,idx,idy] = state[ts-TSO,vs,idx,idy]+dT
+        dT = d2Tdxy(state,(ts,vs,idx,idy))
+        if (gts+1)%TSO==0:   #Corrector step
+            state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dT
         else: #Predictor step
-            state[ts,vs,idx,idy] = state[ts-1,vs,idx,idy]+half*dT
+            state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*dT
     return state
 
 def set_globals(gpu,source_mod,*args):

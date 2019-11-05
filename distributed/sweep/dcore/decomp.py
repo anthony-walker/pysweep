@@ -113,7 +113,7 @@ def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS,total_cpu_block):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
     i1,i2,i3=gsc #Unpack global tuple
-    for si,i in enumerate(range(gts,gts+MPSS,1),start=TSO):
+    for si,i in enumerate(range(gts+1,gts+1+MPSS,1),start=TSO):
         if i%TSO==0:
             hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
             cwt+=1

@@ -106,7 +106,7 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,MPSS,MOSS,TSO):
     garr = decomp.create_local_gpu_array(block_shape)
     # print(block_shape)
     #Building CUDA source code
-    sgs.SM = source.build_gpu_source(GS,os.path.basename(__file__))
+    sgs.SM = source.build_gpu_source(GS)
     source.swept_constant_copy(sgs.SM,const_dict)
     cpu_SM = source.build_cpu_source(CS)   #Building cpu source for set_globals
     cpu_SM.set_globals(GRB,sgs.SM,*gargs)

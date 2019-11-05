@@ -152,6 +152,7 @@ def dsweep_engine():
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+
     cwt = 1
     # -------------------------------SWEPT LOOP--------------------------------------------#
     step = cycle([functions.send_backward,functions.send_forward])
