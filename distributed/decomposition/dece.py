@@ -113,32 +113,30 @@ def decomp_engine():
     #Making blocks match array other dimensions
     bsls = [slice(0,i,1) for i in shared_shape]
     blocks = (bsls[0],bsls[1],blocks,slice(bsls[3].start+OPS,bsls[3].stop-OPS,1))
-    sgs.dset = np.ndindex((BS[0],BS[1]))
-
     GRB = True if gpu_rank is not None else False
     #Filling shared array
     if NMB:
         gsc = (slice(0,arr0.shape[1],1),slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),slice(0,arr0.shape[2],1))
         sarr[TSO-ONE,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
-        sarr[TSO-ONE,:,OPS:-OPS,OPS:-OPS]
+        sarr[TSO-ONE,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS:]
+        sarr[TSO-ONE,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],:OPS]
+
     else:
         gsc = None
-
     # ------------------- Operations specifically for GPus and CPUs------------------------#
     if GRB:
         # Creating cuda device and context
         cuda.init()
         cuda_device = cuda.Device(gpu_rank)
         cuda_context = cuda_device.make_context()
-        block_shape,GRD,garr = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO)
-        mpi_pool,carr,up_sets,down_sets,oct_sets,x_sets,y_sets,total_cpu_block = None,None,None,None,None,None,None,None
+        block_shape,GRD,garr,gread,gwrite = dcore.gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO)
+        mpi_pool,carr,clocal_block,total_cpu_block,shared_write_block = None,None,None,None,None
     else:
-        GRD,block_shape,garr = None,None,None
-        print(blocks)
-        blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs)
+        GRD,block_shape,garr,gread,gwrite = None,None,None,None,None
+        sgs.dset = [(x+OPS,y+OPS) for x,y in np.ndindex((BS[0],BS[1]))]
+        blocks,total_cpu_block,shared_write_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs)
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
-        print(sgs.carr.shape)
-        print(blocks)
+    functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
     # ------------------------------HDF5 File------------------------------------------#
     hdf5_file, hdf5_data = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     comm.Barrier() #Ensure all processes are prepared to solve
@@ -146,9 +144,15 @@ def decomp_engine():
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     node_comm.Barrier()
 
-    # for i in range(1):#time_steps):
-    #     functions.Decomposition(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
-
+    for i in range(1):#time_steps):
+        functions.Decomposition(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,shared_write_block,gwrite)
+        node_comm.Barrier()
+        functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
+    node_comm.Barrier()
+    if NMB:
+        printer.pm(sarr,2)
+    # if not GRB:
+    #     printer.pm(sgs.carr,2)
 
 
 

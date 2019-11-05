@@ -10,7 +10,7 @@ except Exception as e:
 import numpy as np
 
 
-def Decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
+def Decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block,gwrite):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
@@ -20,18 +20,17 @@ def Decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block):
     SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
     #Splitting between cpu and gpu
     if GRB:
-        pass
-        # arr_gpu = cuda.mem_alloc(garr.nbytes)
-        # garr = decomp.copy_s_to_g(sarr,garr,blocks,BS)
-        # cuda.memcpy_htod(arr_gpu,garr)
-        # SM.get_function("UpPyramid")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
+
+        arr_gpu = cuda.mem_alloc(garr.nbytes)
+        cuda.memcpy_htod(arr_gpu,garr)
+        # SM.get_function("Decomp")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
         # cuda.Context.synchronize()
         # cuda.memcpy_dtoh(garr,arr_gpu)
-        # sarr[blocks]=garr[:,:,:,BS[0]:-BS[0]]
+        sarr[gwrite]=garr[:,:,OPS:-OPS,OPS:-OPS]
     else:   #CPUs do this
         mpi_pool.map(dCPU_Decomp,blocks)
         #Copy result to MPI shared process array
-        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        sarr[total_cpu_block] = sgs.carr[:,:,OPS:-OPS,OPS:-OPS]
 
 def dCPU_Decomp(block):
     """Use this function to build the Up Pyramid."""
@@ -39,17 +38,20 @@ def dCPU_Decomp(block):
     ct = sgs.gts
     sgs.carr[block] = sgs.SM.step(sgs.carr[block],sgs.dset,1,ct)
 
-def send_edges(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,total_cpu_block):
+def send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,ops,gread,garr):
     """Use this function to communicate data between nodes"""
     if NMB:
+        sarr[:,:,ops:-ops,:ops] = sarr[:,:,ops:-ops,-2*ops:-ops]
+        sarr[:,:,ops:-ops,-ops:] = sarr[:,:,ops:-ops,ops:2*ops]
         bufffor = np.copy(sarr[:,:,-2*ops:-ops,:])
         buffback = np.copy(sarr[:,:,ops:2*ops,:])
         bufferf = cluster_comm.sendrecv(sendobj=bufffor,dest=comranks[1],source=comranks[0])
         bufferb = cluster_comm.sendrecv(sendobj=buffback,dest=comranks[0],source=comranks[1])
         cluster_comm.Barrier()
         sarr[:,:,:ops,:] = bufferf[:,:,:,:]
-        sarr[:,:,-ops:,:] = bufferf[:,:,:,:]
+        sarr[:,:,-ops:,:] = bufferb[:,:,:,:]
     node_comm.Barrier()
-    # if not GRB:
-    #     sgs.carr[:,:,:,:] = sarr[total_cpu_block]
-    # return cwt
+    if not GRB:
+        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
+    else:
+        garr[:,:,:,:] = sarr[gread]

@@ -77,18 +77,20 @@ def find_remove_ranks(node_ranks,AF,num_gpus):
 
 def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs):
     """Use this function to execute core cpu only processes"""
+    swb = total_cpu_block
     blocks,total_cpu_block = decomp.create_cpu_blocks(total_cpu_block,BS,shared_shape,OPS)
     sgs.SM = source.build_cpu_source(CS) #Building Python source code
     sgs.SM.set_globals(GRB,sgs.SM,*gargs)
     #Creating sets for cpu calculation
     sgs.carr = decomp.create_shared_pool_array(sarr[total_cpu_block].shape)
-    sgs.carr[:,:,:,:] = sarr[total_cpu_block]
-    return blocks,total_cpu_block
+    return blocks,total_cpu_block,swb
 
 def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO):
     """Use this function to execute core gpu only processes"""
-    block_shape = [i.stop-i.start for i in blocks]
-    block_shape[-1] += int(2*BS[0]) #Adding 2 blocks in the column direction
+    block_shape = [i.stop-i.start for i in blocks[:2]]+[i.stop-i.start+2*OPS for i in blocks[2:]]
+    gwrite = blocks
+    gread = blocks[:2]
+    gread+=tuple([slice(i.start-OPS,i.stop+OPS,1) for i in blocks[2:]])
     # Creating local GPU array with split
     GRD = (int((block_shape[2])/BS[0]),int((block_shape[3])/BS[1]))   #Grid size
     #Creating constants
@@ -104,7 +106,7 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO):
     cpu_SM = source.build_cpu_source(CS)   #Building cpu source for set_globals
     cpu_SM.set_globals(GRB,sgs.SM,*gargs)
     del cpu_SM
-    return block_shape,GRD,garr
+    return block_shape,GRD,garr,gread,gwrite
 
 def mpi_destruction(rank,node_ranks,comm,ranks_to_remove,all_ranks):
     """Use this to destory unwanted mpi processes."""

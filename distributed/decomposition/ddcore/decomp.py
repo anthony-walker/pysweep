@@ -24,14 +24,6 @@ def create_CPU_sarray(comm,arr_shape,dType,arr_bytes):
     arr = np.ndarray(buffer=shared_buf, dtype=dType.type, shape=arr_shape)
     return arr
 
-def copy_s_to_g(sarr,arr,blocks,BS):
-    """Use this function to copy the shared array to the local array."""
-    i1,i2,i3,i4 = blocks
-    arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
-    arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
-    arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
-    return arr
-
 def create_shared_pool_array(shared_shape):
     """Use this function to create the shared array for the process pool."""
     sarr_base = mp.Array(ctypes.c_float, int(np.prod(shared_shape)),lock=False)
@@ -76,11 +68,12 @@ def read_input_file(comm):
 
 def create_cpu_blocks(total_cpu_block,BS,shared_shape,ops):
     """Use this function to create blocks."""
-    row_range = np.arange(0,total_cpu_block[2].stop-total_cpu_block[2].start,BS[1],dtype=np.intc)
-    column_range = np.arange(total_cpu_block[3].start,total_cpu_block[3].stop,BS[1],dtype=np.intc)
-    xslice = slice(shared_shape[2]-ops-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2]-ops,1)
-    ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,total_cpu_block[3])
-    return [(total_cpu_block[0],total_cpu_block[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)],ntcb
+    row_range = np.arange(ops,total_cpu_block[2].stop-total_cpu_block[2].start+ops,BS[1],dtype=np.intc)
+    column_range = np.arange(ops,total_cpu_block[3].stop-total_cpu_block[3].start+ops,BS[1],dtype=np.intc)
+    xslice = slice(shared_shape[2]-2*ops-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2],1)
+    yslice = slice(total_cpu_block[3].start-ops,total_cpu_block[3].stop+ops,1)
+    ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,yslice)
+    return [(total_cpu_block[0],total_cpu_block[1],slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)],ntcb
 
 
 def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank,ops):
