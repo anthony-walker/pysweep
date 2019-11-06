@@ -45,9 +45,15 @@ void step(float * shared_state, int idx, int gts)
   float tval[NVC]={0,0,0,0};
    __syncthreads();
 
+
+
   if ((gts+1)%TSO==0) //Corrector step
   {
-      // printf("%s\n", "C");
+      // if (threadIdx.x==0 && threadIdx.y==0 && blockIdx.x == 0 && blockIdx.y == 0)
+      // {
+      //   printf("%s\n","Corrector" );
+      // }
+
       for (int i = 0; i < NVC; i++)
       {
           tval[i] = shared_state[idx-STS]+2;
@@ -56,6 +62,10 @@ void step(float * shared_state, int idx, int gts)
   }
   else //Predictor
   {
+    // if (threadIdx.x==0 && threadIdx.y==0 && blockIdx.x == 0 && blockIdx.y == 0)
+    // {
+    //   printf("%s\n","Predictor" );
+    // }
       for (int i = 0; i < NVC; i++)
       {
           tval[i] = (epoint[i]+wpoint[i]+npoint[i]+spoint[i])/4+1;

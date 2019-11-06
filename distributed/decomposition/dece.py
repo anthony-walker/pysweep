@@ -121,7 +121,9 @@ def decomp_engine():
         sarr[TSO-ONE,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
         sarr[TSO-ONE,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS:]
         sarr[TSO-ONE,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],:OPS]
-
+        sarr[0,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
+        sarr[0,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS:]
+        sarr[0,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],:OPS]
     else:
         gsc = None
     # ------------------- Operations specifically for GPus and CPUs------------------------#
@@ -145,6 +147,7 @@ def decomp_engine():
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     node_comm.Barrier()
     cwt = 1
+
     for i in range(TSO*time_steps):
         functions.Decomposition(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,shared_write_block,gwrite)
         node_comm.Barrier()
@@ -156,9 +159,11 @@ def decomp_engine():
         if NMB:
             np.copyto(sarr[1,:,:,:],sarr[2,:,:,:]) #Copy down
         sgs.gts+=1
+
         node_comm.Barrier()
         #Communicate
         functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
+
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()

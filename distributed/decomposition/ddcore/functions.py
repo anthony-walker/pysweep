@@ -1,6 +1,7 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing the swept rule.
 from .dcore import sgs, decomp
+from ccore import printer
 #CUDA Imports
 try:
     import pycuda.driver as cuda
