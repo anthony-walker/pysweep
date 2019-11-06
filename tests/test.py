@@ -77,7 +77,6 @@ def test_sweep_hde(args=(8,40,0.75,10,0.24,5,10,4)):
         estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
         os.system(estr)
 
-
 def test_comparison():
     """Use this function to compare the values obtain during a run of both solvers"""
     savepath = "./comp_plot"
