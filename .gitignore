@@ -11,3 +11,4 @@ post_sweep/
 #notipy/
 *.gif
 vortex/
+.pytest_cache/

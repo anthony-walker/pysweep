@@ -140,11 +140,11 @@ def test_swept_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 4),remove_file=True):
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
     #Create data using solver
     estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_hde --distributed \'false\' "
-    # estr += "-b "+str(blks)+" -a "+str(aff)+" "
-    # estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
-    # os.system(estr)
-    # if remove_file:
-    #     os.system("rm "+sfp)
+    estr += "-b "+str(blks)+" -a "+str(aff)+" "
+    estr += "--hdf5 " + swept_file + pts +time_str + "--alpha "+str(alpha)+" -TH 373 -TL 298"
+    os.system(estr)
+    if remove_file:
+        os.system("rm "+sfp)
 
 
 # def test_comparison():
