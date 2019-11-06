@@ -102,4 +102,4 @@ def create_hdf_gif(swept_file = "./pysweep/tests/data/swept_hde.hdf5",filename="
 
 if __name__ == "__main__":
     # comp_gif("hdec.gif")
-    create_hdf_gif("./pysweep/tests/data/decomp_hde.hdf5")
+    create_hdf_gif("./test.hdf5")

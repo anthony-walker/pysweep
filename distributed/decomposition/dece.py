@@ -1,6 +1,6 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, os, h5py, math, GPUtil, socket
+import sys, os, h5py, math, GPUtil, time
 from itertools import cycle
 #CUDA Imports
 try:
@@ -38,6 +38,8 @@ def decomp_engine():
     filename: Name of the output file excluding hdf5
     exid: GPU ids to exclude from the calculation.
     """
+    #Starting timer
+    start = time.time()
     #Setting global variables
     sgs.init_globals()
     #Local Constants
@@ -141,7 +143,7 @@ def decomp_engine():
         mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
     functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
     # ------------------------------HDF5 File------------------------------------------#
-    hdf5_file, hdf5_data = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
+    hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------Standard Decomposition---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
@@ -168,6 +170,7 @@ def decomp_engine():
     if GRB:
         cuda_context.pop()
     comm.Barrier()
+    hdf_time[0] = time.time()-start
     hdf5_file.close()
     #Removing input file.
     if NMB:
