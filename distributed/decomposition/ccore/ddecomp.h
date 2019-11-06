@@ -19,6 +19,7 @@ __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
 __device__ __constant__ int TSO; //Time scheme order
 __device__ __constant__ int STS;
+
 //GPU Constants
 __device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
 __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
@@ -156,9 +157,10 @@ Decomp(float *state, int gts)
     int tidy = threadIdx.y+OPS;
     int sgid = get_sgid(tidx,tidy)+STS; //Shared global index
     int gid = get_gid()+TIMES; //global index
-    bool tb = threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0;
+    // bool tb = threadIdx.x==0 && threadIdx.y==0 && blockIdx.x==0 && blockIdx.y==0;
     //Communicating edge values to shared array
     shared_state_fill(shared_state,state,ONE,ONE);
+    //Fill TSO step
     for (int i = 0; i < NV; i++)
     {
         shared_state[sgid+i*SGIDS-STS] = state[gid+i*VARS-(gts%TSO)*TIMES]; //Initial time step

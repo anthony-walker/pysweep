@@ -48,7 +48,7 @@ def source_code_read(filename):
     f.closed
     return source
 
-def swept_constant_copy(source_mod,const_dict):
+def decomp_constant_copy(source_mod,const_dict):
     """Use this function to copy constant args to cuda memory.
         source_mod - the source module obtained from pycuda and source code
         const_dict - dictionary of constants where the key is the global

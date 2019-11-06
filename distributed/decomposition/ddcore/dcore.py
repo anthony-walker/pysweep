@@ -92,7 +92,7 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO):
     gread = blocks[:2]
     gread+=tuple([slice(i.start-OPS,i.stop+OPS,1) for i in blocks[2:]])
     # Creating local GPU array with split
-    GRD = (int((block_shape[2])/BS[0]),int((block_shape[3])/BS[1]))   #Grid size
+    GRD = (int((block_shape[2]-2*OPS)/BS[0]),int((block_shape[3]-2*OPS)/BS[1]))   #Grid size
     #Creating constants
     NV = block_shape[1]
     SGIDS = (BS[0]+2*OPS)*(BS[1]+2*OPS)
@@ -103,6 +103,7 @@ def gpu_core(blocks,BS,OPS,GS,CS,gargs,GRB,TSO):
     garr = decomp.create_local_gpu_array(block_shape)
     #Building CUDA source code
     sgs.SM = source.build_gpu_source(GS)
+    source.decomp_constant_copy(sgs.SM,const_dict)
     cpu_SM = source.build_cpu_source(CS)   #Building cpu source for set_globals
     cpu_SM.set_globals(GRB,sgs.SM,*gargs)
     del cpu_SM

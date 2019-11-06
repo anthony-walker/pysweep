@@ -23,9 +23,9 @@ def Decomposition(sarr,garr,blocks,gts,pargs,mpi_pool,total_cpu_block,gwrite):
 
         arr_gpu = cuda.mem_alloc(garr.nbytes)
         cuda.memcpy_htod(arr_gpu,garr)
-        # SM.get_function("Decomp")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
-        # cuda.Context.synchronize()
-        # cuda.memcpy_dtoh(garr,arr_gpu)
+        SM.get_function("Decomp")(arr_gpu,np.int32(gts),grid=GRD, block=BS,shared=ssb)
+        cuda.Context.synchronize()
+        cuda.memcpy_dtoh(garr,arr_gpu)
         sarr[gwrite]=garr[:,:,OPS:-OPS,OPS:-OPS]
     else:   #CPUs do this
         mpi_pool.map(dCPU_Decomp,blocks)
@@ -51,6 +51,7 @@ def send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,ops,
         sarr[:,:,:ops,:] = bufferf[:,:,:,:]
         sarr[:,:,-ops:,:] = bufferb[:,:,:,:]
     node_comm.Barrier()
+
     if not GRB:
         sgs.carr[:,:,:,:] = sarr[total_cpu_block]
     else:

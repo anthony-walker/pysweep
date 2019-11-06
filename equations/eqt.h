@@ -43,7 +43,6 @@ void step(float * shared_state, int idx, int gts)
   float sspoint[NVC];
   getPoint(sspoint,shared_state,idx-2);
   float tval[NVC]={0,0,0,0};
-
    __syncthreads();
 
   if ((gts+1)%TSO==0) //Corrector step
@@ -54,18 +53,15 @@ void step(float * shared_state, int idx, int gts)
           tval[i] = shared_state[idx-STS]+2;
           // tval[i]=2+shared_state[idx-STS];
       }
-
   }
   else //Predictor
   {
       for (int i = 0; i < NVC; i++)
       {
-          // printf("%s\n", "P");
           tval[i] = (epoint[i]+wpoint[i]+npoint[i]+spoint[i])/4+1;
-          // tval[i]=1+shared_state[idx];
+
       }
   }
-
   __syncthreads();
 
   for (int i = 0; i < NVC; i++)

@@ -116,7 +116,8 @@ def decomp_engine():
     GRB = True if gpu_rank is not None else False
     #Filling shared array
     if NMB:
-        gsc = (slice(0,arr0.shape[1],1),slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),slice(0,arr0.shape[2],1))
+        gsc = (slice(0,arr0.shape[0],1),slice(int(node_info[0]*BS[0]),int(node_info[1]*BS[0]),1),slice(0,arr0.shape[2],1))
+        i1,i2,i3 = gsc
         sarr[TSO-ONE,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
         sarr[TSO-ONE,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS:]
         sarr[TSO-ONE,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],:OPS]
@@ -143,20 +144,21 @@ def decomp_engine():
     # -------------------------------Standard Decomposition---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
     node_comm.Barrier()
-
-    for i in range(1):#time_steps):
+    cwt = 1
+    for i in range(TSO*time_steps):
         functions.Decomposition(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,shared_write_block,gwrite)
         node_comm.Barrier()
+        #Write data and copy down a step
+        if (i+1)%TSO==0 and NMB:
+            hdf5_data[cwt,i1,i2,i3] = sarr[2,:,OPS:-OPS,OPS:-OPS]
+            np.copyto(sarr[0,:,:,:],sarr[2,:,:,:]) #Copy to TSO position
+            cwt+=1
+        if NMB:
+            np.copyto(sarr[1,:,:,:],sarr[2,:,:,:]) #Copy down
+        sgs.gts+=1
+        node_comm.Barrier()
+        #Communicate
         functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
-    node_comm.Barrier()
-    if NMB:
-        printer.pm(sarr,2)
-    # if not GRB:
-    #     printer.pm(sgs.carr,2)
-
-
-
-
     # Clean Up - Pop Cuda Contexts and Close Pool
     if GRB:
         cuda_context.pop()

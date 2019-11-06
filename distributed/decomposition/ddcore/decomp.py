@@ -86,17 +86,3 @@ def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank,o
         gpu_rank = list(zip(gpu_rank,gbs))
     gpu_rank = node_comm.scatter(gpu_rank)
     return gpu_rank
-
-def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS,total_cpu_block):
-    """Use this function to write to the hdf file and shift the shared array
-        # data after writing."""
-    i1,i2,i3=gsc #Unpack global tuple
-    for si,i in enumerate(range(gts,gts+MPSS,1),start=TSO):
-        if i%TSO==0:
-            hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
-            cwt+=1
-    nte = sarr.shape[0]-MPSS
-    sarr[:nte,:,:,:] = sarr[MPSS:,:,:,:]
-    sarr[nte:,:,:,:] = 0
-    sgs.gts +=MPSS
-    return cwt
