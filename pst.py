@@ -144,6 +144,10 @@ def DTP(args):
     decomp.decomp(arr,gargs,swargs,filename=args.hdf5)
 
 if __name__ == "__main__":
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    print(path)
+
+
     parser = argparse.ArgumentParser()
     fmap = {'DSHDE':DSHDE,'swept_vortex' : SweptVortex,
                     'standard_vortex' : StandardVortex,'swept_hde' : SweptHDE,
@@ -157,6 +161,7 @@ if __name__ == "__main__":
     parser.add_argument("-g","--gpu",nargs="?",default="./src/equations/euler.h",type=str)
     parser.add_argument("-c","--cpu",nargs="?",default="./src/equations/euler.py",type=str)
     parser.add_argument("--hdf5",nargs="?",default="./results/result",type=str)
+    parser.add_argument('--distributed',nargs="?",default=True,type=bool)
     parser.add_argument("-nx",nargs="?",default=32,type=int)
     parser.add_argument("-ny",nargs="?",default=32,type=int)
     parser.add_argument("-X",nargs="?",default=1,type=float)
