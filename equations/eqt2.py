@@ -19,14 +19,14 @@ def step(state,iidx,ts,gts):
     TSO = 2
     vSlice = slice(0,state.shape[1],1)
     for idx,idy in iidx:
-        ntidx = (ts,vSlice,idx,idy)  #next step index
-        cidx = (ts-1,vSlice,idx,idy)
-        eidx = (ts-1,vSlice,idx+1,idy)
-        widx = (ts-1,vSlice,idx-1,idy)
-        nidx = (ts-1,vSlice,idx,idy+1)
-        sidx = (ts-1,vSlice,idx,idy-1)
-        pidx = (ts-TSO,vSlice,idx,idy) #next step index
-        if (gts)%TSO==0: #Corrector
+        ntidx = (ts+1,vSlice,idx,idy)  #next step index
+        cidx = (ts,vSlice,idx,idy)
+        eidx = (ts,vSlice,idx+1,idy)
+        widx = (ts,vSlice,idx-1,idy)
+        nidx = (ts,vSlice,idx,idy+1)
+        sidx = (ts,vSlice,idx,idy-1)
+        pidx = (ts-1,vSlice,idx,idy) #next step index
+        if (gts+1)%TSO==0: #Corrector
             state[ntidx] = (state[pidx])+2
         else: #Predictor
             state[ntidx] = (state[nidx]+state[sidx]+state[eidx]+state[widx])/4+1

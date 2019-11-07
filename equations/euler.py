@@ -9,10 +9,10 @@ try:
 except Exception as e:
     pass
 #----------------------------------Globals-------------------------------------#
-gamma = 0
-dtdx = 0
-dtdy = 0
-
+gamma = 1.4
+dtdx = 0.0
+dtdy = 0.0
+gM1 = 0.4
 #----------------------------------End Globals-------------------------------------#
 
 def step(state,iidx,ts,gts):
@@ -22,6 +22,7 @@ def step(state,iidx,ts,gts):
     ts - the current time step
     gts - a step counter that allows implementation of the scheme
     """
+
     half = 0.5
     vs = slice(0,state.shape[1],1)
     for idx,idy in iidx:
@@ -49,6 +50,8 @@ def set_globals(gpu,source_mod,*args):
         dtdy = dt/dy
         global gamma
         gamma = gam
+        global gM1
+        gM1 = gam-1.0
 
 #---------------------------------------------Solving functions
 
@@ -57,8 +60,9 @@ def dfdxy(state,idx):
     #Five point finite volume method
     #Creating indices from given point (idx)
     ops = 2 #number of atomic operations
-    idxx=(idx[0],idx[1],slice(idx[2]-ops,idx[2]+ops+1,1),idx[3])
-    idxy=(idx[0],idx[1],idx[2],slice(idx[3]-ops,idx[3]+ops+1,1))
+    i1,i2,i3,i4 = idx
+    idxx=(i1,i2,slice(i3-ops,i3+ops+1,1),i4)
+    idxy=(i1,i2,i3,slice(i4-ops,i4+ops+1,1))
     idxyt=(idx[0],idx[1],idx[2],slice(idx[3]+ops+1,idx[3]-ops,-1))
     half = 0.5
     #Finding pressure ratio
@@ -66,8 +70,7 @@ def dfdxy(state,idx):
     Pry = pressure_ratio(state[idxy])
     #Finding spatial derivatives
     dfdx = half*direction_flux(state[idxx],Prx,True)
-    # dfdy = half*direction_flux(state[idxy],Pry,False)
-    dfdy = np.zeros(dfdx.shape)
+    dfdy = half*direction_flux(state[idxy],Pry,False)
     return dfdx, dfdy
 
 def pressure_ratio(state):
@@ -92,12 +95,9 @@ def pressure(q):
     q[1] = rho*u
     q[2] = rho*v
     q[3] = rho*e
-    P = (GAMMA-1)*(rho*e-rho/2*(rho*u^2+rho*v^2))
+    P = (GAMMA-1)*(rho*e-(1/2)*(rho*u^2+rho*v^2))
     """
-    HALF = 0.5
-    rho_1_inv = 1/q[0]
-    vss = (rho_1_inv*q[1]*q[1])+(rho_1_inv*q[2]*q[2])
-    return (gamma - 1)*(q[3]-HALF*vss)
+    return gM1*(q[3]-(q[1]*q[1]/(2*q[0]))+(q[2]*q[2]/(2*q[0])))
 
 def direction_flux(state,Pr,xy):
     """Use this method to determine the flux in a particular direction."""
@@ -105,25 +105,16 @@ def direction_flux(state,Pr,xy):
     idx = 2     #This is the index of the point in state (stencil data)
     #Initializing Flux
     flux = np.zeros(len(state[:,idx]))
-    print(state,xy)
     #Atomic Operation 1
     tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
     tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
-    # print(tsl,tsr)
     flux += eflux(tsl,tsr,xy)
-    # print(flux)
     flux += espectral(tsl,tsr,xy)
-    # print(flux)
     #Atomic Operation 2
     tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
     tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
-    # print(tsl,tsr)
-    # print(flux)
     flux -= eflux(tsl,tsr,xy)
-    # print(flux)
     flux -= espectral(tsl,tsr,xy)
-    # print(flux)
-
     return flux
 
 def flimiter(qL,qR,Pr):

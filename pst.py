@@ -81,6 +81,35 @@ def StandardHDE(args):
     else:
         decomp.decomp(arr0,gargs,swargs,filename=args.hdf5)
 
+
+def SweptSimple(args):
+    #Analytical properties
+    arr0 = arr = np.ones((4,args.nx,args.ny))
+    #Dimensions and steps
+    dx = args.X/args.nx
+    dy = args.Y/args.ny
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
+    swargs = (2,2,args.block,args.affinity,os.path.join(epath,'eqt2.h'),os.path.join(epath,'eqt2.py'))
+    if args.distributed:
+        distsweep.dsweep(arr0,gargs,swargs,filename=args.hdf5)
+    else:
+        nodesweep.nsweep(arr0,gargs,swargs,filename=args.hdf5)
+
+def StandardSimple(args):
+    #Analytical properties
+    arr0 = arr = np.ones((4,args.nx,args.ny))
+    #Dimensions and steps
+    dx = args.X/args.nx
+    dy = args.Y/args.ny
+    #Changing arguments
+    gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
+    swargs = (2,2,args.block,args.affinity,os.path.join(epath,'eqt2.h'),os.path.join(epath,'eqt2.py'))
+    if args.distributed:
+        ddecomp.ddecomp(arr0,gargs,swargs,filename=args.hdf5)
+    else:
+        decomp.decomp(arr0,gargs,swargs,filename=args.hdf5)
+
 def str2bool(v):
     if isinstance(v, bool):
        return v
@@ -95,7 +124,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     fmap = {'swept_vortex' : SweptVortex,
                     'standard_vortex' : StandardVortex,"analytical_vortex":AnalyticalVortex,'swept_hde' : SweptHDE,
-                                    'standard_hde' : StandardHDE}
+                                    'standard_hde' : StandardHDE,'swept_simple':SweptSimple,'standard_simple':StandardSimple}
     parser.add_argument('function', choices=fmap.keys())
     parser.add_argument("-b","--block",nargs="?",default=8,type=int)
     parser.add_argument("-a","--affinity",nargs="?",default=0.5,type=float)
