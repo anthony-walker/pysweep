@@ -66,7 +66,8 @@ def dfdxy(state,idx):
     Pry = pressure_ratio(state[idxy])
     #Finding spatial derivatives
     dfdx = half*direction_flux(state[idxx],Prx,True)
-    dfdy = half*direction_flux(state[idxy],Pry,False)
+    # dfdy = half*direction_flux(state[idxy],Pry,False)
+    dfdy = np.zeros(dfdx.shape)
     return dfdx, dfdy
 
 def pressure_ratio(state):
@@ -104,20 +105,24 @@ def direction_flux(state,Pr,xy):
     idx = 2     #This is the index of the point in state (stencil data)
     #Initializing Flux
     flux = np.zeros(len(state[:,idx]))
-
+    print(state,xy)
     #Atomic Operation 1
     tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
     tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
-
+    # print(tsl,tsr)
     flux += eflux(tsl,tsr,xy)
+    # print(flux)
     flux += espectral(tsl,tsr,xy)
-
+    # print(flux)
     #Atomic Operation 2
     tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
     tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
-
+    # print(tsl,tsr)
+    # print(flux)
     flux -= eflux(tsl,tsr,xy)
+    # print(flux)
     flux -= espectral(tsl,tsr,xy)
+    # print(flux)
 
     return flux
 
