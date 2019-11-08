@@ -24,8 +24,8 @@ class pysweep_printer(object):
         elif self.rank == self.master or p_ranks:
             print(args,end=end)
 
-def pm(arr,i,ps="%d"):
-    for item in arr[i,0,:,:]:
+def pm(arr,i,iv=0,ps="%d"):
+    for item in arr[i,iv,:,:]:
         sys.stdout.write("[ ")
         for si in item:
             sys.stdout.write(ps%si+", ")

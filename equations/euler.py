@@ -25,12 +25,20 @@ def step(state,iidx,ts,gts):
 
     half = 0.5
     vs = slice(0,state.shape[1],1)
+    ddylist = list()
+    print("NEW STEP")
+    input()
     for idx,idy in iidx:
         dfdx,dfdy = dfdxy(state,(ts,vs,idx,idy))
+        ddylist.append(dfdy)
+
         if (gts+1)%2==0:   #Corrector step
             state[ts+1,vs,idx,idy] = state[ts-1,vs,idx,idy]+dtdx*dfdx+dtdy*dfdy
         else: #Predictor step
             state[ts+1,vs,idx,idy] = state[ts,vs,idx,idy]+half*(dtdx*dfdx+dtdy*dfdy)
+    # for ddy in ddylist:
+    #     print(ddy)
+    # input()
     return state
 
 def set_globals(gpu,source_mod,*args):
@@ -65,28 +73,12 @@ def dfdxy(state,idx):
     idxy=(i1,i2,i3,slice(i4-ops,i4+ops+1,1))
     idxyt=(idx[0],idx[1],idx[2],slice(idx[3]+ops+1,idx[3]-ops,-1))
     half = 0.5
-    #Finding pressure ratio
-    Prx = pressure_ratio(state[idxx])
-    Pry = pressure_ratio(state[idxy])
     #Finding spatial derivatives
-    dfdx = half*direction_flux(state[idxx],Prx,True)
-    dfdy = half*direction_flux(state[idxy],Pry,False)
-    return dfdx, dfdy
+    # dfdx = half*direction_flux(state[idxx],Prx,True)
 
-def pressure_ratio(state):
-    """Use this function to calculate the pressure ratio for fpfv."""
-    #idxs should be in ascending order
-    sl = state.shape[1]
-    Pr = np.zeros(sl-2)
-    pct = 0
-    for i in range(1,sl-1):
-        try:
-            Pr[pct] = ((pressure(state[:,i+1])-pressure(state[:,i]))/
-                    (pressure(state[:,i])-pressure(state[:,i-1])))
-        except:
-            Pr[pct] = np.nan
-        pct+=1
-    return Pr
+    dfdy = half*direction_flux(state[idxy],False)
+    dfdx=np.zeros(dfdy.shape)
+    return dfdx, dfdy
 
 def pressure(q):
     """Use this function to solve for pressure of the 2D Eulers equations.
@@ -99,27 +91,38 @@ def pressure(q):
     """
     return gM1*(q[3]-(q[1]*q[1]/(2*q[0]))+(q[2]*q[2]/(2*q[0])))
 
-def direction_flux(state,Pr,xy):
+def flux_limiter(state,idx1,idx2):
+    num = pressure(state[:,idx1+1])-pressure(state[:,idx1])
+    den = pressure(state[:,idx1])-pressure(state[:,idx1-1])
+    if (num > 0 and den > 0) or (num < 0 and den < 0):
+        return state[:,idx1]+0.5*min(num/den,1)*(state[:,idx2]-state[:,idx1+1])
+    else:
+        return state[:,idx1]
+
+def direction_flux(state,xy):
     """Use this method to determine the flux in a particular direction."""
     ONE = 1    #Constant value of 1
     idx = 2     #This is the index of the point in state (stencil data)
     #Initializing Flux
     flux = np.zeros(len(state[:,idx]))
     #Atomic Operation 1
-    tsl = flimiter(state[:,idx-1],state[:,idx],Pr[idx-2])
-    tsr = flimiter(state[:,idx],state[:,idx-1],ONE/Pr[idx-1])
+    # print(state[:,2])
+    tsl = flux_limiter(state,idx-1,idx)
+    tsr = flux_limiter(state,idx,idx-1)
     flux += eflux(tsl,tsr,xy)
+    # print("F1: ",flux)
     flux += espectral(tsl,tsr,xy)
+    # print("F2: ",flux)
     #Atomic Operation 2
-    tsl = flimiter(state[:,idx],state[:,idx+1],Pr[idx-1])
-    tsr = flimiter(state[:,idx+1],state[:,idx],ONE/Pr[idx])
+    tsl = flux_limiter(state,idx,idx+1)
+    tsr = flux_limiter(state,idx+1,idx)
+    # print("TSL,TSR:",tsl,tsr)
     flux -= eflux(tsl,tsr,xy)
+    # print("F3: ",flux)
     flux -= espectral(tsl,tsr,xy)
+    # print("F4: ",flux)
+    # input()
     return flux
-
-def flimiter(qL,qR,Pr):
-    """Use this method to apply the flux limiter to get temporary state."""
-    return qL+0.5*min(Pr,1)*(qL-qR) if not np.isinf(Pr) and not np.isnan(Pr) and Pr > 0 else qL
 
 def eflux(left_state,right_state,xy):
     """Use this method to calculation the flux.
@@ -162,7 +165,7 @@ def espectral(left_state,right_state,xy):
     rootrhoR = np.sqrt(right_state[0])
     tL = left_state/left_state[0] #Temporary variable to access e, u, v, and w - Left
     tR = right_state/right_state[0] #Temporary variable to access e, u, v, and w -  Right
-
+    # print(tL,tR)
     #Calculations
     denom = 1/(rootrhoL+rootrhoR)
     spec_state[0] += rootrhoL*rootrhoR
@@ -171,6 +174,8 @@ def espectral(left_state,right_state,xy):
     spec_state[3] += (rootrhoL*tL[3]+rootrhoR*tR[3])*denom
     P = pressure(spec_state*spec_state[0])
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
+    # print(spec_state)
+    # input()
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
 def test_mod_load():
