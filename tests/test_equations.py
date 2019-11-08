@@ -49,7 +49,7 @@ def test_steps():
         arr2D[i+1,:,:ops,:] = arr2D[i,:,-2*ops:-ops,:]
         arr2D[i+1,:,-ops:,:] = arr2D[i,:,ops:2*ops,:]
         # print("--------------------------------------------")
-        printer.pm(arr2D,i,ps="%0.4f")
+        # printer.pm(arr2D,i,ps="%0.4f")
 
 
 

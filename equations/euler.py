@@ -71,12 +71,9 @@ def dfdxy(state,idx):
     i1,i2,i3,i4 = idx
     idxx=(i1,i2,slice(i3-ops,i3+ops+1,1),i4)
     idxy=(i1,i2,i3,slice(i4-ops,i4+ops+1,1))
-    idxyt=(idx[0],idx[1],idx[2],slice(idx[3]+ops+1,idx[3]-ops,-1))
-    half = 0.5
     #Finding spatial derivatives
     # dfdx = half*direction_flux(state[idxx],Prx,True)
-
-    dfdy = half*direction_flux(state[idxy],False)
+    dfdy = direction_flux(state[idxy],False)
     dfdx=np.zeros(dfdy.shape)
     return dfdx, dfdy
 
@@ -106,9 +103,10 @@ def direction_flux(state,xy):
     #Initializing Flux
     flux = np.zeros(len(state[:,idx]))
     #Atomic Operation 1
-    # print(state[:,2])
+    print(state[:,2])
     tsl = flux_limiter(state,idx-1,idx)
     tsr = flux_limiter(state,idx,idx-1)
+    print(tsl,tsr)
     flux += eflux(tsl,tsr,xy)
     # print("F1: ",flux)
     flux += espectral(tsl,tsr,xy)
@@ -122,7 +120,7 @@ def direction_flux(state,xy):
     flux -= espectral(tsl,tsr,xy)
     # print("F4: ",flux)
     # input()
-    return flux
+    return flux/2
 
 def eflux(left_state,right_state,xy):
     """Use this method to calculation the flux.
