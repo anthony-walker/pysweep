@@ -204,7 +204,7 @@ class vics(object):
 
     #----------------------------vics Initializer functions
 
-    def Shu(self,gamma,npts = None):
+    def Shu(self,gamma,aoa=np.pi/4,npts = None):
         """ Initializer function that uses initial conditions from
 
         Shu, C.-W., “Essentially Non-oscillatory and Weighted Essentially Non-oscillatory Schemes for Hyperbolic Conservation
@@ -221,7 +221,7 @@ class vics(object):
         self.R_gas = None  #J/kgK
         #Freestream variables
         self.rho_inf = 1    #Denisty
-        self.alpha = np.pi/4  #Angle of attack
+        self.alpha = aoa  #Angle of attack
         self.M_inf = np.sqrt(2/self.gamma)    #Mach number
         self.P_inf = 1  #pressure kPa
         self.T_inf = 1 #Temperature K
