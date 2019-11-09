@@ -209,7 +209,7 @@ def test_comparison_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 1),remove_file=True,g
         os.system("rm "+sfp)
 
 
-def test_comparison_vortex(args=(2,0.01,48,0.5,10,12,1),remove_file=True,generate_fig=False):
+def test_comparison_vortex(args=(2,0.01,48,0,10,12,1),remove_file=True,generate_fig=False):
     """Use this function to compare the values obtain during a run of both solvers"""
     sfn = os.path.join(path,"data/dist_swept_vtx")
     dfn = os.path.join(path,"data/dist_decomp_vtx")
@@ -224,13 +224,13 @@ def test_comparison_vortex(args=(2,0.01,48,0.5,10,12,1),remove_file=True,generat
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
     #Create data using solver
-    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex "
+    estr = "mpiexec -n "+str(4)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex --distributed \'false\' "
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + decomp_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
 
     #Create data using solver
-    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex "
+    estr = "mpiexec -n "+str(4)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex --distributed \'false\' "
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + swept_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
@@ -239,11 +239,10 @@ def test_comparison_vortex(args=(2,0.01,48,0.5,10,12,1),remove_file=True,generat
 
     swept_hdf5 = h5py.File(sfn+".hdf5", 'r')
     decomp_hdf5 = h5py.File(dfn+".hdf5", 'r')
-    tsdata = swept_hdf5['data'][:,0,:,:][:-1]
+    tsdata = swept_hdf5['data'][:,0,:,:]
     tddata = decomp_hdf5['data'][:,0,:,:]
     max_error = np.amax(abs(tsdata-tddata))
-
-    # assert np.allclose(tsdata,tddata)
+    assert np.allclose(tsdata,tddata)
 
     #Closing files
     swept_hdf5.close()
@@ -428,6 +427,6 @@ class sweep_lambda(object):
 
 if __name__ == "__main__":
     # test_comparison_eqt(generate_fig=False)
-    # test_comparison_vortex(generate_fig=True)
-    test_comparison_hde()
+    test_comparison_vortex(generate_fig=True)
+    # test_comparison_hde()
     # test_flux()

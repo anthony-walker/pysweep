@@ -35,22 +35,18 @@ def test_steps():
         for j in range(nxh):
             arr2D[0,:,i,j] = leftBC
             arr2D[0,:,i,j+nxh] = rightBC
-    idx2D = list(itertools.product((int(nx/2),),np.arange(ops,arr2D.shape[3]-ops)))
+    idx2D = list(itertools.product(np.arange(ops,arr2D.shape[3]-ops),np.arange(ops,arr2D.shape[3]-ops)))
     #Source Modules
     source_mod_2D = source.build_cpu_source(os.path.join(epath,'euler.py'))
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = source.build_cpu_source(os.path.join(epath,'euler1D.py'))
     steps = test_shape[0]
-    for i in range(steps):
+    for i in range(steps-1):
         arr2D = source_mod_2D.step(arr2D,idx2D,i,i)
-        #Update boundary - periodic
-        arr2D[i+1,:,:,:ops] = arr2D[i,:,:,-2*ops:-ops]
-        arr2D[i+1,:,:,-ops:] = arr2D[i,:,:,ops:2*ops]
-        arr2D[i+1,:,:ops,:] = arr2D[i,:,-2*ops:-ops,:]
-        arr2D[i+1,:,-ops:,:] = arr2D[i,:,ops:2*ops,:]
-        # print("--------------------------------------------")
-        # printer.pm(arr2D,i,ps="%0.4f")
-
+        for j in [0,2,3]:
+            printer.pm(arr2D[:,:,:,:],i+1,iv=j,ps="%0.4f")
+        print('---------------------'+str(i)+'-----------------------')
+        input()
 
 
 if __name__ == "__main__":
