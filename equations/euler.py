@@ -10,19 +10,15 @@ try:
     from pycuda.compiler import SourceModule
 except Exception as e:
     pass
+
+import warnings
+# warnings.filterwarnings('error')
 #----------------------------------Globals-------------------------------------#
 gamma = 0
 dtdx = 0
 dtdy = 0
 gM1 = 0
 #----------------------------------End Globals-------------------------------------#
-
-def pm(arr,ps="%0.3f"):
-    for item in arr:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write(ps%si+", ")
-        sys.stdout.write("]\n")
 
 def step(state,iidx,ts,gts):
     """This is the method that will be called by the swept solver.
