@@ -33,16 +33,19 @@ def test_steps():
 
     #2D array
     test_shape = (int((tf-t0)/dt)+1,nv,nx,ny)
-    arr2D = np.zeros(test_shape)
-    for i in range(nx):
-        for j in range(0,nx-i,1):
-            arr2D[0,:,i,j] = leftBC
-        for j in range(-i,0,1):
-            arr2D[0,:,i,j] = rightBC
-    arr2D = vortex.convert_to_flux(arr2D,gamma)
+    #Analytical properties
+    cvics = vortex.vics()
+    arr2D = cvics.Shu(gamma).flux
+    # arr2D = np.zeros(test_shape)
+    # for i in range(nx):
+    #     for j in range(0,nx-i,1):
+    #         arr2D[0,:,i,j] = leftBC
+    #     for j in range(-i,0,1):
+    #         arr2D[0,:,i,j] = rightBC
+    # arr2D = vortex.convert_to_flux(arr2D,gamma)
 
-    assert np.allclose(arr2D[0,:,0,0],flBC)
-    assert np.allclose(arr2D[0,:,-1,-1],frBC)
+    # assert np.allclose(arr2D[0,:,0,0],flBC)
+    # assert np.allclose(arr2D[0,:,-1,-1],frBC)
 
     idx2D = list(itertools.product(np.arange(ops,arr2D.shape[3]-ops),np.arange(ops,arr2D.shape[3]-ops)))
     #Source Modules
@@ -50,7 +53,7 @@ def test_steps():
     source_mod_2D.set_globals(False,None,*(t0,tf,dt,dx,dy,gamma))
     source_mod_1D = source.build_cpu_source(os.path.join(epath,'euler1D.py'))
     steps = test_shape[0]
-    printer.pm(arr2D[:,:,:,:],0,iv=3,ps="%0.4f")
+    printer.pm(arr2D[:,:,:,:],0,iv=0,ps="%0.4f")
     # for i in range(steps-1):
     #     arr2D = source_mod_2D.step(arr2D,idx2D,i,i)
     #     for j in [0,1,2,3]:
