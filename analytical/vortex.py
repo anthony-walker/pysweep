@@ -120,7 +120,7 @@ def steady_vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
     state[0,1] = rho*u
     state[0,2] = rho*v
     state[0,3] = P/(gamma-1)+0.5*rho*(u*u+v*v)
-    
+
     return state
 
 def create_vortex_data(cvics,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex",fdb=True):
