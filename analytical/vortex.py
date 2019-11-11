@@ -56,34 +56,72 @@ def vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
     ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
     state = np.zeros(np.shape(times)+(4,)+xgrid.shape,dtype=np.float64) #Initialization of state
-    idxs = tuple(np.ndindex(xgrid.shape))  #Indicies of the array
     #Solving times
     for i in range(len(times)):
-        for idx in idxs:
-            #getting x and y location
-            x = xgrid[idx]
-            y = ygrid[idx]
-
-            #differences from origin
-            dx0 = (x-x0)
-            dy0 = (y-y0)
-            #Common terms
-            uterm = (dx0-u_bar*times[i])
-            vterm = (dy0-v_bar*times[i])
-            pterm = beta*beta*(gamma-1)*M_inf*M_inf/(8*PI*PI)
-
-            #function calculation f(x,y,t)
-            fx = uterm*uterm
-            fy = vterm*vterm
-            f = (1-fx-fy)/(r_c*r_c)
-
-            #Finding state variables
-            state[(i,pid)+idx] = P_inf*(1-pterm*np.exp(f))**(gamma/(gamma-1)) #pressure
-            state[(i,did)+idx] = rho_inf*(1-pterm*np.exp(f))**(1/(gamma-1)) #density
-            state[(i,uid)+idx] = V_inf*(np.cos(alpha)-beta*vterm/(2*PI*r_c)*np.exp(f/2)) #x velocity
-            state[(i,vid)+idx] = V_inf*(np.sin(alpha)-beta*uterm/(2*PI*r_c)*np.exp(f/2)) #y velocity
+        #differences from origin
+        dx0 = (xgrid-x0)
+        dy0 = (ygrid-y0)
+        uterm = (dx0-u_bar*times[i])
+        vterm = (dy0-v_bar*times[i])
+        pterm = beta*beta*(gamma-1)*M_inf*M_inf/(8*PI*PI)
+        #function calculation f(x,y,t)
+        fx = uterm*uterm
+        fy = vterm*vterm
+        f = (1-fx-fy)/(r_c*r_c)
+        #Finding state variables
+        state[i,pid] = P_inf*(1-pterm*np.exp(f))**(gamma/(gamma-1)) #pressure
+        state[i,did] = rho_inf*(1-pterm*np.exp(f))**(1/(gamma-1)) #density
+        state[i,uid] = V_inf*(np.cos(alpha)-beta*vterm/(2*PI*r_c)*np.exp(f/2)) #x velocity
+        state[i,vid] = V_inf*(np.sin(alpha)-beta*uterm/(2*PI*r_c)*np.exp(f/2)) #y velocity
     return state
 
+def steady_vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
+    """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
+    properties are obtained from the vics object, cvics.
+       The center can be changed with x0 and y0.
+       the time step or steps can be changed with times but it must be a tuple.
+       X & Y are dimensions of the domain.
+       npx, and npy are the number of points the in respective direction
+
+       This solution was obtained from
+
+    """
+
+    # Persson, P. O., Bonet, J., & Peraire, J. (2009).
+    # Discontinuous Galerkin solution of the Navier–Stokes equations on deformable domains.
+    # Computer Methods in Applied Mechanics and Engineering, 198(17-20), 1585-1595.
+
+    alpha, M_inf, P_inf, rho_inf, T_inf, gamma, R_gas, c, sigma, beta, r_c, L = cvics.get_args()
+    PI = np.pi
+    assert epsilon >= L/r_c*np.exp(-L*L/(2*r_c*r_c*sigma*sigma))
+    X = L
+    Y = L
+    #Creating grid
+    xpts = np.linspace(-X,X,npx,dtype=np.float64)
+    ypts = np.linspace(-Y,Y,npy,dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+    state = np.zeros(np.shape(times)+(4,)+xgrid.shape,dtype=np.float64) #Initialization of state
+    #Universal gas Constant
+    R_univ = 8.314 #J/molK
+    rsq = r_c*r_c
+    a = np.sqrt(gamma*R_gas*T_inf)
+    f = -1/(2*sigma*sigma)*((xgrid*xgrid/rsq)+(ygrid*ygrid/rsq))
+    Omega = beta*np.exp(f)
+    du = -ygrid/r_c*Omega
+    dv = xgrid/r_c*Omega
+    dT = (1-gamma)/2*Omega*Omega
+
+    rho = (1+dT)**(1/(gamma-1))
+    u = M_inf*np.cos(alpha)+du
+    v = M_inf*np.sin(alpha)+dv
+    P = 1/gamma*(1+dT)**(gamma/(gamma-1))
+
+    state[0,0] = rho
+    state[0,1] = rho*u
+    state[0,2] = rho*v
+    state[0,3] = P/(gamma-1)+0.5*rho*(u*u+v*v)
+    
+    return state
 
 def create_vortex_data(cvics,npx,npy, times=(0,), x0=0, y0=0, filepath = "./vortex/",filename = "vortex",fdb=True):
     """Use this function to create vortex data from the vortex funciton.
@@ -204,7 +242,7 @@ class vics(object):
 
     #----------------------------vics Initializer functions
 
-    def Shu(self,gamma,aoa=np.pi/4,npts = None):
+    def Shu(self,gamma=1.4,Rg=297,aoa=np.pi/4,npts = None):
         """ Initializer function that uses initial conditions from
 
         Shu, C.-W., “Essentially Non-oscillatory and Weighted Essentially Non-oscillatory Schemes for Hyperbolic Conservation
@@ -218,7 +256,7 @@ class vics(object):
         self.r_c = 1  #Vortex Radius
         #Gas properties
         self.gamma = gamma
-        self.R_gas = None  #J/kgK
+        self.R_gas = Rg  #J/kgK
         #Freestream variables
         self.rho_inf = 1    #Denisty
         self.alpha = aoa  #Angle of attack

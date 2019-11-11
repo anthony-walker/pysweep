@@ -22,8 +22,9 @@ def AnalyticalVortex(args):
 def SweptVortex(args):
     #Analytical properties
     cvics = vortex.vics()
+    cvics.Shu(args.gamma)
     #Creating initial vortex from analytical code
-    flux_vortex = cvics.Shu(args.gamma,aoa=0,npts=args.nx).flux[0]
+    flux_vortex = vortex.steady_vortex(cvics,args.nx,args.ny)[0]
     #Dimensions and steps
     dx = 2*cvics.L/args.nx
     dy = 2*cvics.L/args.ny
@@ -38,8 +39,9 @@ def SweptVortex(args):
 def StandardVortex(args):
     #Analytical properties
     cvics = vortex.vics()
+    cvics.Shu(args.gamma)
     #Creating initial vortex from analytical code
-    flux_vortex = cvics.Shu(args.gamma,aoa=0,npts=args.nx).flux[0]
+    flux_vortex = vortex.steady_vortex(cvics,args.nx,args.ny)[0]
     #Dimensions and steps
     dx = 2*cvics.L/args.nx
     dy = 2*cvics.L/args.ny

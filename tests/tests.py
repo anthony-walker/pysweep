@@ -234,6 +234,25 @@ def test_comparison_vortex(args=(2,0.01,48,0,10,12,1),remove_file=True,generate_
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + swept_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
+    #Opening the data files
+
+    swept_hdf5 = h5py.File(sfn+".hdf5", 'r')
+    decomp_hdf5 = h5py.File(dfn+".hdf5", 'r')
+    tsdata = swept_hdf5['data'][:,0,:,:]
+    tddata = decomp_hdf5['data'][:,0,:,:]
+    max_error = np.amax(abs(tsdata-tddata))
+    # assert np.allclose(tsdata,tddata)
+
+    #Closing files
+    swept_hdf5.close()
+    decomp_hdf5.close()
+    #Generating figure
+    if generate_fig:
+        comp_gif(dfn+".hdf5",sfn+".hdf5",filename="./vtx_comp.gif")
+    #Removing files
+    if remove_file:
+        os.system("rm "+ssfp)
+        os.system("rm "+sfp)
 
 def test_comparison_shock(args=(2,0.01,48,0,10,12,1),remove_file=True,generate_fig=False):
     """Use this function to compare the values obtain during a run of both solvers"""
@@ -452,6 +471,7 @@ class sweep_lambda(object):
 
 if __name__ == "__main__":
     # test_comparison_eqt(generate_fig=False)
-    test_comparison_shock(generate_fig=True)
+    # test_comparison_shock(generate_fig=True)
+    test_comparison_vortex(generate_fig=True)
     # test_comparison_hde()
     # test_flux()
