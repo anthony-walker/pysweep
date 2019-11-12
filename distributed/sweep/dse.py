@@ -145,7 +145,8 @@ def dsweep_engine():
     else:
         GRD,block_shape,garr = None,None,None
         blocks,total_cpu_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs,MPSS)
-        mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
+        pool_size = min(len(blocks), os.cpu_count()-node_comm.Get_size()+1)
+        mpi_pool = mp.Pool(pool_size)
     # ------------------------------HDF5 File------------------------------------------#
     hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
     comm.Barrier() #Ensure all processes are prepared to solve

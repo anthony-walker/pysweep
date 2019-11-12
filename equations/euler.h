@@ -72,7 +72,6 @@ void espectral(float* flux,float *left_state, float *right_state, int dim, int d
   {
     flux[i] += dir*rs*(left_state[i]-right_state[i]);
   }
-  // printf("%f,%f,%f,%f\n", flux[0],flux[1],flux[2],flux[3]);
 }
 
 /*
@@ -138,11 +137,7 @@ void  efluxx(float *flux, float *left_state, float *right_state,int dir)
       }
       else
       {
-          // printf("%f\n",Pr );
-          // printf("%d,%d,%d,%d,%f\n",isnan(Pr),isinf(Pr), Pr > 1.0e6,Pr < 1e-6,Pr);
           float coef = HALF*MIN(Pr, ONE);
-          // printf("%f\n", coef);
-          // printf("%f, %f,%f,%f\n",coef,left_point[0],right_point[0],left_point[0] - right_point[0]);
           for (int j = 0; j < NVC; j++)
           {
               temp_state[j] =  point1[j]+coef*(point2[j] - point3[j]);
@@ -170,36 +165,26 @@ void get_dfdx(float *dfdx, float *shared_state, int idx,int idmod)
     float temp_left[NVC]={0};
     float temp_right[NVC]={0};
     int spi = 1;  //spectral radius idx
-    // printf("%0.2f,%0.2f,%0.2f,%0.2f\n",cpoint[0],cpoint[1],cpoint[2],cpoint[3]);
     // Pressure ratio
     Pv[0] = pressure(wwpoint);
     Pv[1] = pressure(wpoint);
     Pv[2] = pressure(cpoint);
     Pv[3] = pressure(epoint);
     Pv[4] = pressure(eepoint);
-    // printf("%0.2f,%0.2f,%0.2f,%0.2f,%0.2f\n",wwpoint[0],wpoint[0],cpoint[0],epoint[0],eepoint[0]);
     //West
     flimiter(temp_left,wpoint,cpoint,wpoint,Pv[2]-Pv[1],Pv[1]-Pv[0]); //,num,den
     flimiter(temp_right,cpoint,wpoint,cpoint,Pv[2]-Pv[1],Pv[3]-Pv[2]); //,den,num
-    // printf("%f,%f,%d\n",temp_left[0],temp_right[0],idx);
-    // printf("%f,%f\n",temp_left[1],temp_right[1]);
-    // printf("%f,%f\n",temp_left[2],temp_right[2]);
-    // printf("%f,%f\n",temp_left[3],temp_right[3]);
     efluxx(dfdx,temp_left,temp_right,ONE);
     espectral(dfdx,temp_left,temp_right,spi,ONE);
-    // printf("%f,%f,%f,%f\n", dfdx[0],dfdx[1],dfdx[2],dfdx[3]);
     // //East
     flimiter(temp_left,cpoint,epoint,cpoint,Pv[3]-Pv[2],Pv[2]-Pv[1]); //,num,den
     flimiter(temp_right,epoint,cpoint,epoint,Pv[3]-Pv[2],Pv[4]-Pv[3]); //,den,num
-    // // printf("%0.2f,%0.2f,%0.2f,%0.2f\n",temp_left[0],temp_left[1],temp_left[2],temp_left[3]);
-    // // // printf("%0.2f,%0.2f,%0.2f,%0.2f\n",temp_right[0],temp_right[1],temp_right[2],temp_right[3]);
     efluxx(dfdx,temp_left,temp_right,-1);
     espectral(dfdx,temp_left,temp_right,spi,-1);
     // Divide flux in half
     for (int i = 0; i < NVC; i++) {
       dfdx[i]/=2;
     }
-    // printf("%f,%f,%f,%f\n", dfdx[0],dfdx[1],dfdx[2],dfdx[3]);
 }
 
 __device__
@@ -234,7 +219,6 @@ void get_dfdy(float *dfdy, float *shared_state, int idx,int idmod)
 
     efluxy(dfdy,temp_left,temp_right,ONE);
     espectral(dfdy,temp_left,temp_right,spi,ONE);
-    // printf("%f\n", dfdy[0]);
     //East
     flimiter(temp_left,cpoint,epoint,cpoint,Pv[3]-Pv[2],Pv[2]-Pv[1]); //,num,den
     flimiter(temp_right,epoint,cpoint,epoint,Pv[3]-Pv[2],Pv[4]-Pv[3]); //,den,num
@@ -246,7 +230,6 @@ void get_dfdy(float *dfdy, float *shared_state, int idx,int idmod)
     for (int i = 0; i < NVC; i++) {
       dfdy[i]/=2;
     }
-    // printf("%f,%f,%f,%f\n", dfdy[0],dfdy[1],dfdy[2],dfdy[3]);
 }
 
 __device__
@@ -286,11 +269,8 @@ void test_step(float *shared_state, int idx, int gts)
     float dfdy[NVC]={0,0,0,0};
 
     idx = test_idxs()+STS;
-    // printf("%f\n", shared_state[idx]);
     get_dfdx(dfdx,shared_state,idx,(blockDim.y*gridDim.x)); //Need plus 2 ops in actual setting
     get_dfdy(dfdy,shared_state,idx,(1)); //Need plus 2 ops in actual setting
-    // printf("%d\n", gridDim.x);
-    // printf("%f,%f,%f,%f\n", dfdy[0],dfdy[1],dfdy[2],dfdy[3]);
     //These variables determine predictor or corrector
     bool cond = ((gts+1)%TSO==0);
     int sidx =  cond ? 1 : 0;

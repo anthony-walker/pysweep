@@ -16,7 +16,7 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType):
     hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,),data=(time_steps,)+arr0.shape)
     hdf_aff = hdf5_file.create_dataset("AF",(1,),data=AF)
     hdf_time = hdf5_file.create_dataset("time",(1,),data=0.0)
-    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps+1,arr0.shape[0],arr0.shape[1],arr0.shape[2]),dtype=dType)
+    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,arr0.shape[0],arr0.shape[1],arr0.shape[2]),dtype=dType)
     if rank == cluster_master:
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     return hdf5_file, hdf5_data_set,hdf_time

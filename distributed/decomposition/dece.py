@@ -140,7 +140,8 @@ def decomp_engine():
         GRD,block_shape,garr,gread,gwrite = None,None,None,None,None
         sgs.dset = [(x+OPS,y+OPS) for x,y in np.ndindex((BS[0],BS[1]))]
         blocks,total_cpu_block,shared_write_block = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,CS,GRB,gargs)
-        mpi_pool = mp.Pool(os.cpu_count()-node_comm.Get_size()+1)
+        pool_size = min(len(blocks), os.cpu_count()-node_comm.Get_size()+1)
+        mpi_pool = mp.Pool(pool_size)
     functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
     # ------------------------------HDF5 File------------------------------------------#
     hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)

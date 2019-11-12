@@ -209,7 +209,7 @@ def test_comparison_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 1),remove_file=True,g
         os.system("rm "+sfp)
 
 
-def test_comparison_vortex(args=(5,0.01,48,0.5,10,12,1),remove_file=True,generate_fig=False):
+def test_comparison_vortex(args=(5,0.01,120,0.9,10,12,1),remove_file=True,generate_fig=False):
     """Use this function to compare the values obtain during a run of both solvers"""
     sfn = os.path.join(path,"data/dist_swept_vtx")
     dfn = os.path.join(path,"data/dist_decomp_vtx")
@@ -224,13 +224,13 @@ def test_comparison_vortex(args=(5,0.01,48,0.5,10,12,1),remove_file=True,generat
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
     #Create data using solver
-    estr = "mpiexec -n "+str(4)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex --distributed \'false\' "
+    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex --distributed \'true\' "
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + decomp_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
 
     #Create data using solver
-    estr = "mpiexec -n "+str(4)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex --distributed \'false\' "
+    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex --distributed \'true\' "
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + swept_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
@@ -248,7 +248,7 @@ def test_comparison_vortex(args=(5,0.01,48,0.5,10,12,1),remove_file=True,generat
     decomp_hdf5.close()
     #Generating figure
     if generate_fig:
-        comp_gif(dfn+".hdf5",sfn+".hdf5",filename="./vtx_comp.gif")
+        comp_gif(dfn+".hdf5",sfn+".hdf5",X,Y,filename="./vtx_comp.gif")
     #Removing files
     if remove_file:
         os.system("rm "+ssfp)
@@ -348,7 +348,6 @@ def test_comparison_eqt(args=(1, 48, 0.5, 10, 0.24, 5, 12, 1),remove_file=True,g
         os.system("rm "+ssfp)
         os.system("rm "+sfp)
 
-
 def test_flux():
     """Use this function to test the python version of the euler code.
     This test uses a formerly validate 1D code and computes the fluxes in each direction
@@ -401,8 +400,6 @@ def test_flux():
     assert np.allclose(df,dfdx)
     assert np.allclose(df,dfdy)
 
-
-
 #Plottign functions
 def myContour(args):
     """This funciton generates contours"""
@@ -411,16 +408,15 @@ def myContour(args):
     ax2.contourf(xgrid,ygrid,ddata[i,:,:],levels=20,cmap=cm.inferno)
     ax3.contourf(xgrid,ygrid,abs(sdata[i,:,:]-ddata[i,:,:]),levels=20,cmap=cm.inferno)
 
-def set_lims(fig,axes):
+def set_lims(fig,axes,X,Y,bounds):
     """Use this function to set axis limits"""
     for i,ax in enumerate(axes):
-        ax.set_ylim(-5, 5)
-        ax.set_xlim(-5, 5)
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax)
+        ax.set_ylim(-X/2, X/2)
+        ax.set_xlim(-Y/2, Y/2)
+        bx,by = bounds[i]
+        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(bx,by,10))
 
-def comp_gif(decomp_file,swept_file,filename="./comp.gif"):
+def comp_gif(decomp_file,swept_file,X,Y,filename="./comp.gif"):
     #Opening the data files
     decomp_hdf5 = h5py.File(decomp_file, 'r')
     swept_hdf5 = h5py.File(swept_file, 'r')
@@ -432,21 +428,20 @@ def comp_gif(decomp_file,swept_file,filename="./comp.gif"):
     for i,si in enumerate(range(0,len(tsdata)-adj,adj)):
         sdata[i,:,:] = tsdata[si,:,:]
         ddata[i,:,:] = tddata[si,:,:]
-    X=Y=10
-    # # Meshgrid
+    # Meshgrid
     xpts = np.linspace(-X/2,X/2,len(sdata[0]),dtype=np.float64)
     ypts = np.linspace(-Y/2,Y/2,len(ddata[0]),dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
     gs = gsc.GridSpec(2, 2)
     fig = plt.figure()
-
+    plt.subplots_adjust(hspace=0.5,wspace=0.5)
     ax1 = plt.subplot(gs[0,0])
     ax1.set_title("Swept")
     ax2 = plt.subplot(gs[0,1])
     ax2.set_title("Decomp")
     ax3 = plt.subplot(gs[1,:])
     ax3.set_title('Error')
-    set_lims(fig,(ax1,ax2,ax3))
+    set_lims(fig,(ax1,ax2,ax3),X,Y,((np.amin(sdata),np.amax(sdata)),(np.amin(sdata),np.amax(sdata)),(0,np.amax(abs(ddata-sdata)))))
 
     animate = sweep_lambda((myContour,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata))
     frames = len(ddata)
@@ -468,6 +463,7 @@ class sweep_lambda(object):
 if __name__ == "__main__":
     # test_comparison_eqt(generate_fig=False)
     # test_comparison_shock(generate_fig=True)
-    test_comparison_vortex(generate_fig=True)
+    # test_comparison_vortex(remove_file=False,generate_fig=True)
+    comp_gif("./pysweep/tests/data/dist_decomp_vtx.hdf5","./pysweep/tests/data/dist_swept_vtx.hdf5",1,1)
     # test_comparison_hde()
     # test_flux()

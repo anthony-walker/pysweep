@@ -32,7 +32,6 @@ def vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
        This solution was obtained from
 
     """
-
     # Persson, P. O., Bonet, J., & Peraire, J. (2009).
     # Discontinuous Galerkin solution of the Navier–Stokes equations on deformable domains.
     # Computer Methods in Applied Mechanics and Engineering, 198(17-20), 1585-1595.
