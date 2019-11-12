@@ -75,7 +75,7 @@ def vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
         state[i,vid] = V_inf*(np.sin(alpha)-beta*uterm/(2*PI*r_c)*np.exp(f/2)) #y velocity
     return state
 
-def steady_vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
+def steady_vortex(cvics,npx,npy,times=(0,),M_o=None,x0=0,y0=0):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
     properties are obtained from the vics object, cvics.
        The center can be changed with x0 and y0.
@@ -92,6 +92,8 @@ def steady_vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
     # Computer Methods in Applied Mechanics and Engineering, 198(17-20), 1585-1595.
 
     alpha, M_inf, P_inf, rho_inf, T_inf, gamma, R_gas, c, sigma, beta, r_c, L = cvics.get_args()
+    if M_o is not None:
+        M_inf=M_o
     PI = np.pi
     assert epsilon >= L/r_c*np.exp(-L*L/(2*r_c*r_c*sigma*sigma))
     X = L

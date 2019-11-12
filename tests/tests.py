@@ -209,7 +209,7 @@ def test_comparison_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 1),remove_file=True,g
         os.system("rm "+sfp)
 
 
-def test_comparison_vortex(args=(2,0.01,48,0,10,12,1),remove_file=True,generate_fig=False):
+def test_comparison_vortex(args=(5,0.01,48,0.5,10,12,1),remove_file=True,generate_fig=False):
     """Use this function to compare the values obtain during a run of both solvers"""
     sfn = os.path.join(path,"data/dist_swept_vtx")
     dfn = os.path.join(path,"data/dist_decomp_vtx")
@@ -413,16 +413,12 @@ def myContour(args):
 
 def set_lims(fig,axes):
     """Use this function to set axis limits"""
-    lim1 = 300*np.ones(3)
-    lim2 = 375*np.ones(3)
-    lim1[2] = 0
-    lim2[2] = 1
     for i,ax in enumerate(axes):
         ax.set_ylim(-5, 5)
         ax.set_xlim(-5, 5)
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
-        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(lim1[i],lim2[i],10))
+        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax)
 
 def comp_gif(decomp_file,swept_file,filename="./comp.gif"):
     #Opening the data files

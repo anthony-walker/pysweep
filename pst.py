@@ -159,7 +159,7 @@ def SweptSimple(args):
     dy = args.Y/args.ny
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
-    swargs = (2,2,args.block,args.affinity,os.path.join(epath,'eqt2.h'),os.path.join(epath,'eqt2.py'))
+    swargs = (2,2,args.block,args.affinity,os.path.join(epath,'eqt.h'),os.path.join(epath,'eqt.py'))
     if args.distributed:
         distsweep.dsweep(arr0,gargs,swargs,filename=args.hdf5)
     else:
@@ -173,7 +173,7 @@ def StandardSimple(args):
     dy = args.Y/args.ny
     #Changing arguments
     gargs = (args.t0,args.tf,args.dt,dx,dy,args.gamma)
-    swargs = (2,2,args.block,args.affinity,os.path.join(epath,'eqt2.h'),os.path.join(epath,'eqt2.py'))
+    swargs = (2,2,args.block,args.affinity,os.path.join(epath,'eqt.h'),os.path.join(epath,'eqt.py'))
     if args.distributed:
         ddecomp.ddecomp(arr0,gargs,swargs,filename=args.hdf5)
     else:
