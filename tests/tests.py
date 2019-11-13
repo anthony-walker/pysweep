@@ -11,24 +11,39 @@ path = os.path.dirname(fp)
 sys.path.insert(0, path[:-5])
 import distributed.sweep.ccore.source as source
 import distributed.sweep.ccore.printer as printer
+import analytical.vortex as vortex
 epath = os.path.join(path[:-5],'equations')
 import warnings
 warnings.simplefilter('ignore')
 
-def test_distributed_decomp_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=True,ststr=' --stationary \'true\' '):
+def test_distributed_decomp_vortex(args=(1,0.01,48,0.5,10,12,1),remove_file=True,ststr=' --stationary \'true\' ',nodestr=""):
     decomp_file = "\""+os.path.join(path,"data/dist_decomp_vortex")+"\""
-    sfp = "\""+os.path.join(path,"data/dist_decomp_vortex.hdf5")+"\""
+    sfn=os.path.join(path,"data/dist_decomp_vortex.hdf5")
+    sfp = "\""+sfn+"\""
     tf,dt,npx,aff,X,blks,nps = args
     npy=npx
     Y=X
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+ " "
-    if not os.path.isfile(sfp):
+    if not os.path.isfile(sfn):
     #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex "+ststr
+        estr = "mpiexec -n "+str(nps)+nodestr+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex "+ststr
         estr += "-b "+str(blks)+" -a "+str(aff)+ " "
         estr += " --hdf5 " + decomp_file + pts +time_str
         os.system(estr)
+
+    if 'true' in ststr:
+        cvics = vortex.vics()
+        cvics.Shu(1.4)
+        flux_vortex = vortex.steady_vortex(cvics,npx,npy,M_o=0)[0]
+        hdf5_file = h5py.File(sfn, 'r')
+        data = hdf5_file['data'][:,:,:,:]
+        erlist = np.asarray([np.amax(abs(dset-flux_vortex)) for dset in data])
+        errorf = h5py.File(os.path.join(os.path.join(path,"data"),"decomp_err.hdf5"),'w')
+        errorf.create_dataset("error",erlist.shape,data=erlist)
+        errorf.close()
+        hdf5_file.close()
+
     if remove_file:
         os.system("rm "+sfp)
 
@@ -49,7 +64,7 @@ def test_decomp_vortex(args=(0.5,0.01,48,0.5,10,12,4),remove_file=True):
     if remove_file:
         os.system("rm "+sfp)
 
-def test_distributed_decomp_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 1),remove_file=True):
+def test_distributed_decomp_hde(args=(2, 48, 0.5, 10, 0.24, 5, 12, 1),remove_file=True):
     decomp_file = "\""+os.path.join(path,"data/dist_decomp_hde")+"\""
     sfp = "\""+os.path.join(path,"data/dist_decomp_hde.hdf5")+"\""
     tf,npx,aff,X,Fo,alpha,blks,nps = args
@@ -85,20 +100,35 @@ def test_decomp_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 4),remove_file=True):
     if remove_file:
         os.system("rm "+sfp)
 
-def test_distributed_swept_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=True,ststr=' --stationary \'true\' '):
+def test_distributed_swept_vortex(args=(1,0.01,48,0.5,40,12,1),remove_file=True,ststr=' --stationary \'true\' ',nodestr=""):
     swept_file = "\""+os.path.join(path,"data/dist_swept_vortex")+"\""
-    sfp = "\""+os.path.join(path,"data/dist_swept_vortex.hdf5")+"\""
+    sfn = os.path.join(path,"data/dist_swept_vortex.hdf5")
+    sfp = "\""+sfn+"\""
     tf,dt,npx,aff,X,blks,nps = args
     npy=npx
     Y=X
     time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+ " "
-    if not os.path.isfile(sfp):
+
+    if not os.path.isfile(sfn):
     #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex "+ststr
+        estr = "mpiexec -n "+str(nps)+nodestr+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex "+ststr
         estr += "-b "+str(blks)+" -a "+str(aff)+ " "
         estr += " --hdf5 " + swept_file + pts +time_str
         os.system(estr)
+
+    if 'true' in ststr:
+        cvics = vortex.vics()
+        cvics.Shu(1.4)
+        flux_vortex = vortex.steady_vortex(cvics,npx,npy,M_o=0)[0]
+        hdf5_file = h5py.File(sfn, 'r')
+        data = hdf5_file['data'][:,:,:,:]
+        erlist = np.asarray([np.amax(abs(dset-flux_vortex)) for dset in data])
+        errorf = h5py.File(os.path.join(os.path.join(path,"data"),"swept_err.hdf5"),'w')
+        errorf.create_dataset("error",erlist.shape,data=erlist)
+        errorf.close()
+        hdf5_file.close()
+
     if remove_file:
         os.system("rm "+sfp)
 
@@ -224,13 +254,13 @@ def test_comparison_vortex(args=(5,0.01,120,0.9,10,12,1),remove_file=True,genera
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+" -X "+str(X)+ " -Y "+str(Y)
 
     #Create data using solver
-    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex --distributed \'true\' "
+    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex --distributed \'true\' --stationary \'true\'  "
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + decomp_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
 
     #Create data using solver
-    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex --distributed \'true\' "
+    estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex --distributed \'true\' --stationary \'true\' "
     estr += "-b "+str(blks)+" -a "+str(aff)+" "
     estr += "--hdf5 " + swept_file + pts +time_str + "--gamma "+str(1.4)
     os.system(estr)
@@ -463,7 +493,10 @@ class sweep_lambda(object):
 if __name__ == "__main__":
     # test_comparison_eqt(generate_fig=False)
     # test_comparison_shock(generate_fig=True)
+    targs = (1,0.001,2400,0.8,40,12,1)
+    test_distributed_swept_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
+    test_distributed_decomp_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
     # test_comparison_vortex(remove_file=False,generate_fig=True)
-    comp_gif("./pysweep/tests/data/dist_decomp_vtx.hdf5","./pysweep/tests/data/dist_swept_vtx.hdf5",1,1)
+    # comp_gif("./pysweep/tests/data/dist_decomp_vtx.hdf5","./pysweep/tests/data/dist_swept_vtx.hdf5",1,1)
     # test_comparison_hde()
     # test_flux()
