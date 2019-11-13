@@ -24,7 +24,8 @@ def SweptVortex(args):
     cvics = vortex.vics()
     cvics.Shu(args.gamma)
     #Creating initial vortex from analytical code
-    flux_vortex = vortex.steady_vortex(cvics,args.nx,args.ny)[0]
+    Mstat = 0 if args.stationary else None
+    flux_vortex = vortex.steady_vortex(cvics,args.nx,args.ny,M_o=Mstat)[0]
     #Dimensions and steps
     dx = 2*cvics.L/args.nx
     dy = 2*cvics.L/args.ny
@@ -41,7 +42,8 @@ def StandardVortex(args):
     cvics = vortex.vics()
     cvics.Shu(args.gamma)
     #Creating initial vortex from analytical code
-    flux_vortex = vortex.steady_vortex(cvics,args.nx,args.ny)[0]
+    Mstat = 0 if args.stationary else None
+    flux_vortex = vortex.steady_vortex(cvics,args.nx,args.ny,M_o=Mstat)[0]
     #Dimensions and steps
     dx = 2*cvics.L/args.nx
     dy = 2*cvics.L/args.ny
@@ -207,6 +209,7 @@ if __name__ == "__main__":
     parser.add_argument("--alpha",nargs="?",default=25e-6,type=float)
     parser.add_argument("-R",nargs="?",default=1,type=float)
     parser.add_argument("--gamma",nargs="?",default=1.4,type=float)
+    parser.add_argument('--stationary',nargs="?",default=False,type=str2bool)
 
     #Dimensional arguments
     parser.add_argument("-t0",nargs="?",default=0,type=float)

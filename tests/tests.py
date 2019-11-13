@@ -15,7 +15,7 @@ epath = os.path.join(path[:-5],'equations')
 import warnings
 warnings.simplefilter('ignore')
 
-def test_distributed_decomp_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=True):
+def test_distributed_decomp_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=True,ststr=' --stationary \'true\' '):
     decomp_file = "\""+os.path.join(path,"data/dist_decomp_vortex")+"\""
     sfp = "\""+os.path.join(path,"data/dist_decomp_vortex.hdf5")+"\""
     tf,dt,npx,aff,X,blks,nps = args
@@ -25,7 +25,7 @@ def test_distributed_decomp_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=Tr
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+ " "
     if not os.path.isfile(sfp):
     #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex "
+        estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" standard_vortex "+ststr
         estr += "-b "+str(blks)+" -a "+str(aff)+ " "
         estr += " --hdf5 " + decomp_file + pts +time_str
         os.system(estr)
@@ -85,7 +85,7 @@ def test_decomp_hde(args=(1, 48, 0.5, 10, 0.24, 5, 12, 4),remove_file=True):
     if remove_file:
         os.system("rm "+sfp)
 
-def test_distributed_swept_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=True):
+def test_distributed_swept_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=True,ststr=' --stationary \'true\' '):
     swept_file = "\""+os.path.join(path,"data/dist_swept_vortex")+"\""
     sfp = "\""+os.path.join(path,"data/dist_swept_vortex.hdf5")+"\""
     tf,dt,npx,aff,X,blks,nps = args
@@ -95,7 +95,7 @@ def test_distributed_swept_vortex(args=(0.5,0.01,48,0.5,10,12,1),remove_file=Tru
     pts = " -nx "+str(npx)+ " -ny "+str(npx)+ " "
     if not os.path.isfile(sfp):
     #Create data using solver
-        estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex "
+        estr = "mpiexec -n "+str(nps)+" python "+os.path.join(path[:-5],"pst.py")+" swept_vortex "+ststr
         estr += "-b "+str(blks)+" -a "+str(aff)+ " "
         estr += " --hdf5 " + swept_file + pts +time_str
         os.system(estr)
