@@ -515,7 +515,7 @@ if __name__ == "__main__":
     print("Executing Swept Test")
     test_distributed_swept_vortex(args=targs)#,nodestr=" --hostfile=nrg-nodes ")
     print("Executing Decomp Test")
-    test_distributed_decomp_vortex(args=targs,remove_file=False)#,nodestr=" --hostfile=nrg-nodes ")
+    test_distributed_decomp_vortex(args=targs)#,nodestr=" --hostfile=nrg-nodes ")
     # plot_errors("./pysweep/tests/data/swept_err.hdf5","./pysweep/tests/data/decomp_err.hdf5",5)
     # test_comparison_vortex(remove_file=False,generate_fig=True)
     # comp_gif("./pysweep/tests/data/dist_decomp_vortex.hdf5","./pysweep/tests/data/dist_swept_vortex.hdf5",40,40,error=False)
