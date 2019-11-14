@@ -430,8 +430,20 @@ def test_flux():
     assert np.allclose(df,dfdx)
     assert np.allclose(df,dfdy)
 
-def plot_errors(swept_file,decomp_file):
+def plot_errors(swept_file,decomp_file,t):
     """Use this function to plot the errors of each case on the same chart"""
+    decomp_hdf5 = h5py.File(decomp_file, 'r')
+    swept_hdf5 = h5py.File(swept_file, 'r')
+    swept_error = swept_hdf5['error']
+    decomp_error = decomp_hdf5['error']
+    xs = np.linspace(0,t,len(swept_error))
+    xd = np.linspace(0,t,len(decomp_error))
+    fig = plt.figure()
+    plt.title("Error Comparison")
+    ax1 = plt.plot(xs,swept_error,linewidth=3,color='b')
+    ax2 = plt.plot(xd,decomp_error,linewidth=3,color='r',linestyle='--')
+    plt.legend(("Swept","Standard"))
+    plt.show()
 
 #Plottign functions
 def myContour(args):
@@ -439,7 +451,8 @@ def myContour(args):
     i,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata=args
     ax1.contourf(xgrid,ygrid,sdata[i,:,:],levels=20,cmap=cm.inferno)
     ax2.contourf(xgrid,ygrid,ddata[i,:,:],levels=20,cmap=cm.inferno)
-    ax3.contourf(xgrid,ygrid,abs(sdata[i,:,:]-ddata[i,:,:]),levels=20,cmap=cm.inferno)
+    if ax3 is not None:
+        ax3.contourf(xgrid,ygrid,abs(sdata[i,:,:]-ddata[i,:,:]),levels=20,cmap=cm.inferno)
 
 def set_lims(fig,axes,X,Y,bounds):
     """Use this function to set axis limits"""
@@ -449,7 +462,7 @@ def set_lims(fig,axes,X,Y,bounds):
         bx,by = bounds[i]
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=np.linspace(bx,by,10))
 
-def comp_gif(decomp_file,swept_file,X,Y,filename="./comp.gif"):
+def comp_gif(decomp_file,swept_file,X,Y,filename="./comp.gif",error=True):
     #Opening the data files
     decomp_hdf5 = h5py.File(decomp_file, 'r')
     swept_hdf5 = h5py.File(swept_file, 'r')
@@ -465,18 +478,22 @@ def comp_gif(decomp_file,swept_file,X,Y,filename="./comp.gif"):
     xpts = np.linspace(-X/2,X/2,len(sdata[0]),dtype=np.float64)
     ypts = np.linspace(-Y/2,Y/2,len(ddata[0]),dtype=np.float64)
     xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
-    gs = gsc.GridSpec(2, 2)
+    gs = gsc.GridSpec(2, 2) if error else gsc.GridSpec(1, 2)
     fig = plt.figure()
     plt.subplots_adjust(hspace=0.5,wspace=0.5)
     ax1 = plt.subplot(gs[0,0])
     ax1.set_title("Swept")
     ax2 = plt.subplot(gs[0,1])
     ax2.set_title("Decomp")
-    ax3 = plt.subplot(gs[1,:])
-    ax3.set_title('Error')
-    set_lims(fig,(ax1,ax2,ax3),X,Y,((np.amin(sdata),np.amax(sdata)),(np.amin(sdata),np.amax(sdata)),(0,np.amax(abs(ddata-sdata)))))
+    if error:
+        ax3 = plt.subplot(gs[1,:])
+        ax3.set_title('Error')
+        set_lims(fig,(ax1,ax2,ax3),X,Y,((np.amin(sdata),np.amax(sdata)),(np.amin(sdata),np.amax(sdata)),(0,np.amax(abs(ddata-sdata)))))
+        animate = sweep_lambda((myContour,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata))
+    else:
+        set_lims(fig,(ax1,ax2),X,Y,((np.amin(sdata),np.amax(sdata)),(np.amin(sdata),np.amax(sdata))))
+        animate = sweep_lambda((myContour,fig,ax1,ax2,None,xgrid,ygrid,ddata,sdata))
 
-    animate = sweep_lambda((myContour,fig,ax1,ax2,ax3,xgrid,ygrid,ddata,sdata))
     frames = len(ddata)
     anim = animation.FuncAnimation(fig,animate,frames=frames,repeat=False)
     anim.save(filename,writer="imagemagick")
@@ -494,14 +511,13 @@ class sweep_lambda(object):
 
 
 if __name__ == "__main__":
-    # test_comparison_eqt(generate_fig=False)
-    # test_comparison_shock(generate_fig=True)
-    targs = (2,0.005,1200,0.9,20,12,6)
-    print("Executing Swept Test")
-    test_distributed_swept_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
-    print("Executing Decomp Test")
-    test_distributed_decomp_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
+    # targs = (2,0.005,1200,0.9,20,12,6)
+    # print("Executing Swept Test")
+    # test_distributed_swept_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
+    # print("Executing Decomp Test")
+    # test_distributed_decomp_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
+    plot_errors("./pysweep/tests/data/swept_err.hdf5","./pysweep/tests/data/decomp_err.hdf5",5)
     # test_comparison_vortex(remove_file=False,generate_fig=True)
-    # comp_gif("./pysweep/tests/data/dist_decomp_vtx.hdf5","./pysweep/tests/data/dist_swept_vtx.hdf5",1,1)
+    # comp_gif("./pysweep/tests/data/dist_decomp_vortex.hdf5","./pysweep/tests/data/dist_swept_vortex.hdf5",40,40,error=False)
     # test_comparison_hde()
     # test_flux()
