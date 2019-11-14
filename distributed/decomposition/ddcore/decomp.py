@@ -72,6 +72,7 @@ def create_cpu_blocks(total_cpu_block,BS,shared_shape,ops):
     column_range = np.arange(ops,total_cpu_block[3].stop-total_cpu_block[3].start+ops,BS[1],dtype=np.intc)
     xslice = slice(shared_shape[2]-2*ops-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2],1)
     yslice = slice(total_cpu_block[3].start-ops,total_cpu_block[3].stop+ops,1)
+    #There is an issue with total cpu block for decomp on cluster
     ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,yslice)
     return [(total_cpu_block[0],total_cpu_block[1],slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)],ntcb
 
