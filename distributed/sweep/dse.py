@@ -175,6 +175,7 @@ def dsweep_engine():
     #Removing input file.
     if rank==cluster_master:
         os.system("rm "+"input_file.hdf5") #remove input file
+        gargs+=swargs[:4]
         if os.path.isfile('log.hdf5'):
             log_file = h5py.File('log.hdf5','a')
             shape = log_file['time'].shape[0]
