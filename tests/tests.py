@@ -493,7 +493,7 @@ class sweep_lambda(object):
 if __name__ == "__main__":
     # test_comparison_eqt(generate_fig=False)
     # test_comparison_shock(generate_fig=True)
-    targs = (0.5,0.005,600,0.8,40,12,1)
+    targs = (1,0.01,240,0.8,10,12,2)
     # test_distributed_swept_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
     test_distributed_decomp_vortex(args=targs,remove_file=False)
     # test_comparison_vortex(remove_file=False,generate_fig=True)

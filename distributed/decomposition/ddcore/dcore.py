@@ -64,7 +64,6 @@ def get_gpu_info(rank,cluster_master,nid,cluster_comm,AF,BS,exid,processors,ns,a
     cMag = cU-cL
     return gpu_rank,tng,num_gpus,(rLow,rHigh,gMag,cMag),(ranks[nid-1],ranks[nid+1]),GNR,CNR
 
-
 def find_remove_ranks(node_ranks,AF,num_gpus):
     """Use this function to find ranks that need removed."""
     ranks_to_remove = list()
@@ -74,10 +73,9 @@ def find_remove_ranks(node_ranks,AF,num_gpus):
         ranks_to_remove.append(node_ranks.pop())
     return ranks_to_remove
 
-
 def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs):
     """Use this function to execute core cpu only processes"""
-    xslice = slice(shared_shape[2]-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2],1)
+    xslice = slice(shared_shape[2]-OPS-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2]-OPS,1)
     swb = (total_cpu_block[0],total_cpu_block[1],xslice,total_cpu_block[3])
     blocks,total_cpu_block = decomp.create_cpu_blocks(total_cpu_block,BS,shared_shape,OPS)
     sgs.SM = source.build_cpu_source(CS) #Building Python source code
