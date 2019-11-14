@@ -77,7 +77,8 @@ def find_remove_ranks(node_ranks,AF,num_gpus):
 
 def cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,CS,GRB,gargs):
     """Use this function to execute core cpu only processes"""
-    swb = total_cpu_block
+    xslice = slice(shared_shape[2]-2*OPS-(total_cpu_block[2].stop-total_cpu_block[2].start),shared_shape[2],1)
+    swb = (total_cpu_block[0],total_cpu_block[1],xslice,total_cpu_block[3])
     blocks,total_cpu_block = decomp.create_cpu_blocks(total_cpu_block,BS,shared_shape,OPS)
     sgs.SM = source.build_cpu_source(CS) #Building Python source code
     sgs.SM.set_globals(GRB,sgs.SM,*gargs)
