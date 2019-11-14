@@ -430,6 +430,9 @@ def test_flux():
     assert np.allclose(df,dfdx)
     assert np.allclose(df,dfdy)
 
+def plot_errors(swept_file,decomp_file):
+    """Use this function to plot the errors of each case on the same chart"""
+
 #Plottign functions
 def myContour(args):
     """This funciton generates contours"""
@@ -493,9 +496,11 @@ class sweep_lambda(object):
 if __name__ == "__main__":
     # test_comparison_eqt(generate_fig=False)
     # test_comparison_shock(generate_fig=True)
-    targs = (1,0.01,240,0.8,10,12,2)
-    # test_distributed_swept_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
-    test_distributed_decomp_vortex(args=targs,remove_file=False)
+    targs = (2,0.005,1200,0.9,20,12,6)
+    print("Executing Swept Test")
+    test_distributed_swept_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
+    print("Executing Decomp Test")
+    test_distributed_decomp_vortex(args=targs,remove_file=False,nodestr=" --hostfile=nrg-nodes ")
     # test_comparison_vortex(remove_file=False,generate_fig=True)
     # comp_gif("./pysweep/tests/data/dist_decomp_vtx.hdf5","./pysweep/tests/data/dist_swept_vtx.hdf5",1,1)
     # test_comparison_hde()

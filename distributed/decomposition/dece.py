@@ -75,7 +75,6 @@ def decomp_engine():
     cluster_master = cluster_ranks[0]
     cluster_group = comm.group.Incl(cluster_ranks)
     cluster_comm = comm.Create_group(cluster_group)
-
     #CPU Core information
     total_num_cpus = len(processors)
     num_cpus = 1 #Each rank will always have 1 cpu
@@ -145,7 +144,7 @@ def decomp_engine():
 
     functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,total_cpu_block,OPS,gread,garr)
     # ------------------------------HDF5 File------------------------------------------#
-    hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
+    hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType,gargs)
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------Standard Decomposition---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions

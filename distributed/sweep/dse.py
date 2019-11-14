@@ -20,7 +20,6 @@ import numpy as np
 
 
 def dsweep_engine():
-    # arr0,gargs,swargs,filename ="results",exid=[],dType=np.dtype('float32')
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -36,7 +35,6 @@ def dsweep_engine():
         AF -  the GPU affinity (GPU work/CPU work)/TotalWork
         GS - GPU source code file
         CS - CPU source code file
-    dType: data type for the run (e.g. np.dtype("float32")).
     filename: Name of the output file excluding hdf5
     exid: GPU ids to exclude from the calculation.
     """
@@ -68,7 +66,6 @@ def dsweep_engine():
     time_steps = int((tf-t0)/dt)  #Number of time steps
     MGST = int(TSO*(time_steps-MPSS)/(MPSS)+1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
     time_steps = int(MPSS*(MGST+1)/TSO+1) #Number of time steps - Add 1 for initial conditions
-
     #-------------MPI SETUP----------------------------#
     processor = MPI.Get_processor_name()
     rank = comm.Get_rank()  #current rank
@@ -148,7 +145,7 @@ def dsweep_engine():
         pool_size = min(len(blocks), os.cpu_count()-node_comm.Get_size()+1)
         mpi_pool = mp.Pool(pool_size)
     # ------------------------------HDF5 File------------------------------------------#
-    hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType)
+    hdf5_file, hdf5_data,hdf_time = dcore.make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType,gargs)
     comm.Barrier() #Ensure all processes are prepared to solve
     # -------------------------------SWEPT RULE---------------------------------------------#
     pargs = (sgs.SM,GRB,BS,GRD,OPS,TSO,ssb) #Passed arguments to the swept functions
@@ -157,7 +154,6 @@ def dsweep_engine():
     functions.FirstPrism(sarr,garr,blocks,sgs.gts,pargs,mpi_pool,total_cpu_block)
     node_comm.Barrier()
     functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-
     cwt = 1
     # -------------------------------SWEPT LOOP--------------------------------------------#
     step = cycle([functions.send_backward,functions.send_forward])
