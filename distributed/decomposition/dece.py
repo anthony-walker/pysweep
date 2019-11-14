@@ -172,11 +172,29 @@ def decomp_engine():
     if GRB:
         cuda_context.pop()
     comm.Barrier()
-    hdf_time[0] = time.time()-start
+    stop = time.time()
+    hdf_time[0] = stop-start
     hdf5_file.close()
     #Removing input file.
-    if NMB:
-        os.system("rm "+"input_file.hdf5")
+    if rank==cluster_master:
+        os.system("rm "+"input_file.hdf5") #remove input file
+        if os.path.isfile('log.hdf5'):
+            log_file = h5py.File('log.hdf5','a')
+            shape = log_file['time'].shape[0]
+            log_file['time'].resize((log_file['time'].shape[0]+1),axis=0)
+            log_file['time'][shape]=stop-start
+            log_file['type'].resize((log_file['type'].shape[0]+1),axis=0)
+            log_file['type'][shape]=ord('d')
+            log_file['args'].resize((log_file['args'].shape[0]+1),axis=0)
+            log_file['args'][shape]=gargs
+            log_file.close()
+        else:
+            log_file = h5py.File('log.hdf5','w')
+            log_file.create_dataset('time',(1,),data=(stop-start),chunks=True,maxshape=(None,))
+            log_file.create_dataset('type',(1,),data=(ord('d')),chunks=True,maxshape=(None,))
+            log_file.create_dataset('args',(1,)+np.shape(gargs),data=gargs,chunks=True,maxshape=(None,)+np.shape(gargs))
+            log_file.close()
+
 #Statement to execute dsweep
 decomp_engine()
 #Statement to finalize MPI processes
