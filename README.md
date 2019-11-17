@@ -1,10 +1,9 @@
 
 # PySweep
 
-This is a package containing the functions to implement the swept space-time decomposition rule for solving unsteady PDEs in 2 dimensions on
-heterogeneous computing architecture.
+This is a package containing the functions to implement the swept space-time decomposition rule for solving unsteady PDEs in 2 dimensions on heterogeneous computing architecture.
 
-# Constraints
+### Constraints
 - The grid used is structured.
 - block_size is constrained to  <em>b = (2nf)<sup>2</sup></em> and constrained by your GPU. Note the block_size should have the same x and y dimension.
 - A total of three functions must be named accordingly and take specific arguments.
@@ -144,3 +143,5 @@ One pre-programmed example looks like this:
 There is also solvers under `pysweep.node` that use different strategies on a single node but these solvers have not been fully tested or validated. The performance of the distributed solver tends to be better anyways so it is the recommended package to use.
 
 PySweep was validated using the Euler Vortex problem in 2 dimensions. There are tests in `pysweep.tests` that can demonstrate this if desired.
+
+The latex for the paper outlining the work done in this code can be found [here](https://github.com/Niemeyer-Research-Group/2019-walker-2dswept-camwa).
