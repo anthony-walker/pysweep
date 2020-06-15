@@ -1,0 +1,23 @@
+#Dont Track These
+former/
+*.pyc
+*__pycache__/
+*.m
+*.hdf5
+sources/
+figures/
+results/
+post_sweep/
+#notipy/
+*.gif
+vortex/
+.pytest_cache/
+manusol
+sources
+sources.txt
+*distributed/sweep/dcore/cpu.py
+*distributed/sweep/dcore/gpu.h
+*distributed/decomposition/ddcore/cpu.py
+*distributed/decomposition/ddcore/gpu.h
+*_output/
+*pyclaw.log
