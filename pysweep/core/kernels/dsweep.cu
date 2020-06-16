@@ -4,11 +4,23 @@ Programmer: Anthony Walker
 This file contains cuda/c++ source code for launching the pycuda swept rule.
 Other information can be found in the euler.h file
 */
+#include "cuda.h"
+
+#if defined(_MSC_VER)
+    //  Microsoft
+    #define EXPORT extern "C" __declspec(dllexport)
+#elif defined(__GNUC__)
+    //  GCC
+    #define EXPORT extern "C" __attribute__((visibility("default")))
+#else
+    //  do nothing and hope for the best?
+    #define EXPORT
+    #pragma warning Unknown dynamic link export semantics.
+#endif
 
 //Constant Memory Values
 __device__ __constant__ const double RTWO=2;
 //Swept constants
-// __device__ __constant__ int SGIDS; //shift in shared data
 __device__ __constant__ int VARS; //shift in variables in data
 __device__ __constant__ int TIMES; //shift in times in data
 __device__ __constant__  int MPSS; //max pyramid swept steps
@@ -32,7 +44,6 @@ __device__ int get_idx(int tmod)
   return SY*(threadIdx.x)+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*SY+tmod*TIMES;
 }
 
-
 /*
     Use this function to create and return the GPU UpPyramid
 */
@@ -55,7 +66,7 @@ UpPyramid(double *state, int gts)
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             // Solving step function
-            step(state,gid,gts);
+            //step(state,gid,gts);
         }
         __syncthreads();
         //Updating global time step
@@ -89,7 +100,7 @@ YBridge(double *state, int gts)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-          step(state,gid,gts);
+          //step(state,gid,gts);
         }
         __syncthreads();
         //Updating global time step
@@ -124,7 +135,7 @@ YBT(double *state, int gts)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-            step(state,gid,gts);
+            //step(state,gid,gts);
             // state[gid+TIMES]=3;
         }
         __syncthreads();
@@ -160,7 +171,7 @@ XBridge(double *state, int gts)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
-          step(state,gid,gts);
+          //step(state,gid,gts);
           // state[gid+TIMES]=2;
       }
       __syncthreads();
@@ -196,7 +207,7 @@ Octahedron(double *state, int gts)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
-          step(state,gid,gts);
+          //step(state,gid,gts);
           // state[gid+TIMES]=1;
       }
       __syncthreads();
@@ -228,7 +239,7 @@ Octahedron(double *state, int gts)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-            step(state,gid,gts);
+            //step(state,gid,gts);
             // state[gid+TIMES]=1;
         }
         __syncthreads();
@@ -263,7 +274,7 @@ DownPyramid(double *state, int gts)
     {
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-          step(state,gid,gts);
+          //step(state,gid,gts);
         }
         __syncthreads();
         gid+=TIMES;
@@ -274,4 +285,30 @@ DownPyramid(double *state, int gts)
         lx -= OPS;
         ly -= OPS;
     }
+}
+
+//Interface functions
+typedef void (*FunctionArray)(double *state, int gts); //creating type for function array
+FunctionArray functions[] = {UpPyramid,XBridge,YBridge,YBT,Octahedron,DownPyramid}; //Creating global function array
+long long int ARRAY_BYTES; //Size of array
+double *globalState; //globalState array
+
+EXPORT void CudaArrayAllocate(int arr_size)
+{
+  ARRAY_BYTES = arr_size * sizeof(double) ;
+  cudaMalloc((void **) &globalState, ARRAY_BYTES) ;
+}
+
+EXPORT void CudaArrayFree()
+{
+  cudaFree(globalState);
+}
+
+//
+EXPORT void CudaFunctionCall(double * state, int gts, int fcnIdx)
+{
+	cudaMemcpy(globalState, state, ARRAY_BYTES, cudaMemcpyHostToDevice) ;
+  functions[fcnIdx]<<< 1, arr_size >>>(state, gts) ;
+  cudaDeviceSynchronize();
+	cudaMemcpy(state, globalState, ARRAY_BYTES, cudaMemcpyDeviceToHost) ;
 }

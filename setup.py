@@ -9,16 +9,16 @@ setuptools.setup(
     author="Anthony Walker",
     author_email="walkanth@oregonstate.edu",
     license='BSD 3-clause "New" or "Revised License"',
-    description="This package is to solve ",
+    description="This package is used for solving PDEs on distributed computing systems.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/anthony-walker/pysweep-git",
-    entry_points={
-        'console_scripts': [
-            'pysweep=pyplume.commandline:pst',
-            ]
-    },
-    packages=['pysweep'],
+    # entry_points={
+    #     'console_scripts': [
+    #         'pysweep=pyplume.commandline:pst',
+    #         ]
+    # },
+    packages=setuptools.find_packages(),
     include_package_data=True,
     # package_data={'pyplume': ['mechanisms/*','originals/*','tests/*']},
     classifiers=[

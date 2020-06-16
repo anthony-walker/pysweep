@@ -1,13 +1,12 @@
 
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
-import sys, h5py, GPUtil, time, os,shutil
-import numpy as np
-from mpi4py import MPI
-import shutil
+import sys, h5py,os,shutil,mpi4py.MPI as MPI
+pysweep_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(pysweep_path)
+import gputools.GPUtil as GPUtil
 
-
-def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float64'):
+def ddecomp(arr0,gargs,swargs,filename ="results",exid=[],dType='float64'):
     """Use this function to perform swept rule
     args:
     arr0 -  3D numpy array of initial conditions (v (variables), x,y)
@@ -36,7 +35,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float64'):
     proc_mult = 1
     rank = comm.Get_rank()  #current rank
     master_rank = 0
-    # Making sure arr0 has correct data type
+    #Making sure arr0 has correct data type
     arr0 = arr0.astype(dType)
     #Create input file
     ifn = "input_file.hdf5"
@@ -52,7 +51,7 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float64'):
     comm.Barrier()
     hdf5_file.close()
     #Copy GPU/CPU files
-    cpath = os.path.join(os.path.dirname(__file__),'dcore')
+    cpath = os.path.join(os.path.dirname(__file__),'ddcore')
     shutil.copyfile(swargs[5],os.path.join(cpath,'cpu.py'))
     shutil.copyfile(swargs[4],os.path.join(cpath,'gpu.h'))
     #Getting GPUs if affinity is greater than 0
@@ -71,29 +70,8 @@ def dsweep(arr0,gargs,swargs,filename ="results",exid=[],dType='float64'):
     num_procs = int(proc_mult*comm.Get_size())
     # Spawning MPI processes
     if rank == master_rank:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'dse.py')
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'dece.py')
         MPI.COMM_SELF.Spawn(sys.executable,args=[path],maxprocs=num_procs)
     else:
         MPI.Finalize()
         exit(0)
-
-
-if __name__ == "__main__":
-    #Analytical properties
-    t0,tf,dt,npx,X,nps,aff,blks=(0,0.1,0.001,12,1.2,1,0,12)
-    arr0 = np.zeros((4,npx,npx))
-    ct = 0
-    for idz in range(arr0.shape[0]):
-        for idx in range(arr0.shape[1]):
-            for idy in range(arr0.shape[2]):
-                arr0[idz,idx,idy] = ct
-                ct += 1
-    #Dimensions and steps
-    dx = X/(npx-1)
-    dy = X/(npx-1)
-    #Changing arguments
-    gargs = (t0,tf,dt,dx,dy,1.4)
-    direc = os.path.abspath(__file__)[:-len('distributed/sweep/distsweep.py')]
-    direc = os.path.join(direc,'equations')
-    swargs = (2,2,blks,0,os.path.join(direc,'eqt.h'),os.path.join(direc,'eqt.py'))
-    dsweep(arr0,gargs,swargs,filename='distsweeptest')
