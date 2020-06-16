@@ -1,32 +1,15 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
 import sys, os, h5py, numpy, time, pickle, itertools.cycle as cycle, multiprocessing as mp, mpi4py.MPI as MPI
-from core import core, block, functions, sgs, interface, io, process, GPUtil
+import core, block, functions, sgs, interface, io, process, GPUtil
 #CUDA Imports
 try:
     import pycuda.driver as cuda
 except Exception as e:
     print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 
-def dsweep_engine():
-    """Use this function to perform swept rule
-    args:
-    arr0 -  3D numpy array of initial conditions (v (variables), x,y)
-    gargs:   (global args)
-        The first three variables must be time arguments (t0,tf,dt).
-        Subsequent variables can be anything passed to the source code in the
-        "set_globals" function
-    swargs: (Swept args)
-        TSO - order of the time scheme
-        OPS - operating points to remove from each side for a function step
-            (e.g. a 5 point stencil would result in OPS=2).
-        BS - an integer which represents the x and y dimensions of the gpu block size
-        AF -  the GPU affinity (GPU work/CPU work)/TotalWork
-        GS - GPU source code file
-        CS - CPU source code file
-    filename: Name of the output file excluding hdf5
-    exid: GPU ids to exclude from the calculation.
-    """
+def swept_engine():
+    """Use this function to perform swept rule"""
     #Starting timer
     start = time.time()
     #initialize global cpu arr

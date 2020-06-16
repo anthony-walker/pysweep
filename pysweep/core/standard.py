@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #PySweep is a package used to implement the swept rule for solving PDEs
 import sys, os, h5py, math, time, numpy, mpi4py.MPI as MPI, multiprocessing as mp, itertools.cycle as cycle
-from core import core, block, functions, sgs, interface, io, process, GPUtil
+import core, block, functions, sgs, interface, io, process, GPUtil
 #CUDA Imports
 try:
     import pycuda.driver as cuda
