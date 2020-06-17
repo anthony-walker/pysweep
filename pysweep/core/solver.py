@@ -51,11 +51,12 @@ class Solver(object):
             if sendWarning:
                 warnings.warn('yaml not specified, requires manual input.')
 
-    def __call__():
+    def __call__(self):
         """Use this function to spawn processes."""
         self.verbosePrint('Running simulation...\n')
         if self.rank == self.master_rank:
-            MPI.COMM_SELF.Spawn(sys.executable,args=[self.enginePath],maxprocs=self.um_procs)
+            print(self.engineCPU)
+            MPI.COMM_SELF.Spawn(sys.executable,args=[self.engineCPU],maxprocs=self.num_procs)
         else:
             MPI.Finalize()
             exit(0)
