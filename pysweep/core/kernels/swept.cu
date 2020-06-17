@@ -4,7 +4,11 @@ Programmer: Anthony Walker
 This file contains cuda/c++ source code for launching the pycuda swept rule.
 Other information can be found in the euler.h file
 */
+
+
 #include "cuda.h"
+#include <iostream>
+
 
 #if defined(_MSC_VER)
     //  Microsoft
@@ -34,8 +38,7 @@ __device__ __constant__ int SY; //Space in y
 __device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
 __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
 
-//!!(@#
-
+#include PYSWEEP_GPU_SOURCE
 /*
     Use this function to get the global id
 */
@@ -291,6 +294,7 @@ DownPyramid(double *state, int gts)
 typedef void (*FunctionArray)(double *state, int gts); //creating type for function array
 FunctionArray functions[] = {UpPyramid,XBridge,YBridge,YBT,Octahedron,DownPyramid}; //Creating global function array
 long long int ARRAY_BYTES; //Size of array
+int array_size;
 double *globalState; //globalState array
 
 EXPORT void CudaArrayAllocate(int arr_size)
@@ -308,7 +312,13 @@ EXPORT void CudaArrayFree()
 EXPORT void CudaFunctionCall(double * state, int gts, int fcnIdx)
 {
 	cudaMemcpy(globalState, state, ARRAY_BYTES, cudaMemcpyHostToDevice) ;
-  functions[fcnIdx]<<< 1, arr_size >>>(state, gts) ;
+  functions[fcnIdx]<<< 1, array_size >>>(state, gts) ;
   cudaDeviceSynchronize();
 	cudaMemcpy(state, globalState, ARRAY_BYTES, cudaMemcpyDeviceToHost) ;
+}
+
+int main(int argc, char const *argv[])
+{
+  printf("%s\n", PYSWEEP_GPU_SOURCE);
+  return 0;
 }
