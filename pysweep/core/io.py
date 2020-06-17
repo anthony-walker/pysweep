@@ -15,6 +15,11 @@ def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType,garg
         hdf5_data_set[0,:,:,:] = arr0[:,:,:]
     return hdf5_file, hdf5_data_set,hdf_time
 
+def verbosePrint(self,outString):
+    """Use this function to print only when verbose option is specified."""
+    if self.verbose and self.rank == self.cluster_master:
+        print(outString)
+
 def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""

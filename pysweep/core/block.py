@@ -69,19 +69,7 @@ def create_swept_escpu_blocks(cpu_blocks,shared_shape,BS):
             shift_blocks[i] = new_block
     return cpu_blocks,shift_blocks
 
-def nsplit(rank,node_master,node_comm,num_gpus,node_info,BS,arr_shape,gpu_rank,ops=None,swept=True):
-    """Use this function to split data amongst nodes."""
-    if rank == node_master:
-        start,stop,gm,cm = node_info
-        gstop = start+gm
-        g = numpy.linspace(start,gstop,num_gpus+1,dtype=numpy.intc)
-        if swept: #Swept rule
-            gbs = [slice(int(g[i]*BS[0]),int(g[i+1]*BS[0]),1) for i in range(num_gpus)]+[slice(int(gstop*BS[0]),int(stop*BS[0]),1)]
-        else: #Standard
-            gbs = [slice(int(g[i]*BS[0]+ops),int(g[i+1]*BS[0]+ops),1) for i in range(num_gpus)]+[slice(int(gstop*BS[0]+ops),int(stop*BS[0]+ops),1)]
-        gpu_rank = list(zip(gpu_rank,gbs))
-    gpu_rank = node_comm.scatter(gpu_rank)
-    return gpu_rank
+
 
 def create_dist_up_sets(block_size,ops):
     """This function creates up sets for the dsweep."""
