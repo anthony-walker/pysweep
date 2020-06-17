@@ -104,7 +104,7 @@ class Solver(object):
             self.maxPyramidSize = int(self.blocksize[0]/(2*self.operating)-1) #This will need to be adjusted for differing x and y block lengths
             self.maxGlobalSweptStep = int(self.intermediate*(self.time_steps-self.maxPyramidSize)/(self.maxPyramidSize)+1)  #Global swept step  #THIS ASSUMES THAT time_steps > MOSS
             self.time_steps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
-        self.arrayshape = (self.time_steps,)+self.timeTuple
+        self.arrayshape = (self.time_steps,)+self.arrayshape
 
 
     def createOutputFile(self):

@@ -1,7 +1,7 @@
 import numpy, mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 
-def splitNodeBlocks(solver):
+def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
     """Use this function to split data amongst nodes."""
     if solver.nodeMasterBool:
         start,stop,gm,cm = solver.nodeInfo
@@ -12,11 +12,12 @@ def splitNodeBlocks(solver):
         else: #Standard
             ops = solver.operating
             gbs = [slice(int(g[i]*solver.blocksize[0]+ops),int(g[i+1]*solver.blocksize[0]+ops),1) for i in range(numberOfGPUs)]+[slice(int(gstop*solver.blocksize[0]+ops),int(stop*solver.blocksize[0]+ops),1)]
-    solver.gpuRank,solver.blocks = solver.nodeComm.scatter(list(zip(solver.gpuRank,gbs)))
+        gpuRank,solver.blocks = solver.nodeComm.scatter(list(zip(gpuRank,gbs)))
+    solver.gpuBool = True if gpuRank is not None else False
 
-def destroyUnecessaryProcesses(solver,nodeRanks,comm,removeRanks):
+def destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks):
     """Use this to destory unwanted mpi processes."""
-    [solver.allRanks.remove(x) for x in set([x[0] for x in solver.comm.allgather(removeRanks) if x])]
+    [allRanks.remove(x) for x in set([x[0] for x in solver.comm.allgather(removeRanks) if x])]
     solver.comm.Barrier()
     #Remaking comms
     if solver.rank in allRanks:
@@ -31,13 +32,13 @@ def destroyUnecessaryProcesses(solver,nodeRanks,comm,removeRanks):
         exit(0)
     solver.comm.Barrier()
 
-def findRanksToDestroy(nodeRanks,AF,numberOfGPUs,CPURows):
+def findRanksToDestroy(nodeRanks,share,numberOfGPUs,CPURows):
     """Use this function to find ranks that need removed."""
     removeRanks = list()
     # nodeRanks = [nodeRanks[0]] if solver.share == 0 else nodeRanks
     try:
-        assert CPURows > 0 if solver.share < 1 else True, "AssertionError: CPURows!>0, Affinity specified forces number of rows for the cpu to be zero, CPU process will be destroyed. Adjusting affintiy to 1."
-        while len(nodeRanks) > numberOfGPUs+(1-int(solver.share)):
+        assert CPURows > 0 if share < 1 else True, "AssertionError: CPURows!>0, Affinity specified forces number of rows for the cpu to be zero, CPU process will be destroyed. Adjusting affintiy to 1."
+        while len(nodeRanks) > numberOfGPUs+(1-int(share)):
             removeRanks.append(nodeRanks.pop())
     except Exception as e:
         print(str(e))
@@ -64,7 +65,7 @@ def getGPUInfo(solver,nodeID):
     ranks.append(ranks[1]) #Add first rank to end
     i = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(1,len(numberOfGPUsList))]
     totalGPUs = numpy.sum(numberOfGPUsList)
-    numberOfRows = solver.arrayshape[1]/solver.blocksize[0]
+    numberOfRows = solver.arrayshape[2]/solver.blocksize[0]
     assert (numpy.prod(solver.arrayshape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
     GPURows = numpy.ceil(numberOfRows*solver.share)
     CPURows = numberOfRows-GPURows
@@ -128,7 +129,6 @@ def setupMPI(solver):
         gpuRank,totalGPUs, numberOfGPUs, nodeInfo, communicationRanks, GPURows,CPURows = getGPUInfo(solver,nodeID)
         removeRanks = findRanksToDestroy(nodeRanks,solver.share,numberOfGPUs,CPURows)
         [gpuRank.append(None) for i in range(len(nodeRanks)-len(gpuRank))]
-        print(totalGPUs,GPURows)
         #Testing ranks and number of gpus to ensure simulation is viable
         assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
         assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
@@ -138,10 +138,10 @@ def setupMPI(solver):
         removeRanks = []
     #Broadcasting gpu information
     totalGPUs = solver.comm.bcast(totalGPUs)
-    nodeRanks = nodeComm.bcast(nodeRanks)
-    solver.nodeInfo = nodeComm.bcast(nodeInfo)
+    nodeRanks = solver.nodeComm.bcast(nodeRanks)
+    solver.nodeInfo = solver.nodeComm.bcast(nodeInfo)
     #----------------------__Removing Unwanted MPI Processes------------------------#
-    solver.nodeComm,solver.comm = destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks)
-    splitNodeBlocks(rank,nodeMaster,nodeComm,numberOfGPUs,nodeInfo,BS,arr0.shape,gpuRank)
+    destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks)
+    splitNodeBlocks(solver,numberOfGPUs,gpuRank)
     # Checking to ensure that there are enough
-    assert totalGPUs >= nodeComm.Get_size() if AF == 1 else True,"Not enough GPUs for ranks"
+    assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
