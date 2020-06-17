@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing process management and data decomposition for the swept rule.
 
-import numpy, mpi4py.MPI as MPI,
+import numpy, mpi4py.MPI as MPI
 from itertools import product
 
 def create_local_gpu_array(block_shape):

@@ -1,1 +1,1 @@
-from .solver import Solver
+from pysweep.core.solver import Solver

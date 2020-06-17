@@ -1,4 +1,4 @@
-import sys, os, yaml, numpy, h5py, warnings, subprocess, traceback, mpi4py.MPI as MPI
+import sys, os, yaml, numpy, h5py, warnings, subprocess, traceback,  mpi4py.MPI as MPI, pysweep.core.GPUtil as GPUtil
 
 class Solver(object):
     """docstring for Solver."""
@@ -7,7 +7,7 @@ class Solver(object):
         super(Solver, self).__init__()
         self.initialConditions = initialConditions
         self.arrayshape = numpy.shape(initialConditions)
-        self.corepath = os.path.join(os.path.dirname(os.path.abspath(__file__)),"core")
+        self.corepath = os.path.dirname(os.path.abspath(__file__))
         self.libpath = os.path.join(self.corepath,"lib")
         self.kernelpath = os.path.join(self.corepath,"kernels")
 
@@ -39,8 +39,7 @@ class Solver(object):
 
             #number of processes
             self.verbosePrint("Finding number of processes...\n")
-            # self.numberOfProcesses()
-
+            self.numberOfProcesses()
 
             #Compile code
             self.cudaCompiler()
@@ -188,7 +187,7 @@ class Solver(object):
         if self.rank == self.master_rank:
             #Multipler for Number of processes to add
             self.proc_mult += max(node_gpus_list)
-        self.proc_mult = comm.bcast(self.proc_mult,root=self.master_rank)
+        self.proc_mult = self.comm.bcast(self.proc_mult,root=self.master_rank)
         self.comm.Barrier()
         self.num_procs = int(self.proc_mult*self.comm.Get_size())
 
@@ -243,7 +242,7 @@ class Solver(object):
 
         #number of processes
         solverObj.verbosePrint("Finding number of processes...\n")
-        # solverObj.numberOfProcesses()
+        solverObj.numberOfProcesses()
         #Final statement
         solverObj.verbosePrint(solverObj)
         solverObj.verbosePrint("Ready to run simulation.")

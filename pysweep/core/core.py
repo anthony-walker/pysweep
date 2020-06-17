@@ -1,5 +1,5 @@
 
-import functions, block, numpy
+import pysweep.core.functions as functions
 
 def swept_cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,gargs,MPSS,TSO):
     """Use this function to execute core cpu only processes"""
