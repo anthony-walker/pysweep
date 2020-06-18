@@ -27,12 +27,12 @@ class Solver(object):
             #set up MPI
             process.setupMPI(self)
             io.verbosePrint(self,"Setting up MPI...\n")
-
+            print(self.rank)
             #Creating simulatneous input and output file
             # io.verbosePrint(self,'Creating output file...\n')
             # self.createOutputFile()
 
-            #Creating shared array
+            # Creating shared array
             if self.simulation:
                 block.sweptBlock(self)
             else:

@@ -20,8 +20,8 @@ def createSweptSharedArray(solver):
     #Filling shared array
     if solver.nodeMasterBool:
         gsc = (slice(0,solver.arrayShape[2],1),slice(int(solver.nodeInfo[0]*solver.blocksize[0]),int(solver.nodeInfo[1]*solver.blocksize[0]),1),slice(0,solver.arrayShape[3],1))
-        sarr[TSO-1,:,:,:] =  arr0[gsc]
-        sarr[0,:,:,:] =  arr0[gsc]
+        solver.sharedArray[solver.intermediate-1,:,:,:] =  solver.initialConditions[gsc]
+        solver.sharedArray[0,:,:,:] =  solver.initialConditions[gsc]
     else:
         gsc = None
 

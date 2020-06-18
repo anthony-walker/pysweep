@@ -42,12 +42,17 @@ def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
         else: #Standard
             ops = solver.operating
             gbs = [slice(int(g[i]*solver.blocksize[0]+ops),int(g[i+1]*solver.blocksize[0]+ops),1) for i in range(numberOfGPUs)]+[slice(int(gstop*solver.blocksize[0]+ops),int(stop*solver.blocksize[0]+ops),1)]
-    gpuRank,solver.blocks = solver.nodeComm.scatter(list(zip(gpuRank,gbs)))
+        gpuRank = list(zip(gpuRank,gbs))
+    gpuRank,solver.blocks = solver.nodeComm.scatter(gpuRank)
     solver.gpuBool = True if gpuRank is not None else False
 
 def destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks):
     """Use this to destory unwanted mpi processes."""
-    [allRanks.remove(x) for x in set([x[0] for x in solver.comm.allgather(removeRanks) if x])]
+    removeList = []
+    for x in solver.comm.allgather(removeRanks):
+        if x:
+            removeList+=x
+    [allRanks.remove(x) for x in set(removeList)]
     solver.comm.Barrier()
     #Remaking comms
     if solver.rank in allRanks:
@@ -170,6 +175,7 @@ def setupMPI(solver):
     totalGPUs = solver.comm.bcast(totalGPUs)
     nodeRanks = solver.nodeComm.bcast(nodeRanks)
     solver.nodeInfo = solver.nodeComm.bcast(nodeInfo)
+
     #----------------------__Removing Unwanted MPI Processes------------------------#
     destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks)
     splitNodeBlocks(solver,numberOfGPUs,gpuRank)
