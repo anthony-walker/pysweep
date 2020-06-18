@@ -20,6 +20,23 @@ def verbosePrint(self,outString):
     if self.verbose and self.rank == self.cluster_master:
         print(outString)
 
+def sweptInput():
+    #------------------INPUT DATA SETUP-------------------------$
+    arr0,gargs,swargs,filename,exid,dType = decomp.read_input_file(comm)
+    TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
+    t0,tf,dt = gargs[:3]
+    assert BS%(2*OPS)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
+    BS = (BS,BS,1)
+
+def standardInput():
+    #------------------INPUT DATA SETUP-------------------------$
+    arr0,gargs,swargs,filename,exid,dType = decomp.read_input_file(comm)
+    TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
+    sgs.TSO,sgs.OPS,sgs.BS,sgs.AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
+    t0,tf,dt = gargs[:3]
+    assert BS%(2*OPS)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
+    BS = (BS,BS,1)
+
 def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""

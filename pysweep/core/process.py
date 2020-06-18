@@ -1,6 +1,36 @@
 import numpy, mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 
+def cleanupProcesses():
+    # Clean Up - Pop Cuda Contexts and Close Pool
+    if GRB:
+        cuda_context.pop()
+    comm.Barrier()
+    stop = time.time()
+    # print(stop-stop1)
+    hdf_time[0] = stop-start
+    hdf5_file.close()
+    #Removing input file.
+    if rank==cluster_master:
+        os.system("rm "+"input_file.hdf5") #remove input file
+        gargs+=swargs[:4]
+        if os.path.isfile('log.hdf5'):
+            log_file = h5py.File('log.hdf5','a')
+            shape = log_file['time'].shape[0]
+            log_file['time'].resize((log_file['time'].shape[0]+1),axis=0)
+            log_file['time'][shape]=stop-start
+            log_file['type'].resize((log_file['type'].shape[0]+1),axis=0)
+            log_file['type'][shape]=ord('s')
+            log_file['args'].resize((log_file['args'].shape[0]+1),axis=0)
+            log_file['args'][shape]=gargs
+            log_file.close()
+        else:
+            log_file = h5py.File('log.hdf5','w')
+            log_file.create_dataset('time',(1,),data=(stop-start),chunks=True,maxshape=(None,))
+            log_file.create_dataset('type',(1,),data=(ord('s')),chunks=True,maxshape=(None,))
+            log_file.create_dataset('args',(1,)+numpy.shape(gargs),data=gargs,chunks=True,maxshape=(None,)+numpy.shape(gargs))
+            log_file.close()
+
 def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
     """Use this function to split data amongst nodes."""
     if solver.nodeMasterBool:
@@ -12,7 +42,7 @@ def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
         else: #Standard
             ops = solver.operating
             gbs = [slice(int(g[i]*solver.blocksize[0]+ops),int(g[i+1]*solver.blocksize[0]+ops),1) for i in range(numberOfGPUs)]+[slice(int(gstop*solver.blocksize[0]+ops),int(stop*solver.blocksize[0]+ops),1)]
-        gpuRank,solver.blocks = solver.nodeComm.scatter(list(zip(gpuRank,gbs)))
+    gpuRank,solver.blocks = solver.nodeComm.scatter(list(zip(gpuRank,gbs)))
     solver.gpuBool = True if gpuRank is not None else False
 
 def destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks):
@@ -65,8 +95,8 @@ def getGPUInfo(solver,nodeID):
     ranks.append(ranks[1]) #Add first rank to end
     i = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(1,len(numberOfGPUsList))]
     totalGPUs = numpy.sum(numberOfGPUsList)
-    numberOfRows = solver.arrayshape[2]/solver.blocksize[0]
-    assert (numpy.prod(solver.arrayshape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
+    numberOfRows = solver.arrayShape[2]/solver.blocksize[0]
+    assert (numpy.prod(solver.arrayShape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
     GPURows = numpy.ceil(numberOfRows*solver.share)
     CPURows = numberOfRows-GPURows
     k = (GPURows-GPURows%totalGPUs)/totalGPUs if totalGPUs!=0 else 0.0
