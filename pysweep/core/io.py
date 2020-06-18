@@ -1,23 +1,42 @@
-import sys
+import sys, h5py, time
 from collections import Iterable
 
-def make_hdf5(filename,cluster_master,comm,rank,BS,arr0,time_steps,AF,dType,gargs):
-    """Use this function to make hdf5 output file."""
-    filename+=".hdf5"
-    hdf5_file = h5py.File(filename, 'w', driver='mpio', comm=comm)
-    hdf_bs = hdf5_file.create_dataset("BS",(len(BS),),data=BS)
-    hdf5_file.create_dataset('args',numpy.shape(gargs),data=gargs)
-    hdf_as = hdf5_file.create_dataset("array_size",(len(arr0.shape)+1,),data=(time_steps,)+arr0.shape)
-    hdf_aff = hdf5_file.create_dataset("AF",(1,),data=AF)
-    hdf_time = hdf5_file.create_dataset("time",(1,),data=0.0)
-    hdf5_data_set = hdf5_file.create_dataset("data",(time_steps,arr0.shape[0],arr0.shape[1],arr0.shape[2]),dtype=dType)
-    if rank == cluster_master:
-        hdf5_data_set[0,:,:,:] = arr0[:,:,:]
-    return hdf5_file, hdf5_data_set,hdf_time
+def manageLogFile(solver):
+    gargs+=swargs[:4]
+    if os.path.isfile('log.hdf5'):
+        log_file = h5py.File('log.hdf5','a')
+        shape = log_file['time'].shape[0]
+        log_file['time'].resize((log_file['time'].shape[0]+1),axis=0)
+        log_file['time'][shape]=stop-start
+        log_file['type'].resize((log_file['type'].shape[0]+1),axis=0)
+        log_file['type'][shape]=ord('s')
+        log_file['args'].resize((log_file['args'].shape[0]+1),axis=0)
+        log_file['args'][shape]=gargs
+        log_file.close()
+    else:
+        log_file = h5py.File('log.hdf5','w')
+        log_file.create_dataset('time',(1,),data=(stop-start),chunks=True,maxshape=(None,))
+        log_file.create_dataset('type',(1,),data=(ord('s')),chunks=True,maxshape=(None,))
+        log_file.create_dataset('args',(1,)+numpy.shape(gargs),data=gargs,chunks=True,maxshape=(None,)+numpy.shape(gargs))
+        log_file.close()
 
-def verbosePrint(self,outString):
+def createOutputFile(solver):
+    """Use this function to create output file which will act as the input file as well."""
+    #Create input file
+    solver.hdf5 = h5py.File(solver.output, 'w', driver='mpio', comm=solver.comm)
+    solver.hdf5.create_dataset("blocksize",(1,),data=(solver.blocksize[0],))
+    solver.hdf5.create_dataset("share",(1,),data=(solver.share,))
+    solver.hdf5.create_dataset("exid",(len(solver.exid),),data=solver.exid)
+    solver.hdf5.create_dataset("globals",(len(solver.globals),),data=solver.globals)
+    solver.clocktime = solver.hdf5.create_dataset("clocktime",(1,),data=0.0)
+    solver.data = solver.hdf5.create_dataset("data",(solver.time_steps,)+solver.arrayShape,dtype=solver.dtype)
+    if solver.clusterMasterBool:
+        solver.data[0,:,:,:] = solver.initialConditions[:,:,:]
+    solver.comm.Barrier()
+
+def verbosePrint(solver,outString):
     """Use this function to print only when verbose option is specified."""
-    if self.verbose and self.rank == self.cluster_master:
+    if solver.verbose and solver.rank == solver.clusterMaster:
         print(outString)
 
 def sweptInput():

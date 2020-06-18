@@ -28,6 +28,12 @@ def createSweptSharedArray(solver):
 def sweptBlock(solver):
     """This is the entry point for the swept portion of the block module."""
     createSweptSharedArray(solver) #This creates shared array
+    if solver.gpuBool:
+        print(solver.rank,"GPU")
+    else:
+        print(solver.rank,"CPU")
+
+
 
 def sweptCore():
     # ------------------- Operations specifically for GPus and CPUs------------------------#

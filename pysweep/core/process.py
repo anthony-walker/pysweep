@@ -1,35 +1,20 @@
 import numpy, mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
+import pysweep.core.io as io
 
-def cleanupProcesses():
+def cleanupProcesses(solver,start,stop):
+    """Use this function to wrap up the code and produce log file."""
     # Clean Up - Pop Cuda Contexts and Close Pool
-    if GRB:
-        cuda_context.pop()
-    comm.Barrier()
+    # if solver.gpuBool:
+    #     cuda_context.pop()
+    solver.comm.Barrier()
     stop = time.time()
     # print(stop-stop1)
-    hdf_time[0] = stop-start
-    hdf5_file.close()
+    solver.clocktime[0] = stop-start
+    solver.hdf5.close()
     #Removing input file.
-    if rank==cluster_master:
-        os.system("rm "+"input_file.hdf5") #remove input file
-        gargs+=swargs[:4]
-        if os.path.isfile('log.hdf5'):
-            log_file = h5py.File('log.hdf5','a')
-            shape = log_file['time'].shape[0]
-            log_file['time'].resize((log_file['time'].shape[0]+1),axis=0)
-            log_file['time'][shape]=stop-start
-            log_file['type'].resize((log_file['type'].shape[0]+1),axis=0)
-            log_file['type'][shape]=ord('s')
-            log_file['args'].resize((log_file['args'].shape[0]+1),axis=0)
-            log_file['args'][shape]=gargs
-            log_file.close()
-        else:
-            log_file = h5py.File('log.hdf5','w')
-            log_file.create_dataset('time',(1,),data=(stop-start),chunks=True,maxshape=(None,))
-            log_file.create_dataset('type',(1,),data=(ord('s')),chunks=True,maxshape=(None,))
-            log_file.create_dataset('args',(1,)+numpy.shape(gargs),data=gargs,chunks=True,maxshape=(None,)+numpy.shape(gargs))
-            log_file.close()
+    if solver.clusterMasterBool:
+        io.manageLogFile(solver)
 
 def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
     """Use this function to split data amongst nodes."""
@@ -84,7 +69,7 @@ def findRanksToDestroy(nodeRanks,share,numberOfGPUs,CPURows):
 def getGPUInfo(solver,nodeID):
     """Use this function to split data amongst nodes."""
     #Assert that the total number of blocks is an integer
-    tnc = solver.cluster_comm.Get_size()
+    tnc = solver.clusterComm.Get_size()
     ns = solver.nodeComm.Get_size()
     if solver.share>0:
         lim = ns if solver.share==1 else ns-1
@@ -94,13 +79,13 @@ def getGPUInfo(solver,nodeID):
         gpuRank = []
         numberOfGPUs = 0
     j = numpy.arange(0,tnc+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(tnc+1,dtype=numpy.intc)
-    ranks,numberOfGPUsList = zip(*[(None,0)]+solver.cluster_comm.allgather((solver.rank,numberOfGPUs)))
+    ranks,numberOfGPUsList = zip(*[(None,0)]+solver.clusterComm.allgather((solver.rank,numberOfGPUs)))
     ranks = list(ranks)
     ranks[0] = ranks[-1] #Set first rank to last rank
     ranks.append(ranks[1]) #Add first rank to end
     i = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(1,len(numberOfGPUsList))]
     totalGPUs = numpy.sum(numberOfGPUsList)
-    numberOfRows = solver.arrayShape[2]/solver.blocksize[0]
+    numberOfRows = solver.arrayShape[1]/solver.blocksize[0]
     assert (numpy.prod(solver.arrayShape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
     GPURows = numpy.ceil(numberOfRows*solver.share)
     CPURows = numberOfRows-GPURows
@@ -142,24 +127,24 @@ def separateNodeAndCluster(solver):
     solver.nodeMasterBool = solver.rank == solver.nodeMaster
     #Create cluster comm
     clusterRanks = list(set(solver.comm.allgather(solver.nodeMaster)))
-    solver.cluster_master = clusterRanks[0]
+    solver.clusterMaster = clusterRanks[0]
     cluster_group = solver.comm.group.Incl(clusterRanks)
-    solver.cluster_comm = solver.comm.Create_group(cluster_group)
-    solver.clusterMasterBool = solver.rank == solver.cluster_master
+    solver.clusterComm = solver.comm.Create_group(cluster_group)
+    solver.clusterMasterBool = solver.rank == solver.clusterMaster
     return allRanks,nodeRanks
-
 
 def setupMPI(solver):
     #-------------MPI SETUP----------------------------#
     allRanks,nodeRanks = separateNodeAndCluster(solver) #This function creates necessary variables for MPI to use
+    io.verbosePrint(solver,"Setting up MPI...\n")
      #Assumes all nodes have the same number of cores in CPU
     if solver.nodeMasterBool:
         #Giving each node an id
         if solver.clusterMasterBool:
-            nodeID = numpy.arange(1,solver.cluster_comm.Get_size()+1,1,dtype=numpy.intc)
+            nodeID = numpy.arange(1,solver.clusterComm.Get_size()+1,1,dtype=numpy.intc)
         else:
             nodeID = None
-        nodeID = solver.cluster_comm.scatter(nodeID)
+        nodeID = solver.clusterComm.scatter(nodeID)
         #Getting GPU information
         gpuRank,totalGPUs, numberOfGPUs, nodeInfo, communicationRanks, GPURows,CPURows = getGPUInfo(solver,nodeID)
         removeRanks = findRanksToDestroy(nodeRanks,solver.share,numberOfGPUs,CPURows)

@@ -1,4 +1,4 @@
-import sys, os, yaml, numpy, h5py, warnings, subprocess, traceback,  mpi4py.MPI as MPI
+import sys, os, yaml, numpy, warnings, subprocess, traceback, time,  mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
 import pysweep.core.process as process
@@ -10,6 +10,7 @@ class Solver(object):
 
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
+        self.moments = [time.time(),]
         self.initialConditions = initialConditions
         self.arrayShape = numpy.shape(initialConditions)
         self.corepath = os.path.dirname(os.path.abspath(__file__))
@@ -22,21 +23,6 @@ class Solver(object):
             self.yamlManager()
             self.initialConditions = self.initialConditions.astype(self.dtype)
 
-            #Creating time step data
-            self.createTimeStepData()
-            #set up MPI
-            process.setupMPI(self)
-            io.verbosePrint(self,"Setting up MPI...\n")
-            print(self.rank)
-            #Creating simulatneous input and output file
-            # io.verbosePrint(self,'Creating output file...\n')
-            # self.createOutputFile()
-
-            # Creating shared array
-            if self.simulation:
-                block.sweptBlock(self)
-            else:
-                block.standardBlock(self)
 
         #     #Setting egine
         #     self.engine = "swept" if self.simulation else "standard"
@@ -54,23 +40,38 @@ class Solver(object):
         #     #Final statement
         #     io.verbosePrint(self,self)
         #     io.verbosePrint(self,"Ready to run simulation.")
+
         else:
             if sendWarning:
                 warnings.warn('yaml not specified, requires manual input.')
 
-    def __call__(self):
+    def __call__(self,start=0,stop=-1):
         """Use this function to spawn processes."""
+        #Grabbing start of call time
+        self.moments.append(time.time())
+        #set up MPI
+        process.setupMPI(self)
+        self.moments.append(time.time())
+        #Creating time step data
+        io.verbosePrint(self,'Creating time step data...\n')
+        self.createTimeStepData()
+        self.moments.append(time.time())
+        #Creating simulatneous input and output file
+        io.verbosePrint(self,'Creating output file...\n')
+        io.createOutputFile(self)
+        self.moments.append(time.time())
+
+        # Creating shared array
+        if self.simulation:
+            block.sweptBlock(self)
+        else:
+            block.standardBlock(self)
+        self.moments.append(time.time())
         io.verbosePrint(self,'Running simulation...\n')
-        #Starting timer
-        start = time.time()
-        #Setting global variables
-        sgs.init_globals()
-        #Local Constants
-        ZERO = 0
-        QUARTER = 0.25
-        HALF = 0.5
-        ONE = 1
-        TWO = 2
+
+        io.verbosePrint(self,'Cleaning up processes...\n')
+        process.cleanupProcesses(self,self.moments[start],self.moments[stop])
+
 
 
     def __str__(self):
@@ -116,21 +117,7 @@ class Solver(object):
         self.arrayShape = (self.maxOctSize+self.intermediate+1,)+self.arrayShape
 
 
-    def createOutputFile(self):
-        """Use this function to create output file which will act as the input file as well."""
-        #Create input file
-        hdf5_file = h5py.File(self.output, 'w', driver='mpio', comm=self.comm)
-        hdf5_file.create_dataset("blocksize",(1,),data=(self.blocksize,))
-        hdf5_file.create_dataset("share",(1,),data=(self.share,))
-        hdf5_file.create_dataset("exid",(len(self.exid),),data=self.exid)
-        hdf5_file.create_dataset("globals",(len(self.globals),),data=self.globals)
-        hdf5_file.create_dataset("clocktime",(1,),data=0.0)
-        hdf5_data_set = hdf5_file.create_dataset("data",(self.time_steps,)+self.arrayShape,dtype=self.dtype)
 
-        if self.rank == self.master_rank:
-            hdf5_data_set[0,:,:,:] = self.initialConditions[:,:,:]
-        hdf5_file.close()
-        self.comm.Barrier()
 
     def yamlManager(self):
         """Use this function to manage and assign all specified yaml variables."""
