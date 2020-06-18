@@ -1,4 +1,4 @@
-import numpy, mpi4py.MPI as MPI
+import numpy,time, mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
 
@@ -8,13 +8,12 @@ def cleanupProcesses(solver,start,stop):
     # if solver.gpuBool:
     #     cuda_context.pop()
     solver.comm.Barrier()
-    stop = time.time()
-    # print(stop-stop1)
-    solver.clocktime[0] = stop-start
+    clocktime = stop-start
+    solver.clocktime[0] = clocktime
     solver.hdf5.close()
     #Removing input file.
     if solver.clusterMasterBool:
-        io.manageLogFile(solver)
+        io.updateLogFile(solver,clocktime)
 
 def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
     """Use this function to split data amongst nodes."""

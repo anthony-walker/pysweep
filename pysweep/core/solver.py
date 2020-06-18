@@ -7,7 +7,6 @@ import pysweep.core.block as block
 
 class Solver(object):
     """docstring for Solver."""
-
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
         self.moments = [time.time(),]
@@ -15,94 +14,55 @@ class Solver(object):
         self.arrayShape = numpy.shape(initialConditions)
         self.corepath = os.path.dirname(os.path.abspath(__file__))
         self.libpath = os.path.join(self.corepath,"lib")
-        self.kernelpath = os.path.join(self.corepath,"kernels")
+
 
         if yamlFileName is not None:
             self.yamlFileName = yamlFileName
             #Managing inputs
-            self.yamlManager()
+            io.yamlManager(self)
             self.initialConditions = self.initialConditions.astype(self.dtype)
-
-
-        #     #Setting egine
-        #     self.engine = "swept" if self.simulation else "standard"
-        #     self.engineGPU = os.path.join(self.kernelpath,self.engine+".cu")
-        #     self.engineCPU = os.path.join(self.corepath,self.engine+".py")
-        #     io.verbosePrint(self,"Setting engine: {}\n".format(self.engine))
-        #
-        #     #number of processes
-        #     io.verbosePrint(self,"Finding number of processes...\n")
-        #     self.numberOfProcesses()
-        #
-        #     #Compile code
-        #     self.cudaCompiler()
-        #
-        #     #Final statement
-        #     io.verbosePrint(self,self)
-        #     io.verbosePrint(self,"Ready to run simulation.")
-
         else:
             if sendWarning:
                 warnings.warn('yaml not specified, requires manual input.')
 
-    def __call__(self,start=0,stop=-1):
+    def __call__(self,start=0,stop=-1,libname=None,recompile=False):
         """Use this function to spawn processes."""
         #Grabbing start of call time
         self.moments.append(time.time())
+
         #set up MPI
         process.setupMPI(self)
         self.moments.append(time.time())
+
+        #Compiling GPU kernel
+        self.cudaCompiler(libname=libname,recompile=recompile)
+        self.moments.append(time.time())
+
         #Creating time step data
         io.verbosePrint(self,'Creating time step data...\n')
         self.createTimeStepData()
         self.moments.append(time.time())
+
         #Creating simulatneous input and output file
         io.verbosePrint(self,'Creating output file...\n')
         io.createOutputFile(self)
         self.moments.append(time.time())
 
         # Creating shared array
+        io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
         if self.simulation:
             block.sweptBlock(self)
         else:
             block.standardBlock(self)
         self.moments.append(time.time())
-        io.verbosePrint(self,'Running simulation...\n')
-
+        # io.verbosePrint(self,'Running simulation...\n')
+        #Process cleanup
         io.verbosePrint(self,'Cleaning up processes...\n')
         process.cleanupProcesses(self,self.moments[start],self.moments[stop])
 
-
-
     def __str__(self):
         """Use this function to print the object."""
-        returnString = "\nPysweep simulation properties:\n"
-        returnString += "\tsimulation type: {}\n".format("swept" if self.simulation else "standard")
-
-        returnString+="\tgpu source: {}\n".format(self.source['gpu'])
-        returnString+="\tcpu source: {}\n".format(self.source['cpu'])
-        returnString+="\toutput file: {}\n".format(self.output)
-        returnString+="\tverbose: {}\n".format(self.verbose)
-        returnString+="\tArray shape: {}\n".format(self.arrayShape)
-        returnString+="\tdtype: {}\n".format(self.dtype)
-        returnString+="\tshare: {}\n".format(self.share)
-        returnString+="\tblocksize: {}\n".format(self.blocksize[0])
-        returnString+="\tstencil size: {}\n".format(int(self.operating*2+1))
-        returnString+="\tintermediate time steps: {}\n".format(self.intermediate)
-        returnString+="\ttime data (t0,tf,dt): ({},{},{})\n".format(*self.timeTuple)
-        if self.globals:
-            returnString+="\tglobals: ["
-            for glob in self.globals:
-                returnString+=str(glob)+","
-            returnString=returnString[:-1]
-            returnString+="]\n"
-        if self.exid:
-            returnString+="\texcluded gpus: ["
-            for exid in self.exid:
-                returnString+=str(exid)+","
-            returnString=returnString[:-1]
-            returnString+="]\n"
-        return returnString
+        return io.getSolverPrint(self)
 
     def createTimeStepData(self):
         """Use this function to create timestep data."""
@@ -116,74 +76,21 @@ class Solver(object):
             self.maxOctSize = 2*self.maxPyramidSize
         self.arrayShape = (self.maxOctSize+self.intermediate+1,)+self.arrayShape
 
-
-
-
-    def yamlManager(self):
-        """Use this function to manage and assign all specified yaml variables."""
-        def yamlGet(key,default):
-            """Use this function to get arguments from yaml file."""
-            return self.yamlFile[key] if key in self.yamlFile else default
-        document = open(self.yamlFileName,'r')
-        self.yamlFile = yaml.load(document,Loader=yaml.FullLoader)
-        #Setting simulation type - true for swept
-        self.simulation = yamlGet('swept',True)
-        #Setting verbose flag
-        self.verbose = yamlGet('verbose',False)
-        #setting intermediate steps
-        self.intermediate = yamlGet('intermediate_steps',1)
-        #setting operating points
-        self.operating = yamlGet('operating_points',1)
-        #setting blocksize
-        self.blocksize = yamlGet('blocksize',32)
-        assert self.blocksize%(2*self.operating)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
-        self.blocksize = (self.blocksize,self.blocksize,1)
-        #setting share
-        self.share = yamlGet('share',0.9)
-        #setting exid
-        self.exid = yamlGet('exid',list())
-        #setting time variables
-        self.time = yamlGet('time',{'t0': 0, 'tf': 1, 'dt': 0.1})
-        #setting globals
-        self.globals = yamlGet('globals',list())
-        #setting gpu source
-        self.source = yamlGet('source',{'cpu': 0, 'gpu': 0})
-        try:
-            self.source['gpu'] = os.path.abspath(self.source["gpu"])
-            self.source['cpu'] = os.path.abspath(self.source["cpu"])
-        except Exception as e:
-            pass
-        #Setting output file
-        self.output = yamlGet('filename','output.hdf5')
-        #Settings datatype
-        self.dtype = numpy.dtype(yamlGet('dtype','float64'))
-        #Time tuple
-        self.timeTuple = (self.time['t0'],self.time['tf'],self.time['dt'])
-
-    def mpiSetup(self):
-        """Use this function to create MPI variables"""
-        #-------------MPI Set up----------------------------#
-        self.comm = MPI.COMM_WORLD
-        self.processor = MPI.Get_processor_name()
-        self.proc_mult = 1
-        self.rank = self.comm.Get_rank()  #current rank
-        self.master_rank = 0
-
     def cudaCompiler(self,libname=None,recompile=False):
         """Use this function to create compiled lib."""
-        if self.rank == self.master_rank:
-            self.libname = libname
-            if libname is None or recompile:
-                io.verbosePrint(self,'Attempting to create shared library...')
-                if self.libname is None:
-                    basename = os.path.basename(self.source['gpu']).split(".")[0]
-                    self.libname = os.path.join(self.libpath,"lib{}.so".format(self.engine+basename))
-                nvccStatement = '''nvcc -Xcompiler -fPIC -shared -DPYSWEEP_GPU_SOURCE=\'\"{}\"\' -o {} {}'''.format(self.source['gpu'],self.libname,self.engineGPU)
+        if self.clusterMasterBool:
+
+            if libname is None:
+                basename = os.path.basename(self.source['gpu']).split(".")[0]
+                self.libname = os.path.join(self.libpath,"lib{}.so".format(basename))
+
+            if not os.path.exists(self.libname) or recompile:
+                io.verbosePrint(self,'Attempting to create shared library...\n')
+                nvccStatement = '''nvcc -Xcompiler -fPIC -shared -DPYSWEEP_GPU_SOURCE=\'\"{}\"\' -o {} {}'''.format(self.source['gpu'],self.libname,os.path.join(self.corepath,"pysweep.cu"))
                 os.system(nvccStatement)
             else:
-                warnings.warn('Code was not recompiled, set recompile=True to force recompile')
-                if not os.path.exists(self.libname):
-                    raise UserWarning('{} could not be located'.format(self.libname))
+                warnings.warn('{} already exists, code was not recompiled, set recompile=True to force recompile'.format(os.path.basename(self.libname)))
+        self.comm.Barrier()
 
     def standardSolve():
         # -------------------------------Standard Decomposition---------------------------------------------#

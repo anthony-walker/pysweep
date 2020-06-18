@@ -39,6 +39,14 @@ __device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min bloc
 __device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
 
 #include PYSWEEP_GPU_SOURCE
+
+/*
+
+---------------------Swept Functions -----------
+
+*/
+
+
 /*
     Use this function to get the global id
 */
@@ -289,6 +297,39 @@ DownPyramid(double *state, int gts)
         ly -= OPS;
     }
 }
+/*
+
+---------------------Standard Functions -----------
+
+*/
+
+/*
+    Use this function to get the global id
+*/
+__device__ int get_gid()
+{
+    // int bid = blockIdx.x + blockIdx.y * gridDim.x;
+    int M = gridDim.y*blockDim.y+2*OPS;
+    return M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
+}
+
+__global__ void
+__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
+Standard(double *state, int gts)
+{
+
+    int gid = get_gid()+(TSO-1)*TIMES; //global index
+    // Solving step function
+    step(state,gid,gts);
+    // Place values back in original matrix
+    __syncthreads();
+}
+
+/*
+
+---------------------Interface Functions -----------
+
+*/
 
 //Interface functions
 typedef void (*FunctionArray)(double *state, int gts); //creating type for function array
@@ -309,16 +350,10 @@ EXPORT void CudaArrayFree()
 }
 
 //
-EXPORT void CudaFunctionCall(double * state, int gts, int fcnIdx)
+EXPORT void executeGPUFunction(double * state, int gts, int fcnIdx)
 {
 	cudaMemcpy(globalState, state, ARRAY_BYTES, cudaMemcpyHostToDevice) ;
   functions[fcnIdx]<<< 1, array_size >>>(state, gts) ;
   cudaDeviceSynchronize();
 	cudaMemcpy(state, globalState, ARRAY_BYTES, cudaMemcpyDeviceToHost) ;
-}
-
-int main(int argc, char const *argv[])
-{
-  printf("%s\n", PYSWEEP_GPU_SOURCE);
-  return 0;
 }

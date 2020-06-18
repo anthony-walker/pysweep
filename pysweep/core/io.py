@@ -1,24 +1,69 @@
-import sys, h5py, time
+import sys, os, h5py, time, yaml, numpy
+from datetime import datetime
 from collections import Iterable
 
-def manageLogFile(solver):
-    gargs+=swargs[:4]
-    if os.path.isfile('log.hdf5'):
-        log_file = h5py.File('log.hdf5','a')
-        shape = log_file['time'].shape[0]
-        log_file['time'].resize((log_file['time'].shape[0]+1),axis=0)
-        log_file['time'][shape]=stop-start
-        log_file['type'].resize((log_file['type'].shape[0]+1),axis=0)
-        log_file['type'][shape]=ord('s')
-        log_file['args'].resize((log_file['args'].shape[0]+1),axis=0)
-        log_file['args'][shape]=gargs
-        log_file.close()
+def updateLogFile(solver,clocktime):
+    """Use this function to update log.yaml"""
+    if os.path.isfile('log.yaml'):
+        with open('log.yaml','r') as f:
+            previous = yaml.load(f,Loader=yaml.FullLoader)
+        new = generateYamlEntry(solver,clocktime)
+        previous.update(new)
+        with open('log.yaml','w') as f:
+            yaml.dump(previous,f)
     else:
-        log_file = h5py.File('log.hdf5','w')
-        log_file.create_dataset('time',(1,),data=(stop-start),chunks=True,maxshape=(None,))
-        log_file.create_dataset('type',(1,),data=(ord('s')),chunks=True,maxshape=(None,))
-        log_file.create_dataset('args',(1,)+numpy.shape(gargs),data=gargs,chunks=True,maxshape=(None,)+numpy.shape(gargs))
-        log_file.close()
+        with open('log.yaml','w') as f:
+            entry = generateYamlEntry(solver,clocktime)
+            yaml.dump(entry,f)
+
+def generateYamlEntry(obj,clocktime):
+    """Use this function to generate a yaml entry."""
+
+    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":obj.blocksize[0],"filename":obj.output,"verbose":obj.verbose,"share":obj.share,"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"source":obj.source,"dtype":obj.dtypeStr,"exid":obj.exid,"time":obj.time}
+
+    return {datetime.now().strftime("%m/%d/%Y-%H:%M:%S"):rundata}
+
+def yamlManager(solver):
+    """Use this function to manage and assign all specified yaml variables."""
+    def yamlGet(key,default):
+        """Use this function to get arguments from yaml file."""
+        return solver.yamlFile[key] if key in solver.yamlFile else default
+    document = open(solver.yamlFileName,'r')
+    solver.yamlFile = yaml.load(document,Loader=yaml.FullLoader)
+    #Setting simulation type - true for swept
+    solver.simulation = yamlGet('swept',True)
+    #Setting verbose flag
+    solver.verbose = yamlGet('verbose',False)
+    #setting intermediate steps
+    solver.intermediate = yamlGet('intermediate_steps',1)
+    #setting operating points
+    solver.operating = yamlGet('operating_points',1)
+    #setting blocksize
+    solver.blocksize = yamlGet('blocksize',32)
+    assert solver.blocksize%(2*solver.operating)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
+    solver.blocksize = (solver.blocksize,solver.blocksize,1)
+    #setting share
+    solver.share = yamlGet('share',0.9)
+    #setting exid
+    solver.exid = yamlGet('exid',list())
+    #setting time variables
+    solver.time = yamlGet('time',{'t0': 0, 'tf': 1, 'dt': 0.1})
+    #setting globals
+    solver.globals = yamlGet('globals',list())
+    #setting gpu source
+    solver.source = yamlGet('source',{'cpu': 0, 'gpu': 0})
+    try:
+        solver.source['gpu'] = os.path.abspath(solver.source["gpu"])
+        solver.source['cpu'] = os.path.abspath(solver.source["cpu"])
+    except Exception as e:
+        pass
+    #Setting output file
+    solver.output = yamlGet('filename','output.hdf5')
+    #Settings datatype
+    solver.dtypeStr=yamlGet('dtype','float64')
+    solver.dtype = numpy.dtype(solver.dtypeStr)
+    #Time tuple
+    solver.timeTuple = (solver.time['t0'],solver.time['tf'],solver.time['dt'])
 
 def createOutputFile(solver):
     """Use this function to create output file which will act as the input file as well."""
@@ -39,22 +84,35 @@ def verbosePrint(solver,outString):
     if solver.verbose and solver.rank == solver.clusterMaster:
         print(outString)
 
-def sweptInput():
-    #------------------INPUT DATA SETUP-------------------------$
-    arr0,gargs,swargs,filename,exid,dType = decomp.read_input_file(comm)
-    TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
-    t0,tf,dt = gargs[:3]
-    assert BS%(2*OPS)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
-    BS = (BS,BS,1)
+def getSolverPrint(solver):
+    returnString = "\nPysweep simulation properties:\n"
+    returnString += "\tsimulation type: {}\n".format("swept" if solver.simulation else "standard")
 
-def standardInput():
-    #------------------INPUT DATA SETUP-------------------------$
-    arr0,gargs,swargs,filename,exid,dType = decomp.read_input_file(comm)
-    TSO,OPS,BS,AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
-    sgs.TSO,sgs.OPS,sgs.BS,sgs.AF = [int(x) for x in swargs[:-1]]+[swargs[-1]]
-    t0,tf,dt = gargs[:3]
-    assert BS%(2*OPS)==0, "Invalid blocksize, blocksize must satisfy BS = 2*ops*k and the architectural limit where k is any integer factor."
-    BS = (BS,BS,1)
+    returnString+="\tgpu source: {}\n".format(solver.source['gpu'])
+    returnString+="\tcpu source: {}\n".format(solver.source['cpu'])
+    returnString+="\toutput file: {}\n".format(solver.output)
+    returnString+="\tverbose: {}\n".format(solver.verbose)
+    returnString+="\tArray shape: {}\n".format(solver.arrayShape)
+    returnString+="\tdtype: {}\n".format(solver.dtype)
+    returnString+="\tshare: {}\n".format(solver.share)
+    returnString+="\tblocksize: {}\n".format(solver.blocksize[0])
+    returnString+="\tstencil size: {}\n".format(int(solver.operating*2+1))
+    returnString+="\tintermediate time steps: {}\n".format(solver.intermediate)
+    returnString+="\ttime data (t0,tf,dt): ({},{},{})\n".format(*solver.timeTuple)
+    if solver.globals:
+        returnString+="\tglobals: ["
+        for glob in solver.globals:
+            returnString+=str(glob)+","
+        returnString=returnString[:-1]
+        returnString+="]\n"
+    if solver.exid:
+        returnString+="\texcluded gpus: ["
+        for exid in solver.exid:
+            returnString+=str(exid)+","
+        returnString=returnString[:-1]
+        returnString+="]\n"
+    return returnString
+
 
 def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS):
     """Use this function to write to the hdf file and shift the shared array

@@ -1,6 +1,10 @@
 
 import numpy,mpi4py.MPI as MPI
 import pysweep.core.functions as functions
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 
 def createCPUSharedArray(solver,arrayBytes):
     """Use this function to create shared memory arrays for node communication."""
@@ -29,33 +33,26 @@ def sweptBlock(solver):
     """This is the entry point for the swept portion of the block module."""
     createSweptSharedArray(solver) #This creates shared array
     if solver.gpuBool:
-        print(solver.rank,"GPU")
-    else:
-        print(solver.rank,"CPU")
-
-
-
-def sweptCore():
-    # ------------------- Operations specifically for GPus and CPUs------------------------#
-    if GRB:
         # Creating cuda device and context
-        cuda.init()
-        cuda_device = cuda.Device(gpu_rank)
-        cuda_context = cuda_device.make_context()
-        SM,garr,Up,Down,Oct,Xb,Yb  = dcore.gpu_core(blocks,BS,OPS,gargs,GRB,MPSS,MOSS,TSO)
-        mpiPool,total_cpu_block = None,None
+        # cuda.init()
+        # cuda_device = cuda.Device(gpu_rank)
+        # cuda_context = cuda_device.make_context()
+        # SM,garr,Up,Down,Oct,Xb,Yb  = dcore.gpu_core(blocks,BS,OPS,gargs,GRB,MPSS,MOSS,TSO)
+        # mpiPool,total_cpu_block = None,None
+        pass
     else:
         SM,garr = None,None
-        blocks,total_cpu_block,Up,Down,Oct,Xb,Yb = dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,gargs,MPSS,TSO)
+        blocks,total_cpu_block,Up,Down,Oct,Xb,Yb = setupCPUSwept(solver)
         poolSize = min(len(blocks[0]), os.cpu_count()-node_comm.Get_size()+1)
         mpiPool = mp.Pool(poolSize)
-    comm.Barrier() #Ensure all processes are prepared to solve
+    solver.comm.Barrier() #Ensure all processes are
 
-def swept_cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,gargs,MPSS,TSO):
+
+def setupCPUSwept(solver):
     """Use this function to execute core cpu only processes"""
-    blocks,total_cpu_block = decomp.create_cpu_blocks(total_cpu_block,BS,shared_shape)
-    blocks = decomp.create_escpu_blocks(blocks,shared_shape,BS)
-    cpu.set_globals(False,*gargs)
+    solver.blocks,solver.totalCPUBlock = makeCPUBlocksSwept(solver.blocks,solver.blocksize,solver.arrayShape)
+    blocks = makeECPUBlocksSwept(solver.blocks,solver.arrayarrayShape,solver.blocksize)
+    cpu.set_globals(False,*solver.globals)
     #Creating sets for cpu calculation
     up_sets = block.create_dist_up_sets(BS,OPS)
     down_sets = block.create_dist_down_sets(BS,OPS)
@@ -201,7 +198,7 @@ def create_shared_pool_array(shared_shape):
     sarr = sarr.reshape(shared_shape)
     return sarr
 
-def create_swept_cpu_blocks(total_cpu_block,BS,shared_shape):
+def makeCPUBlocksSwept(total_cpu_block,BS,shared_shape):
     """Use this function to create blocks."""
     row_range = numpy.arange(0,total_cpu_block[2].stop-total_cpu_block[2].start,BS[1],dtype=numpy.intc)
     column_range = numpy.arange(total_cpu_block[3].start,total_cpu_block[3].stop,BS[1],dtype=numpy.intc)
@@ -219,7 +216,7 @@ def create_standard_cpu_blocks(total_cpu_block,BS,shared_shape,ops):
     ntcb = (total_cpu_block[0],total_cpu_block[1],xslice,yslice)
     return [(total_cpu_block[0],total_cpu_block[1],slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)],ntcb
 
-def create_swept_escpu_blocks(cpu_blocks,shared_shape,BS):
+def makeECPUBlocksSwept(cpu_blocks,shared_shape,BS):
     """Use this function to create shift blocks and edge blocks."""
     #This handles edge blocks in the y direction
     shift = int(BS[1]/2)
