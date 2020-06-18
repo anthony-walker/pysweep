@@ -27,31 +27,7 @@ def createSweptSharedArray(solver):
 
 def sweptBlock(solver):
     """This is the entry point for the swept portion of the block module."""
-    createSweptSharedArray(solver)
-
-def standardBlock(solver):
-    """This is the entry point for the standard portion of the block module."""
-    #---------------------------Creating and Filling Shared Array-------------#
-    shared_shape = (TSO+1,arr0.shape[0],int(sum(solver.nodeInfo[2:])*BS[0]+2*OPS),arr0.shape[2]+2*OPS)
-    sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,numpy.zeros(shared_shape).nbytes)
-    #Making blocks match array other dimensions
-    bsls = [slice(0,i,1) for i in shared_shape]
-    blocks = (bsls[0],bsls[1],blocks,slice(bsls[3].start+OPS,bsls[3].stop-OPS,1))
-    GRB = True if gpu_rank is not None else False
-    #Filling shared array
-    if NMB:
-        gsc = (slice(0,arr0.shape[0],1),slice(int(solver.nodeInfo[0]*BS[0]),int(solver.nodeInfo[1]*BS[0]),1),slice(0,arr0.shape[2],1))
-        i1,i2,i3 = gsc
-        #TSO STEP and BOUNDARIES
-        sarr[TSO-1,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
-        sarr[TSO-1,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS-1:-1]
-        sarr[TSO-1,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
-        #INITIAL STEP AND BOUNDARIES
-        sarr[0,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
-        sarr[0,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS-1:-1]
-        sarr[0,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
-    else:
-        gsc = None
+    createSweptSharedArray(solver) #This creates shared array
 
 def sweptCore():
     # ------------------- Operations specifically for GPus and CPUs------------------------#
@@ -68,24 +44,6 @@ def sweptCore():
         poolSize = min(len(blocks[0]), os.cpu_count()-node_comm.Get_size()+1)
         mpiPool = mp.Pool(poolSize)
     comm.Barrier() #Ensure all processes are prepared to solve
-
-def standardCore():
-    # ------------------- Operations specifically for GPus and CPUs------------------------#
-    if GRB:
-        # Creating cuda device and context
-        cuda.init()
-        cuda_device = cuda.Device(gpu_rank)
-        cuda_context = cuda_device.make_context()
-        DecompObj,garr = dcore.gpu_core(blocks,BS,OPS,gargs,GRB,TSO)
-        mpi_pool= None
-    else:
-        garr = None
-        DecompObj,blocks= dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,GRB,TSO,gargs)
-        pool_size = min(len(blocks), os.cpu_count()-node_comm.Get_size()+1)
-        mpi_pool = mp.Pool(pool_size)
-    functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
-    comm.Barrier() #Ensure all processes are prepared to solve
-
 
 def swept_cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,gargs,MPSS,TSO):
     """Use this function to execute core cpu only processes"""
@@ -107,6 +65,7 @@ def swept_cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,gargs,MPSS,TSO):
     Yb = functions.GeometryCPU(0,y_sets,TSO,MPSS,TSO-1)
     Oct = functions.GeometryCPU(0,oct_sets,TSO,MPSS,TSO-1)
     return blocks,total_cpu_block,Up,Down,Oct,Xb,Yb
+
 
 def swept_gpu_core(blocks,BS,OPS,gargs,GRB,MPSS,MOSS,TSO):
     """Use this function to execute core gpu only processes"""
@@ -134,6 +93,49 @@ def swept_gpu_core(blocks,BS,OPS,gargs,GRB,MPSS,MOSS,TSO):
     Xb = functions.GeometryGPU(0,SM.get_function("XBridge"),BS,GRD,MPSS,block_shape)
     Oct = functions.GeometryGPU(0,SM.get_function("Octahedron"),BS,(GRD[0],GRD[1]-1),MPSS,block_shape)
     return SM,garr,Up,Down,Oct,Xb,Yb
+
+
+def standardBlock(solver):
+    """This is the entry point for the standard portion of the block module."""
+    #---------------------------Creating and Filling Shared Array-------------#
+    shared_shape = (TSO+1,arr0.shape[0],int(sum(solver.nodeInfo[2:])*BS[0]+2*OPS),arr0.shape[2]+2*OPS)
+    sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,numpy.zeros(shared_shape).nbytes)
+    #Making blocks match array other dimensions
+    bsls = [slice(0,i,1) for i in shared_shape]
+    blocks = (bsls[0],bsls[1],blocks,slice(bsls[3].start+OPS,bsls[3].stop-OPS,1))
+    GRB = True if gpu_rank is not None else False
+    #Filling shared array
+    if NMB:
+        gsc = (slice(0,arr0.shape[0],1),slice(int(solver.nodeInfo[0]*BS[0]),int(solver.nodeInfo[1]*BS[0]),1),slice(0,arr0.shape[2],1))
+        i1,i2,i3 = gsc
+        #TSO STEP and BOUNDARIES
+        sarr[TSO-1,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
+        sarr[TSO-1,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS-1:-1]
+        sarr[TSO-1,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
+        #INITIAL STEP AND BOUNDARIES
+        sarr[0,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
+        sarr[0,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS-1:-1]
+        sarr[0,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
+    else:
+        gsc = None
+
+
+def standardCore():
+    # ------------------- Operations specifically for GPus and CPUs------------------------#
+    if GRB:
+        # Creating cuda device and context
+        cuda.init()
+        cuda_device = cuda.Device(gpu_rank)
+        cuda_context = cuda_device.make_context()
+        DecompObj,garr = dcore.gpu_core(blocks,BS,OPS,gargs,GRB,TSO)
+        mpi_pool= None
+    else:
+        garr = None
+        DecompObj,blocks= dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,GRB,TSO,gargs)
+        pool_size = min(len(blocks), os.cpu_count()-node_comm.Get_size()+1)
+        mpi_pool = mp.Pool(pool_size)
+    functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
+    comm.Barrier() #Ensure all processes are prepared to solve
 
 def standard_cpu_core(sarr,total_cpu_block,shared_shape,OPS,BS,GRB,TSO,gargs):
     """Use this function to execute core cpu only processes"""

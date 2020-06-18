@@ -175,7 +175,6 @@ def setupMPI(solver):
     totalGPUs = solver.comm.bcast(totalGPUs)
     nodeRanks = solver.nodeComm.bcast(nodeRanks)
     solver.nodeInfo = solver.nodeComm.bcast(nodeInfo)
-
     #----------------------__Removing Unwanted MPI Processes------------------------#
     destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks)
     splitNodeBlocks(solver,numberOfGPUs,gpuRank)
