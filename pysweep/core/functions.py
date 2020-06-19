@@ -1,6 +1,12 @@
 #Programmer: Anthony Walker
 #This file contains all of the necessary functions for implementing the swept rule.
 #------------------------------Decomp Functions----------------------------------
+import numpy
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+
 def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
@@ -15,7 +21,7 @@ def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
     else:   #CPUs do this
         mpi_pool.map(DecompObj,blocks)
         #Copy result to MPI shared process array
-        sarr[DecompObj.cwrite] = sgs.carr[:,:,OPS:-OPS,OPS:-OPS]
+        sarr[DecompObj.cwrite] = sgs.CPUArray[:,:,OPS:-OPS,OPS:-OPS]
     DecompObj.gts+=1 #Update global time step
 
 def send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,ops,garr,DecompObj):
@@ -35,7 +41,7 @@ def send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,ops,garr,DecompObj):
     if GRB:
         garr[:,:,:,:] = sarr[DecompObj.gread]
     else:
-        sgs.carr[:,:,:,:] = sarr[DecompObj.cread]
+        sgs.CPUArray[:,:,:,:] = sarr[DecompObj.cread]
 
 
 class DecompCPU(object):
@@ -49,7 +55,7 @@ class DecompCPU(object):
 
     def __call__(self,block):
         """Use this function to build the Up Pyramid."""
-        sgs.carr[block] = cpu.step(sgs.carr[block],self.set,self.start,self.gts)
+        sgs.CPUArray[block] = cpu.step(sgs.CPUArray[block],self.set,self.start,self.gts)
 
     def __reduce__(self):
         """Use this function to make the object pickleable"""
@@ -78,21 +84,20 @@ class DecompGPU(object):
 
 #------------------------------Swept Functions----------------------------------
 
-def FirstPrism(*args):
+def FirstPrism(solver):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    # SM,GRB,BS,GRD,OPS,TSO,ssb = pargs
-    SM,GRB,Up,Yb,mpiPool,blocks,sarr,garr,total_cpu_block = args
+
     #Splitting between cpu and gpu
-    if GRB:
-        lgarr = decomp.get_local_extend_array(sarr,numpy.zeros(Up.shape),blocks,Up.BS)
-        cuda.memcpy_htod(garr,lgarr)
-        Up(garr)
-        Yb(garr)
+    if solver.gpuBool:
+        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.blocks,solver.Up.BS)
+        cuda.memcpy_htod(solver.GPUArray,localGPUArray)
+        solver.Up(solver.GPUArray)
+        solver.Yb(solver.GPUArray)
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(lgarr,garr)
         sarr[blocks]=lgarr[:,:,:,Up.BS[0]:-Up.BS[0]]
@@ -105,7 +110,7 @@ def FirstPrism(*args):
         Up.gts+=Up.MPSS
         Yb.gts+=Yb.MPSS
         Yb.start += Yb.MPSS #Change starting location for UpPrism
-        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        sarr[total_cpu_block] = sgs.CPUArray[:,:,:,:]
 
 def UpPrism(*args):
     """
@@ -118,7 +123,7 @@ def UpPrism(*args):
     #Splitting between cpu and gpu
     if GRB:
 
-        lgarr = decomp.get_local_extend_array(sarr,numpy.zeros(Oct.shape),blocks,Oct.BS)
+        lgarr = decomp.getLocalExtendedArray(sarr,numpy.zeros(Oct.shape),blocks,Oct.BS)
         cuda.memcpy_htod(garr,lgarr)
         Xb(garr)
         Oct(garr)
@@ -130,7 +135,7 @@ def UpPrism(*args):
         mpiPool.map(Xb,blocks[0])
         mpiPool.map(Oct,blocks[1])
         mpiPool.map(Yb,blocks[0])
-        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        sarr[total_cpu_block] = sgs.CPUArray[:,:,:,:]
     Xb.gts+=Xb.MPSS
     Oct.gts+=Oct.MPSS
     Yb.gts+=Yb.MPSS
@@ -145,7 +150,7 @@ def LastPrism(*args):
     GRB,Xb,Down,mpiPool,blocks,sarr,garr,total_cpu_block = args
     #Splitting between cpu and gpu
     if GRB:
-        lgarr = decomp.get_local_extend_array(sarr,numpy.zeros(Down.shape),blocks,Down.BS)
+        lgarr = decomp.getLocalExtendedArray(sarr,numpy.zeros(Down.shape),blocks,Down.BS)
         cuda.memcpy_htod(garr,lgarr)
         Xb(garr)
         Down(garr)
@@ -155,7 +160,7 @@ def LastPrism(*args):
     else:   #CPUs do this
         mpiPool.map(Xb,blocks[0])
         mpiPool.map(Down,blocks[1])
-        sarr[total_cpu_block] = sgs.carr[:,:,:,:]
+        sarr[total_cpu_block] = sgs.CPUArray[:,:,:,:]
 
 def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_block):
     """Use this function to communicate data between nodes"""
@@ -167,7 +172,7 @@ def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_blo
         sarr[:,:,:spx,:] = buffer[:,:,:,:]
     node_comm.Barrier()
     if not GRB:
-        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
+        sgs.CPUArray[:,:,:,:] = sarr[total_cpu_block]
 
 def send_forward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,gts,TSO,MPSS,total_cpu_block):
     """Use this function to communicate data between nodes"""
@@ -180,7 +185,7 @@ def send_forward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,
         sarr[:,:,:spx,:] = buffer[:,:,:,:]
     node_comm.Barrier()
     if not GRB:
-        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
+        sgs.CPUArray[:,:,:,:] = sarr[total_cpu_block]
     return cwt
 
 def send_backward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,gts,TSO,MPSS,total_cpu_block):
@@ -194,8 +199,17 @@ def send_backward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks
         cwt = decomp.swept_write(cwt,sarr,hdf5_data,gsc,gts,TSO,MPSS)
     node_comm.Barrier()
     if not GRB:
-        sgs.carr[:,:,:,:] = sarr[total_cpu_block]
+        sgs.CPUArray[:,:,:,:] = sarr[total_cpu_block]
     return cwt
+
+def getLocalExtendedArray(sarr,arr,blocks,BS):
+    """Use this function to copy the shared array to the local array and extend each end by one block."""
+    i1,i2,i3,i4 = blocks
+    arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
+    arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
+    arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
+    return arr
+
 
 class GeometryCPU(object):
     """This class computes the octahedron of the swept rule"""
@@ -210,7 +224,7 @@ class GeometryCPU(object):
         ct = self.gts
         for ts,swept_set in enumerate(self.sets,start=self.start):
             #Calculating Step
-            sgs.carr[block] = cpu.step(sgs.carr[block],swept_set,ts,ct)
+            sgs.CPUArray[block] = cpu.step(sgs.CPUArray[block],swept_set,ts,ct)
             ct+=1
         return block
 

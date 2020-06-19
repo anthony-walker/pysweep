@@ -5,22 +5,7 @@ This file contains cuda/c++ source code for launching the pycuda swept rule.
 Other information can be found in the euler.h file
 */
 
-
 #include "cuda.h"
-#include <iostream>
-
-
-#if defined(_MSC_VER)
-    //  Microsoft
-    #define EXPORT extern "C" __declspec(dllexport)
-#elif defined(__GNUC__)
-    //  GCC
-    #define EXPORT extern "C" __attribute__((visibility("default")))
-#else
-    //  do nothing and hope for the best?
-    #define EXPORT
-    #pragma warning Unknown dynamic link export semantics.
-#endif
 
 //Constant Memory Values
 __device__ __constant__ const double RTWO=2;
@@ -323,37 +308,4 @@ Standard(double *state, int gts)
     step(state,gid,gts);
     // Place values back in original matrix
     __syncthreads();
-}
-
-/*
-
----------------------Interface Functions -----------
-
-*/
-
-//Interface functions
-typedef void (*FunctionArray)(double *state, int gts); //creating type for function array
-FunctionArray functions[] = {UpPyramid,XBridge,YBridge,YBT,Octahedron,DownPyramid}; //Creating global function array
-long long int ARRAY_BYTES; //Size of array
-int array_size;
-double *globalState; //globalState array
-
-EXPORT void CudaArrayAllocate(int arr_size)
-{
-  ARRAY_BYTES = arr_size * sizeof(double) ;
-  cudaMalloc((void **) &globalState, ARRAY_BYTES) ;
-}
-
-EXPORT void CudaArrayFree()
-{
-  cudaFree(globalState);
-}
-
-//
-EXPORT void executeGPUFunction(double * state, int gts, int fcnIdx)
-{
-	cudaMemcpy(globalState, state, ARRAY_BYTES, cudaMemcpyHostToDevice) ;
-  functions[fcnIdx]<<< 1, array_size >>>(state, gts) ;
-  cudaDeviceSynchronize();
-	cudaMemcpy(state, globalState, ARRAY_BYTES, cudaMemcpyDeviceToHost) ;
 }

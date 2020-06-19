@@ -5,8 +5,8 @@ import pysweep.core.io as io
 def cleanupProcesses(solver,start,stop):
     """Use this function to wrap up the code and produce log file."""
     # Clean Up - Pop Cuda Contexts and Close Pool
-    # if solver.gpuBool:
-    #     cuda_context.pop()
+    if solver.gpuBool:
+        solver.cuda_context.pop()
     solver.comm.Barrier()
     clocktime = stop-start
     solver.clocktime[0] = clocktime
@@ -27,7 +27,7 @@ def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
             ops = solver.operating
             gbs = [slice(int(g[i]*solver.blocksize[0]+ops),int(g[i+1]*solver.blocksize[0]+ops),1) for i in range(numberOfGPUs)]+[slice(int(gstop*solver.blocksize[0]+ops),int(stop*solver.blocksize[0]+ops),1)]
         gpuRank = list(zip(gpuRank,gbs))
-    gpuRank,solver.blocks = solver.nodeComm.scatter(gpuRank)
+    solver.gpuRank,solver.blocks = solver.nodeComm.scatter(gpuRank)
     solver.gpuBool = True if gpuRank is not None else False
 
 def destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks):

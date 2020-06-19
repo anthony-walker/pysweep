@@ -1,6 +1,11 @@
-import sys, os, h5py, time, yaml, numpy
+import sys, os, h5py, time, yaml, numpy, importlib.util
 from datetime import datetime
 from collections import Iterable
+from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 
 def updateLogFile(solver,clocktime):
     """Use this function to update log.yaml"""
@@ -19,7 +24,7 @@ def updateLogFile(solver,clocktime):
 def generateYamlEntry(obj,clocktime):
     """Use this function to generate a yaml entry."""
 
-    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":obj.blocksize[0],"filename":obj.output,"verbose":obj.verbose,"share":obj.share,"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"source":obj.source,"dtype":obj.dtypeStr,"exid":obj.exid,"time":obj.time}
+    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":obj.blocksize[0],"filename":obj.output,"verbose":obj.verbose,"share":obj.share,"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"cpu":obj.cpuStr,"gpu":obj.gpuStr,"dtype":obj.dtypeStr,"exid":obj.exid}
 
     return {datetime.now().strftime("%m/%d/%Y-%H:%M:%S"):rundata}
 
@@ -46,15 +51,15 @@ def yamlManager(solver):
     solver.share = yamlGet('share',0.9)
     #setting exid
     solver.exid = yamlGet('exid',list())
-    #setting time variables
-    solver.time = yamlGet('time',{'t0': 0, 'tf': 1, 'dt': 0.1})
     #setting globals
     solver.globals = yamlGet('globals',list())
-    #setting gpu source
-    solver.source = yamlGet('source',{'cpu': 0, 'gpu': 0})
+    #setting cpu source
+    solver.cpuStr = solver.cpu = yamlGet('cpu',"")
+    #setting cpu source
+    solver.gpuStr = solver.gpu = yamlGet('gpu',"")
     try:
-        solver.source['gpu'] = os.path.abspath(solver.source["gpu"])
-        solver.source['cpu'] = os.path.abspath(solver.source["cpu"])
+        solver.gpu = os.path.abspath(solver.gpu)
+        solver.cpu = os.path.abspath(solver.cpu)
     except Exception as e:
         pass
     #Setting output file
@@ -63,7 +68,10 @@ def yamlManager(solver):
     solver.dtypeStr=yamlGet('dtype','float64')
     solver.dtype = numpy.dtype(solver.dtypeStr)
     #Time tuple
-    solver.timeTuple = (solver.time['t0'],solver.time['tf'],solver.time['dt'])
+    spec = importlib.util.spec_from_file_location("module.step", solver.cpu)
+    solver.cpu  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(solver.cpu)
+
 
 def createOutputFile(solver):
     """Use this function to create output file which will act as the input file as well."""
@@ -74,14 +82,14 @@ def createOutputFile(solver):
     solver.hdf5.create_dataset("exid",(len(solver.exid),),data=solver.exid)
     solver.hdf5.create_dataset("globals",(len(solver.globals),),data=solver.globals)
     solver.clocktime = solver.hdf5.create_dataset("clocktime",(1,),data=0.0)
-    solver.data = solver.hdf5.create_dataset("data",(solver.time_steps,)+solver.arrayShape,dtype=solver.dtype)
+    solver.data = solver.hdf5.create_dataset("data",(solver.timeSteps,)+solver.arrayShape[1:],dtype=solver.dtype)
     if solver.clusterMasterBool:
         solver.data[0,:,:,:] = solver.initialConditions[:,:,:]
     solver.comm.Barrier()
 
 def verbosePrint(solver,outString):
     """Use this function to print only when verbose option is specified."""
-    if solver.verbose and solver.rank == solver.clusterMaster:
+    if solver.verbose and solver.clusterMasterBool:
         print(outString)
 
 def getSolverPrint(solver):
@@ -98,8 +106,8 @@ def getSolverPrint(solver):
     returnString+="\tblocksize: {}\n".format(solver.blocksize[0])
     returnString+="\tstencil size: {}\n".format(int(solver.operating*2+1))
     returnString+="\tintermediate time steps: {}\n".format(solver.intermediate)
-    returnString+="\ttime data (t0,tf,dt): ({},{},{})\n".format(*solver.timeTuple)
-    if solver.globals:
+    returnString+="\ttime data (t0,tf,dt): ({},{},{})\n".format(*solver.globals[:3])
+    if solver.globals[5:]:
         returnString+="\tglobals: ["
         for glob in solver.globals:
             returnString+=str(glob)+","
@@ -127,38 +135,19 @@ def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS):
     sarr[nte:,:,:,:] = 0
     return cwt
 
-def read_input_file(comm,filename = 'input_file.hdf5'):
-    """This function is to read the input file"""
-    file = h5py.File(filename,'r',driver='mpio',comm=comm)
-    gargs = tuple(file['gargs'])
-    swargs = tuple(file['swargs'])
-    exid = tuple(file['exid'])
-    filename = ''
-    for item in file['filename']:
-        filename += chr(item)
-    dType = ''
-    for item in file['dType']:
-        dType += chr(item)
-    dType = numpy.dtype(dType)
-    arrf = file['arr0']
-    arr0 = numpy.zeros(numpy.shape(arrf), dtype=dType)
-    arr0[:,:,:] = arrf[:,:,:]
-    file.close()
-    return arr0,gargs,swargs,filename,exid,dType
-
-def build_gpu_source(kpath,cuda_file = "dsweep.h"):
+def buildGPUSource(sourcefile):
     """Use this function to build the given and swept source module together.
     """
     #GPU Swept Calculations
     #----------------Reading In Source Code-------------------------------#
-    fpath = op.join(op.join(kpath[:-len('dcore')],'ccore'),cuda_file)
-    source_code = source_code_read(op.join(kpath,'gpu.h'))
-    split_source_code = source_code_read(fpath).split("//!!(@#\n")
-    source_code = split_source_code[0]+"\n"+source_code+"\n"+split_source_code[1]
-    source_mod = SourceModule(source_code)
-    return source_mod
+    sourcefile = "\""+sourcefile+"\""
+    options = ["-DPYSWEEP_GPU_SOURCE={}".format(sourcefile),]
+    kernel = os.path.join(os.path.abspath(os.path.dirname(__file__)),"pysweep.cu")
+    sourceCode = readSourceCode(kernel)
+    return SourceModule(sourceCode,options=options)
 
-def source_code_read(filename):
+
+def readSourceCode(filename):
     """Use this function to generate a multi-line string for pycuda from a source file."""
     with open(filename,"r") as f:
         source = """\n"""
@@ -169,7 +158,7 @@ def source_code_read(filename):
     f.closed
     return source
 
-def swept_constant_copy(source_mod,const_dict):
+def copySweptConstants(source_mod,const_dict):
     """Use this function to copy constant args to cuda memory.
         source_mod - the source module obtained from pycuda and source code
         const_dict - dictionary of constants where the key is the global

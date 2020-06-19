@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #This file is for global variable initialization
-def init_globals():
+def initializeGlobals():
     """Use this function to initialize globals."""
     #Setting global variables
-    global carr
-    carr = None
+    global CPUArray
+    CPUArray = None
