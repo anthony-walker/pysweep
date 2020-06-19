@@ -26,9 +26,12 @@ def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
         else: #Standard
             ops = solver.operating
             gbs = [slice(int(g[i]*solver.blocksize[0]+ops),int(g[i+1]*solver.blocksize[0]+ops),1) for i in range(numberOfGPUs)]+[slice(int(gstop*solver.blocksize[0]+ops),int(stop*solver.blocksize[0]+ops),1)]
-        gpuRank = list(zip(gpuRank,gbs))
-    solver.gpuRank,solver.blocks = solver.nodeComm.scatter(gpuRank)
-    solver.gpuBool = True if gpuRank is not None else False
+
+        # gbs = numpy.array_split(gbs,solver.nodeComm.Get_size()-numberOfGPUs)
+    #     gpuRank = list(zip(gpuRank,gbs))
+    # solver.gpuRank,solver.blocks = solver.nodeComm.scatter(gpuRank)
+    # print(solver.blocks)
+    # solver.gpuBool = True if gpuRank is not None else False
 
 def destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks):
     """Use this to destory unwanted mpi processes."""
@@ -67,7 +70,7 @@ def findRanksToDestroy(nodeRanks,share,numberOfGPUs,CPURows):
 
 def getGPUInfo(solver,nodeID):
     """Use this function to split data amongst nodes."""
-    #Assert that the total number of blocks is an integer
+
     tnc = solver.clusterComm.Get_size()
     ns = solver.nodeComm.Get_size()
     if solver.share>0:
@@ -85,6 +88,7 @@ def getGPUInfo(solver,nodeID):
     i = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(1,len(numberOfGPUsList))]
     totalGPUs = numpy.sum(numberOfGPUsList)
     numberOfRows = solver.arrayShape[1]/solver.blocksize[0]
+    #Assert that the total number of blocks is an integer
     assert (numpy.prod(solver.arrayShape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
     GPURows = numpy.ceil(numberOfRows*solver.share)
     CPURows = numberOfRows-GPURows
@@ -120,6 +124,7 @@ def separateNodeAndCluster(solver):
     nodes_processors = solver.comm.allgather((solver.rank,processor))
     processors = tuple(zip(*nodes_processors))[1]
     nodeRanks = [n for n,p in nodes_processors if p==processor]
+    #Group node ranks and make node comm
     nodeGroup = solver.comm.group.Incl(nodeRanks)
     solver.nodeComm = solver.comm.Create_group(nodeGroup)
     solver.nodeMaster = nodeRanks[0]
@@ -146,7 +151,6 @@ def setupMPI(solver):
         nodeID = solver.clusterComm.scatter(nodeID)
         #Getting GPU information
         gpuRank,totalGPUs, numberOfGPUs, nodeInfo, communicationRanks, GPURows,CPURows = getGPUInfo(solver,nodeID)
-        removeRanks = findRanksToDestroy(nodeRanks,solver.share,numberOfGPUs,CPURows)
         [gpuRank.append(None) for i in range(len(nodeRanks)-len(gpuRank))]
         #Testing ranks and number of gpus to ensure simulation is viable
         assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
@@ -160,7 +164,6 @@ def setupMPI(solver):
     nodeRanks = solver.nodeComm.bcast(nodeRanks)
     solver.nodeInfo = solver.nodeComm.bcast(nodeInfo)
     #----------------------__Removing Unwanted MPI Processes------------------------#
-    destroyUnecessaryProcesses(solver,nodeRanks,removeRanks,allRanks)
     splitNodeBlocks(solver,numberOfGPUs,gpuRank)
     # Checking to ensure that there are enough
     assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
