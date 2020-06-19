@@ -2,15 +2,14 @@
 #This file contains all of the necessary functions for implementing the swept rule.
 #------------------------------Decomp Functions----------------------------------
 import numpy
+import pysweep.core.sgs as sgs
+
 try:
     import pycuda.driver as cuda
 except Exception as e:
     print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 
-cpu = None # global module
-def setGlobalModule(solver):
-    global cpu
-    cpu = solver.cpu
+
 
 def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
     """
@@ -229,7 +228,7 @@ class GeometryCPU(object):
         ct = self.gts
         for ts,swept_set in enumerate(self.sets,start=self.start):
             #Calculating Step
-            sgs.CPUArray[block] = cpu.step(sgs.CPUArray[block],swept_set,ts,ct)
+            sgs.CPUArray[block] = sgs.cpu.step(sgs.CPUArray[block],swept_set,ts,ct)
             ct+=1
         return block
 
