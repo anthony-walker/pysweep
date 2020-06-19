@@ -6,6 +6,7 @@ import pysweep.core.process as process
 import pysweep.core.functions as functions
 import pysweep.core.block as block
 
+
 class Solver(object):
     """docstring for Solver."""
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
@@ -43,13 +44,13 @@ class Solver(object):
         io.verbosePrint(self,'Creating output file...\n')
         io.createOutputFile(self)
         self.moments.append(time.time())
-
         # Creating shared array
         io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
         if self.simulation:
             block.sweptBlock(self)
         else:
             block.standardBlock(self)
+        functions.setGlobalModule(self)
         self.moments.append(time.time())
         #Cleaning up unneeded variables
         io.verbosePrint(self,'Cleaning up solver...\n')
@@ -101,7 +102,7 @@ class Solver(object):
         """Use this function to begin the simulation."""
         # -------------------------------SWEPT RULE---------------------------------------------#
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
-        functions.FirstPrism(solver)
+        functions.FirstPrism(self)
         # node_comm.Barrier()
         # functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
         # #Loop variables

@@ -4,6 +4,7 @@ import pysweep.core.functions as functions
 import pysweep.core.io as io
 import pysweep.core.sgs as sgs
 from itertools import product
+
 try:
     import pycuda.driver as cuda
 except Exception as e:
@@ -179,15 +180,6 @@ def createLocalGPUArray(block_shape):
     arr = numpy.zeros(block_shape)
     arr = arr.astype(numpy.float64)
     arr = numpy.ascontiguousarray(arr)
-    return arr
-
-
-def getLocalExtendedArray(sarr,arr,blocks,BS):
-    """Use this function to copy the shared array to the local array and extend each end by one block."""
-    i1,i2,i3,i4 = blocks
-    arr[:,:,:,BS[0]:-BS[0]] = sarr[blocks]
-    arr[:,:,:,0:BS[0]] = sarr[i1,i2,i3,-BS[0]:]
-    arr[:,:,:,-BS[0]:] = sarr[i1,i2,i3,:BS[0]]
     return arr
 
 def createSharedPoolArray(shared_shape):

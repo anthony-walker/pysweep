@@ -7,6 +7,11 @@ try:
 except Exception as e:
     print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 
+cpu = None # global module
+def setGlobalModule(solver):
+    global cpu
+    cpu = solver.cpu
+
 def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
@@ -99,18 +104,18 @@ def FirstPrism(solver):
         solver.Up(solver.GPUArray)
         solver.Yb(solver.GPUArray)
         cuda.Context.synchronize()
-        cuda.memcpy_dtoh(lgarr,garr)
-        sarr[blocks]=lgarr[:,:,:,Up.BS[0]:-Up.BS[0]]
-        Up.gts+=Up.MPSS
-        Yb.gts+=Yb.MPSS
-        Yb.gfunction = SM.get_function("YBT") #Change to new ybridge function
+        cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
+        solver.sharedArray[solver.blocks]=localGPUArray[:,:,:,solver.Up.BS[0]:-solver.Up.BS[0]]
+        solver.Up.gts+=solver.Up.MPSS
+        solver.Yb.gts+=solver.Yb.MPSS
+        solver.Yb.gfunction = solver.gpu.get_function("YBT") #Change to new ybridge function
     else:   #CPUs do this
-        mpiPool.map(Up,blocks[0])
-        mpiPool.map(Yb,blocks[1])
-        Up.gts+=Up.MPSS
-        Yb.gts+=Yb.MPSS
-        Yb.start += Yb.MPSS #Change starting location for UpPrism
-        sarr[total_cpu_block] = sgs.CPUArray[:,:,:,:]
+        solver.mpiPool.map(solver.Up,solver.blocks[0])
+        solver.mpiPool.map(solver.Yb,solver.blocks[1])
+        solver.Up.gts+=solver.Up.MPSS
+        solver.Yb.gts+=solver.Yb.MPSS
+        solver.Yb.start += solver.Yb.MPSS #Change starting location for UpPrism
+        solver.sharedArray[solver.totalCPUBlock] = sgs.CPUArray[:,:,:,:]
 
 def UpPrism(*args):
     """
@@ -119,7 +124,7 @@ def UpPrism(*args):
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    GRB,Xb,Yb,Oct,mpiPool,blocks,sarr,garr,total_cpu_block = args
+    GRB,Xb,Yb,Oct,mpiPool,blocks,sarr,garr,totalCPUBlock = args
     #Splitting between cpu and gpu
     if GRB:
 
@@ -135,7 +140,7 @@ def UpPrism(*args):
         mpiPool.map(Xb,blocks[0])
         mpiPool.map(Oct,blocks[1])
         mpiPool.map(Yb,blocks[0])
-        sarr[total_cpu_block] = sgs.CPUArray[:,:,:,:]
+        sarr[totalCPUBlock] = sgs.CPUArray[:,:,:,:]
     Xb.gts+=Xb.MPSS
     Oct.gts+=Oct.MPSS
     Yb.gts+=Yb.MPSS
@@ -147,7 +152,7 @@ def LastPrism(*args):
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    GRB,Xb,Down,mpiPool,blocks,sarr,garr,total_cpu_block = args
+    GRB,Xb,Down,mpiPool,blocks,sarr,garr,totalCPUBlock = args
     #Splitting between cpu and gpu
     if GRB:
         lgarr = decomp.getLocalExtendedArray(sarr,numpy.zeros(Down.shape),blocks,Down.BS)
@@ -160,9 +165,9 @@ def LastPrism(*args):
     else:   #CPUs do this
         mpiPool.map(Xb,blocks[0])
         mpiPool.map(Down,blocks[1])
-        sarr[total_cpu_block] = sgs.CPUArray[:,:,:,:]
+        sarr[totalCPUBlock] = sgs.CPUArray[:,:,:,:]
 
-def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_block):
+def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,totalCPUBlock):
     """Use this function to communicate data between nodes"""
     if NMB:
         buff = numpy.copy(sarr[:,:,-spx:,:])
@@ -172,9 +177,9 @@ def first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,spx,total_cpu_blo
         sarr[:,:,:spx,:] = buffer[:,:,:,:]
     node_comm.Barrier()
     if not GRB:
-        sgs.CPUArray[:,:,:,:] = sarr[total_cpu_block]
+        sgs.CPUArray[:,:,:,:] = sarr[totalCPUBlock]
 
-def send_forward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,gts,TSO,MPSS,total_cpu_block):
+def send_forward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,gts,TSO,MPSS,totalCPUBlock):
     """Use this function to communicate data between nodes"""
     if NMB:
         cwt = decomp.swept_write(cwt,sarr,hdf5_data,gsc,gts,TSO,MPSS)
@@ -185,10 +190,10 @@ def send_forward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,
         sarr[:,:,:spx,:] = buffer[:,:,:,:]
     node_comm.Barrier()
     if not GRB:
-        sgs.CPUArray[:,:,:,:] = sarr[total_cpu_block]
+        sgs.CPUArray[:,:,:,:] = sarr[totalCPUBlock]
     return cwt
 
-def send_backward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,gts,TSO,MPSS,total_cpu_block):
+def send_backward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,spx,gts,TSO,MPSS,totalCPUBlock):
     """Use this function to communicate data between nodes"""
     if NMB:
         buff = numpy.copy(sarr[:,:,:spx,:])
@@ -199,7 +204,7 @@ def send_backward(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks
         cwt = decomp.swept_write(cwt,sarr,hdf5_data,gsc,gts,TSO,MPSS)
     node_comm.Barrier()
     if not GRB:
-        sgs.CPUArray[:,:,:,:] = sarr[total_cpu_block]
+        sgs.CPUArray[:,:,:,:] = sarr[totalCPUBlock]
     return cwt
 
 def getLocalExtendedArray(sarr,arr,blocks,BS):
