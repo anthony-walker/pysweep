@@ -1,6 +1,7 @@
 import numpy,time, mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
+import socket #TEMPORARY
 
 def cleanupProcesses(solver,start,stop):
     """Use this function to wrap up the code and produce log file."""
@@ -26,7 +27,6 @@ def splitNodeBlocks(solver,numberOfGPUs,gpuRank):
         else: #Standard
             ops = solver.operating
             gbs = [slice(int(g[i]*solver.blocksize[0]+ops),int(g[i+1]*solver.blocksize[0]+ops),1) for i in range(numberOfGPUs)]+[slice(int(gstop*solver.blocksize[0]+ops),int(stop*solver.blocksize[0]+ops),1)]
-
         # gbs = numpy.array_split(gbs,solver.nodeComm.Get_size()-numberOfGPUs)
     #     gpuRank = list(zip(gpuRank,gbs))
     # solver.gpuRank,solver.blocks = solver.nodeComm.scatter(gpuRank)
@@ -117,53 +117,54 @@ def separateNodeAndCluster(solver):
     solver - solver object
     """
     solver.comm = MPI.COMM_WORLD
-    processor = MPI.Get_processor_name()
+    processor = socket.gethostname() # MPI.Get_processor_name() #temporarily replace processor with hostname to treat vc as different nodes
     solver.rank = solver.comm.Get_rank()  #current rank
-    allRanks = solver.comm.allgather(solver.rank) #All ranks in simulation
-    #Create individual node comm
-    nodes_processors = solver.comm.allgather((solver.rank,processor))
-    processors = tuple(zip(*nodes_processors))[1]
-    nodeRanks = [n for n,p in nodes_processors if p==processor]
-    #Group node ranks and make node comm
-    nodeGroup = solver.comm.group.Incl(nodeRanks)
-    solver.nodeComm = solver.comm.Create_group(nodeGroup)
-    solver.nodeMaster = nodeRanks[0]
-    solver.nodeMasterBool = solver.rank == solver.nodeMaster
-    #Create cluster comm
-    clusterRanks = list(set(solver.comm.allgather(solver.nodeMaster)))
-    solver.clusterMaster = clusterRanks[0]
-    cluster_group = solver.comm.group.Incl(clusterRanks)
-    solver.clusterComm = solver.comm.Create_group(cluster_group)
-    solver.clusterMasterBool = solver.rank == solver.clusterMaster
-    return allRanks,nodeRanks
+    # allRanks = solver.comm.allgather(solver.rank) #All ranks in simulation
+    # print(processor,solver.rank)
+    # #Create individual node comm
+    # nodes_processors = solver.comm.allgather((solver.rank,processor))
+    # processors = tuple(zip(*nodes_processors))[1]
+    # nodeRanks = [n for n,p in nodes_processors if p==processor]
+    # #Group node ranks and make node comm
+    # nodeGroup = solver.comm.group.Incl(nodeRanks)
+    # solver.nodeComm = solver.comm.Create_group(nodeGroup)
+    # solver.nodeMaster = nodeRanks[0]
+    # solver.nodeMasterBool = solver.rank == solver.nodeMaster
+    # #Create cluster comm
+    # clusterRanks = list(set(solver.comm.allgather(solver.nodeMaster)))
+    # solver.clusterMaster = clusterRanks[0]
+    # cluster_group = solver.comm.group.Incl(clusterRanks)
+    # solver.clusterComm = solver.comm.Create_group(cluster_group)
+    # solver.clusterMasterBool = solver.rank == solver.clusterMaster
+    # return allRanks,nodeRanks
 
 def setupMPI(solver):
     #-------------MPI SETUP----------------------------#
-    allRanks,nodeRanks = separateNodeAndCluster(solver) #This function creates necessary variables for MPI to use
-    io.verbosePrint(solver,"Setting up MPI...\n")
-     #Assumes all nodes have the same number of cores in CPU
-    if solver.nodeMasterBool:
-        #Giving each node an id
-        if solver.clusterMasterBool:
-            nodeID = numpy.arange(1,solver.clusterComm.Get_size()+1,1,dtype=numpy.intc)
-        else:
-            nodeID = None
-        nodeID = solver.clusterComm.scatter(nodeID)
-        #Getting GPU information
-        gpuRank,totalGPUs, numberOfGPUs, nodeInfo, communicationRanks, GPURows,CPURows = getGPUInfo(solver,nodeID)
-        [gpuRank.append(None) for i in range(len(nodeRanks)-len(gpuRank))]
-        #Testing ranks and number of gpus to ensure simulation is viable
-        assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
-        assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
-        assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
-    else:
-        totalGPUs,nodeInfo,gpuRank,nodeID,numberOfGPUs,comranks = None,None,None,None,None,None
-        removeRanks = []
-    #Broadcasting gpu information
-    totalGPUs = solver.comm.bcast(totalGPUs)
-    nodeRanks = solver.nodeComm.bcast(nodeRanks)
-    solver.nodeInfo = solver.nodeComm.bcast(nodeInfo)
-    #----------------------__Removing Unwanted MPI Processes------------------------#
-    splitNodeBlocks(solver,numberOfGPUs,gpuRank)
-    # Checking to ensure that there are enough
-    assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
+    separateNodeAndCluster(solver) #This function creates necessary variables for MPI to use
+    # io.verbosePrint(solver,"Setting up MPI...\n")
+    #Assumes all nodes have the same number of cores in CPU
+    # if solver.nodeMasterBool:
+    #     #Giving each node an id
+    #     if solver.clusterMasterBool:
+    #         nodeID = numpy.arange(1,solver.clusterComm.Get_size()+1,1,dtype=numpy.intc)
+    #     else:
+    #         nodeID = None
+    #     nodeID = solver.clusterComm.scatter(nodeID)
+    #     #Getting GPU information
+    #     gpuRank,totalGPUs, numberOfGPUs, nodeInfo, communicationRanks, GPURows,CPURows = getGPUInfo(solver,nodeID)
+    #     [gpuRank.append(None) for i in range(len(nodeRanks)-len(gpuRank))]
+    #     #Testing ranks and number of gpus to ensure simulation is viable
+    #     assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
+    #     assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
+    #     assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
+    # else:
+    #     totalGPUs,nodeInfo,gpuRank,nodeID,numberOfGPUs,comranks = None,None,None,None,None,None
+    #     removeRanks = []
+    # #Broadcasting gpu information
+    # totalGPUs = solver.comm.bcast(totalGPUs)
+    # nodeRanks = solver.nodeComm.bcast(nodeRanks)
+    # solver.nodeInfo = solver.nodeComm.bcast(nodeInfo)
+    # #----------------------__Removing Unwanted MPI Processes------------------------#
+    # splitNodeBlocks(solver,numberOfGPUs,gpuRank)
+    # # Checking to ensure that there are enough
+    # assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"

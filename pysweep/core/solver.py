@@ -123,20 +123,20 @@ class Solver(object):
         # next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,gts,TSO,MPSS,total_cpu_block)
 
 
-    def standardSolve():
-        # -------------------------------Standard Decomposition---------------------------------------------#
-        node_comm.Barrier()
-        cwt = 1
-        for i in range(TSO*timeSteps):
-            functions.Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj)
-            node_comm.Barrier()
-            #Write data and copy down a step
-            if (i+1)%TSO==0 and NMB:
-                hdf5_data[cwt,i1,i2,i3] = sarr[TSO,:,OPS:-OPS,OPS:-OPS]
-                sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
-                cwt+=1
-            elif NMB:
-                sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
-            node_comm.Barrier()
-            #Communicate
-            functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
+    # def standardSolve():
+    #     # -------------------------------Standard Decomposition---------------------------------------------#
+    #     node_comm.Barrier()
+    #     cwt = 1
+    #     for i in range(TSO*timeSteps):
+    #         functions.Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj)
+    #         node_comm.Barrier()
+    #         #Write data and copy down a step
+    #         if (i+1)%TSO==0 and NMB:
+    #             hdf5_data[cwt,i1,i2,i3] = sarr[TSO,:,OPS:-OPS,OPS:-OPS]
+    #             sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
+    #             cwt+=1
+    #         elif NMB:
+    #             sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
+    #         node_comm.Barrier()
+    #         #Communicate
+    #         functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
