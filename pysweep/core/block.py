@@ -8,7 +8,8 @@ from itertools import product
 try:
     import pycuda.driver as cuda
 except Exception as e:
-    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    # print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    pass
 
 def createCPUSharedArray(solver,arrayBytes):
     """Use this function to create shared memory arrays for node communication."""
