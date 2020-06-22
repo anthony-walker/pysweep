@@ -7,8 +7,8 @@ import pysweep.core.sgs as sgs
 try:
     import pycuda.driver as cuda
 except Exception as e:
-    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
-
+    # print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    pass
 
 
 def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
