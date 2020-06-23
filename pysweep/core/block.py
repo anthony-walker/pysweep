@@ -1,5 +1,5 @@
 
-import numpy,mpi4py.MPI as MPI,multiprocessing as mp,ctypes,os
+import numpy,mpi4py.MPI as MPI,multiprocessing as mp,ctypes,os,warnings
 import pysweep.core.functions as functions
 import pysweep.core.io as io
 import pysweep.core.sgs as sgs

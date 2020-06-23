@@ -37,8 +37,8 @@ class Solver(object):
 
         # #Creating time step data
         # io.verbosePrint(self,'Creating time step data...\n')
-        # self.createTimeStepData()
-        # self.moments.append(time.time())
+        self.createTimeStepData()
+        self.moments.append(time.time())
         #
         # #Creating simulatneous input and output file
         # io.verbosePrint(self,'Creating output file...\n')
