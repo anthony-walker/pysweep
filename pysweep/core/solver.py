@@ -36,20 +36,20 @@ class Solver(object):
         self.moments.append(time.time())
 
         # #Creating time step data
-        # io.verbosePrint(self,'Creating time step data...\n')
+        io.verbosePrint(self,'Creating time step data...\n')
         self.createTimeStepData()
         self.moments.append(time.time())
-        #
+        
         # #Creating simulatneous input and output file
         # io.verbosePrint(self,'Creating output file...\n')
         # io.createOutputFile(self)
-        # self.moments.append(time.time())
-        # # Creating shared array
-        # io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
-        # if self.simulation:
-        #     block.sweptBlock(self)
-        # else:
-        #     block.standardBlock(self)
+        self.moments.append(time.time())
+        # Creating shared array
+        io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
+        if self.simulation:
+            block.sweptBlock(self)
+        else:
+            block.standardBlock(self)
         # sgs.setGlobalModule(self)
         # self.moments.append(time.time())
         # #Cleaning up unneeded variables
@@ -79,7 +79,9 @@ class Solver(object):
             self.maxGlobalSweptStep = int(self.intermediate*(self.timeSteps-self.maxPyramidSize)/(self.maxPyramidSize)+1)  #Global swept step  #THIS ASSUMES THAT timeSteps > MOSS
             self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
             self.maxOctSize = 2*self.maxPyramidSize
-        self.arrayShape = (self.maxOctSize+self.intermediate+1,)+self.arrayShape
+            self.sharedShape = (self.maxOctSize+self.intermediate+1,)+self.sharedShape
+        else:
+            self.sharedShape = (self.intermediate+1,)+self.sharedShape
 
     def solverCleanUp(self):
         """Use this function to remove unvariables not needed for computation."""

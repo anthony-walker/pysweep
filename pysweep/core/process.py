@@ -81,19 +81,15 @@ def getBlockBoundaries(Rows,Devices,nodeID,deviceType,multiplier):
 
 def MinorSplit(solver,nodeInfo,gpuRank):
     """
-        This function splits the total number of number of rows (determined from blocksize) amongst a global group for the GPU and CPU.
+        This function splits the total number of blocks up on the node level 
 
-        The blocks are then further subdivided on the node level. It then determines block boundaries for each node based on this premise. 
-
-        The block boundaries are used to determine the array sections in which a node will handle.
     """
-
-    
     ranksPerNode = solver.nodeComm.Get_size() #getting number of ranks per node
-    start, stop, gpuSize, cpuSize = nodeInfo
-    start = int(start*solver.blocksize[0]) #Convert to actual array size
-    intersection = int((stop-cpuSize)*solver.blocksize[0]) #gpu-cpu intersection on a node
-    stop = int(stop*solver.blocksize[0]) #Convert to actual array size
+    gpuSize, cpuSize = nodeInfo
+    start = 0 #Convert to actual array size
+    intersection = int(gpuSize*solver.blocksize[0]) #gpu-cpu intersection on a node
+    stop = int((gpuSize+cpuSize)*solver.blocksize[0]) #Convert to actual array size
+    solver.sharedShape = solver.arrayShape[0],stop,solver.arrayShape[2]
     gpuBlock = slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) #total GPU slice of shared array
     cpuBlock = slice(intersection,stop,1),slice(0,solver.arrayShape[-1],1) #total CPU slice of shared array
     individualBlocks = list() #For CPU 
@@ -135,15 +131,14 @@ def MajorSplit(solver,nodeID):
     #Get cpu boundaries
     cpuLowerBound,cpuUpperBound = getBlockBoundaries(CPURows,numOfNodes,nodeID,"CPU",cpuMult)
     #Compiling info into ranges and magnitudes
-    nodeInfo = gpuLowerBound+cpuLowerBound,gpuUpperBound+cpuUpperBound,gpuUpperBound-gpuLowerBound,cpuUpperBound-cpuLowerBound #low range, high range, gpu magnitude, cpu magnitude
-    
+    nodeInfo = gpuUpperBound-gpuLowerBound,cpuUpperBound-cpuLowerBound #low range, high range, gpu magnitude, cpu magnitude
     #Testing ranks and number of gpus to ensure simulation is viable
     assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
     assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
     assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
     assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
-
-    return MinorSplit(solver,nodeInfo,gpuRank) #Splitting up blocks at node level
+    #Splitting up blocks at node level and returning results
+    return MinorSplit(solver,nodeInfo,gpuRank) 
 
 
 def getNeighborRanks(solver,nodeID):
@@ -181,7 +176,7 @@ def setupCommunicators(solver):
 def setupMPI(solver):
     #-------------MPI SETUP----------------------------#
     setupCommunicators(solver) #This function creates necessary variables for MPI to use
-    # io.verbosePrint(solver,"Setting up MPI...\n")
+    io.verbosePrint(solver,"Setting up MPI...\n")
     #Assumes all nodes have the same number of cores in CPU
     if solver.nodeMasterBool:
         #Giving each node an id
@@ -195,12 +190,13 @@ def setupMPI(solver):
         #Getting neighboring ranks for communication
         getNeighborRanks(solver,nodeID) 
     else:
-       gpuRank,gpuBlock,cpuBlock,nodeID,blocks = None,None,None,None,None
+       gpuRank,gpuBlock,cpuBlock,blocks,solver.sharedShape = None,None,None,None,None
     #Broadcasting gpu information
     solver.blocks = solver.nodeComm.scatter(blocks)
     gpuRank = solver.nodeComm.scatter(gpuRank)
     solver.gpuBlock = solver.nodeComm.bcast(gpuBlock) #total gpu block in shared array
     solver.cpuBlock = solver.nodeComm.bcast(cpuBlock) #total cpu block in shared array
+    solver.sharedShape = solver.nodeComm.bcast(solver.sharedShape) #shape of node shared array
     solver.gpuBool = True if gpuRank is not None else False
     #----------------------Warning Empty MPI Processes------------------------#
     if len(solver.blocks)==0:

@@ -1,5 +1,5 @@
 
-import numpy,mpi4py.MPI as MPI,multiprocessing as mp,ctypes,os,warnings
+import numpy,mpi4py.MPI as MPI,multiprocessing as mp,ctypes,os
 import pysweep.core.functions as functions
 import pysweep.core.io as io
 import pysweep.core.sgs as sgs
@@ -17,12 +17,12 @@ def createCPUSharedArray(solver,arrayBytes):
     #Creating MPI Window for shared memory
     win = MPI.Win.Allocate_shared(arrayBytes, itemsize, comm=solver.nodeComm)
     sharedBuffer, itemsize = win.Shared_query(0)
-    solver.sharedArray = numpy.ndarray(buffer=sharedBuffer, dtype=solver.dtype.type, shape=solver.arrayShape)
+    solver.sharedArray = numpy.ndarray(buffer=sharedBuffer, dtype=solver.dtype.type, shape=solver.sharedShape)
 
 def createSweptSharedArray(solver):
     """Use this function to create and fill the shared array for the swept solver."""
     #---------------------------Creating and Filling Shared Array-------------#
-    createCPUSharedArray(solver,numpy.zeros(solver.arrayShape,dtype=solver.dtype).nbytes)
+    
     #Making blocks match array other dimensions
     bsls = [slice(0,i,1) for i in solver.arrayShape]
     solver.blocks = (bsls[0],bsls[1],solver.blocks,bsls[3])
@@ -36,20 +36,20 @@ def createSweptSharedArray(solver):
 
 def sweptBlock(solver):
     """This is the entry point for the swept portion of the block module."""
-    createSweptSharedArray(solver) #This creates shared array
-    if solver.gpuBool:
-        # Creating cuda device and context
-        cuda.init()
-        cuda_device = cuda.Device(solver.gpuRank)
-        solver.cuda_context = cuda_device.make_context()
-        setupGPUSwept(solver)
-        solver.mpiPool,solver.totalCPUBlock = None,None
-    else:
-        solver.gpu,solver.GPUArray = None,None
-        setupCPUSwept(solver)
-        poolSize = min(len(solver.blocks[0]), os.cpu_count()-solver.nodeComm.Get_size()+1)
-        solver.mpiPool = mp.Pool(poolSize)
-    solver.comm.Barrier() #Ensure all processes are
+    createCPUSharedArray(solver,numpy.zeros(solver.sharedShape,dtype=solver.dtype).nbytes)
+    # if solver.gpuBool:
+    #     # Creating cuda device and context
+    #     cuda.init()
+    #     cuda_device = cuda.Device(solver.gpuRank)
+    #     solver.cuda_context = cuda_device.make_context()
+    #     setupGPUSwept(solver)
+    #     solver.mpiPool,solver.totalCPUBlock = None,None
+    # else:
+    #     solver.gpu,solver.GPUArray = None,None
+    #     setupCPUSwept(solver)
+    #     poolSize = min(len(solver.blocks[0]), os.cpu_count()-solver.nodeComm.Get_size()+1)
+    #     solver.mpiPool = mp.Pool(poolSize)
+    # solver.comm.Barrier() #Ensure all processes are
 
 
 def setupCPUSwept(solver):
