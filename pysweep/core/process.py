@@ -111,15 +111,34 @@ def getGPUInfo(solver,nodeID):
     return gpuRank,totalGPUs,numberOfGPUs,nodeInfo,commRanks,GPURows,CPURows
 
 
+def pseudoCluster(rank):
+    """This is a temporary function to rename processors based on rank."""
+    if rank < 2:
+        return "node1"
+    elif rank < 4:
+        return "node2"
+    elif rank < 6:
+        return "node3"
+    elif rank < 8:
+        return "node4"
+
 def separateNodeAndCluster(solver):
     """Use this function to create MPI variables and separate node and cluster variables
     args:
     solver - solver object
     """
     solver.comm = MPI.COMM_WORLD
-    processor = socket.gethostname() # MPI.Get_processor_name() #temporarily replace processor with hostname to treat vc as different nodes
     solver.rank = solver.comm.Get_rank()  #current rank
-    # allRanks = solver.comm.allgather(solver.rank) #All ranks in simulation
+    nodeProcessor = MPI.Get_processor_name()
+    nodeProcessor = pseudoCluster(solver.rank) #TEMPORARY
+    processors = list(set(solver.comm.allgather(nodeProcessor))) #temporarily replace processor with hostname to treat vc as different nodes
+    processors.sort()
+    colors = {proc:i for i,proc in enumerate(processors)}
+    solver.nodeComm =solver.comm.Split(colors[nodeProcessor])
+    myNode = solver.nodeComm.allgather(solver.rank)
+    print(myNode,solver.rank)
+    allRanks = solver.comm.allgather(solver.rank) #All ranks in simulation
+   
     # print(processor,solver.rank)
     # #Create individual node comm
     # nodes_processors = solver.comm.allgather((solver.rank,processor))

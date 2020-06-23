@@ -9,11 +9,11 @@ The plan is to make this pip and conda installable.
 
 #### Dependencies
 
-PySweep depends heavily on HDF5, h5py, MPI, and mpi4py. HDF5 has to be built in parallel to function properly. First install MPI/mpi4py through whatever means you prefer, e.g., conda. I personally built MPI ([guide](https://www.mpich.org/static/downloads/3.3.2/mpich-3.3.2-installguide.pdf)) and mpi4py from source.
+PySweep depends heavily on HDF5, h5py, MPI, and mpi4py. HDF5 has to be built in parallel to function properly. First install MPI/mpi4py through whatever means you prefer, e.g., conda. I personally built mpich ([guide](https://www.mpich.org/static/downloads/3.3.2/mpich-3.3.2-installguide.pdf)) and mpi4py from source.
 
 I installed mpich from the source directory as
 ```shell
-./configure -prefix=/opt/mpich --with-device=ch4:ofi |& tee c.txt
+./configure -prefix=/opt/mpich --with-device=ch4:ofi --disable-fortran |& tee c.txt
 make 2>&1 | tee m.txt
 make install |& tee mi.txt
 ```
@@ -27,15 +27,16 @@ python setup.py install
 Then get the source distribution of HDF5 and h5py. Install HDF5 first via
 ```shell
 export CC=/opt/mpich/bin/mpicc #export CC path - change as is needed
-./configure --enable-parallel --prefix=/opt/hdf5-1.12.0/ #configure from hdf5 source dir
+./configure --enable-parallel --enable-shared --prefix=/opt/hdf5-1.12.0/ #configure from hdf5 source dir
 make
 make check
 make install #You may or may not need sudo for this depending on your prefix
 ```
-Next, install h5py from the source directory via
+Next, install h5py from the source directory ([git](https://github.com/h5py/h5py)) via
 ```shell
 export CC=/opt/mpich/bin/mpicc #doesn't need repeated if done in previous step and the same shell
-python setup.py configure --mpi --hdf5=prefix=/opt/hdf5-1.12.0/
+export HDF5_MPI="ON"
+python setup.py configure --hdf5=/opt/hdf5-1.12.0
 python setup.py build
 python setup.py install
 ```
