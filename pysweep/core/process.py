@@ -43,8 +43,7 @@ def getGPUInfo(solver):
     #Getting gpus if share is greater than 0
     ranksPerNode = solver.nodeComm.Get_size() #number of ranks for each node
     if solver.share>0:  
-        lim = ranksPerNode if solver.share==1 else ranksPerNode-1
-        gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=lim) #getting devices by load
+        gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
         #gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
         numberOfGPUs = len(gpuRank)
     else:
@@ -62,7 +61,7 @@ def getBlockBoundaries(Rows,Devices,nodeID,deviceType,multiplier):
     deviceType: a string with "CPU" or "GPU" for error assertion
     multiplier: a variable used for determining boundary
     """
-    #GPU decomposition
+    #Decomposition
     k = (Rows-Rows%Devices)/Devices if Devices!=0 else 0.0
     n = Rows%Devices if Devices!=0 else 0.0
     m = Devices-n
@@ -131,13 +130,12 @@ def MajorSplit(solver,nodeID):
     solver.globalBlock = slice(0,solver.arrayShape[0],1),slice(start,stop,1),slice(0,solver.arrayShape[-1],1) #part of initial conditions for this node
     nodeInfo = gpuUpperBound-gpuLowerBound,cpuUpperBound-cpuLowerBound #low range, high range, gpu magnitude, cpu magnitude
     #Testing ranks and number of gpus to ensure simulation is viable
-    assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
+    assert totalGPUs <= solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
     assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
     assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
     assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
     #Splitting up blocks at node level and returning results
     return MinorSplit(solver,nodeInfo,gpuRank) 
-
 
 def getNeighborRanks(solver,nodeID):
     #Get communicating ranks

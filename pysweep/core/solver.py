@@ -57,7 +57,8 @@ class Solver(object):
         self.solverCleanUp()
         self.moments.append(time.time())
         #Running simulation
-        io.verbosePrint(self,'Running simulation...\n')
+        io.verbosePrint(self,'Running simulation...')
+        io.verbosePrint(self,io.getSolverPrint(self))
         if self.simulation:
             self.sweptSolve()
         else:
@@ -96,10 +97,7 @@ class Solver(object):
         del self.yamlFileName
         del self.rank
         del self.timeSteps
-        # del self.sharedArray #TEMPORARY
-        # del self.blocks #TEMPORARY
-        # del self.edgeblocks #TEMPORARY
-        # print(self.__dict__)
+        
 
     def sweptSolve(self):
         """Use this function to begin the simulation."""
@@ -115,7 +113,7 @@ class Solver(object):
         del self.Up #Deleting Up object after FirstPrism
         #-------------------------------SWEPT LOOP--------------------------------------------#
         step = cycle([functions.sendBackward,functions.sendForward])
-        for i in range(1):#MGST):
+        for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
             self.nodeComm.Barrier()
             cwt = next(step)(cwt,self)
@@ -123,7 +121,6 @@ class Solver(object):
         functions.LastPrism(self)
         self.nodeComm.Barrier()
         next(step)(cwt,self)
-
 
     # def standardSolve():
     #     # -------------------------------Standard Decomposition---------------------------------------------#

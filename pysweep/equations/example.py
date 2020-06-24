@@ -22,18 +22,19 @@ def step(state,iidx,ts,globalTimeStep):
         ntidx = (ts+1,vSlice,idx,idy)  #next step index
         cidx = (ts,vSlice,idx,idy)
         pidx = (ts-1,vSlice,idx,idy) #next step index
-        if (globalTimeStep+1)%TSO==0: #Corrector
-            state[ntidx] = (state[pidx])+1
-        else: #Predictor
-            state[ntidx] = state[cidx]+1
+        state[ntidx] = state[cidx]+1
+        # if (globalTimeStep+1)%TSO==0: #Corrector
+        #     state[ntidx] = (state[pidx])+1
+        # else: #Predictor
+        #     state[ntidx] = state[cidx]+1
     return state
 
 def set_globals(gpu,*args,source_mod=None):
     """Use this function to set cpu global variables"""
-    t0,tf,dt,dx,dy,gam = args
+    t0,tf,dt,dx,dy = args
     if gpu:
-        keys = "DT","DX","DY","GAMMA","GAM_M1"
-        nargs = args[2:]+(gam-1,)
+        keys = "DT","DX","DY"
+        nargs = args[2:]
         fc = lambda x:np.float32(x)
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
@@ -43,5 +44,3 @@ def set_globals(gpu,*args,source_mod=None):
         dtdx = dt/dx
         global dtdy
         dtdy = dt/dy
-        global gamma
-        gamma = gam

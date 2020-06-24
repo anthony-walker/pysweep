@@ -92,12 +92,20 @@ def verbosePrint(solver,outString):
     if solver.verbose and solver.clusterMasterBool:
         print(outString)
 
+def debugPrint(solver,outString):
+    """Use this function to print for debugging."""
+    if solver.clusterMasterBool:
+        print(outString)
+
 def getSolverPrint(solver):
     returnString = "\nPysweep simulation properties:\n"
     returnString += "\tsimulation type: {}\n".format("swept" if solver.simulation else "standard")
-
-    returnString+="\tgpu source: {}\n".format(solver.source['gpu'])
-    returnString+="\tcpu source: {}\n".format(solver.source['cpu'])
+    try:
+        returnString+="\tnumber of processes: {}\n".format(solver.comm.Get_size())
+    except Exception as e:
+        pass
+    returnString+="\tgpu source: {}\n".format(solver.gpuStr)
+    returnString+="\tcpu source: {}\n".format(solver.cpuStr)
     returnString+="\toutput file: {}\n".format(solver.output)
     returnString+="\tverbose: {}\n".format(solver.verbose)
     returnString+="\tArray shape: {}\n".format(solver.arrayShape)
@@ -174,3 +182,4 @@ def copySweptConstants(source_mod,const_dict):
         c_ptr,_ = source_mod.get_global(key)
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
+

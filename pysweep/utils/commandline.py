@@ -8,7 +8,7 @@ def execute(args):
     print("Executing {} with {} processes.".format(args.filename,args.processes))
     if args.hostfile is not None:
         print("Hostfile provided: {}".format(args.hostfile))
-
+    
 
 def str2bool(v):
     if isinstance(v, bool):

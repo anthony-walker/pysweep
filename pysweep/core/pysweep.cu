@@ -62,7 +62,7 @@ UpPyramid(double *state, int globalTimeStep)
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             // Solving step function
-            //step(state,gid,globalTimeStep);
+            step(state,gid,globalTimeStep);
         }
         __syncthreads();
         //Updating global time step
@@ -96,7 +96,7 @@ YBridge(double *state, int globalTimeStep)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-          //step(state,gid,globalTimeStep);
+          step(state,gid,globalTimeStep);
         }
         __syncthreads();
         //Updating global time step
@@ -131,7 +131,7 @@ YBT(double *state, int globalTimeStep)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-            //step(state,gid,globalTimeStep);
+            step(state,gid,globalTimeStep);
             // state[gid+TIMES]=3;
         }
         __syncthreads();
@@ -167,7 +167,7 @@ XBridge(double *state, int globalTimeStep)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
-          //step(state,gid,globalTimeStep);
+          step(state,gid,globalTimeStep);
           // state[gid+TIMES]=2;
       }
       __syncthreads();
@@ -203,7 +203,7 @@ Octahedron(double *state, int globalTimeStep)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
-          //step(state,gid,globalTimeStep);
+          step(state,gid,globalTimeStep);
           // state[gid+TIMES]=1;
       }
       __syncthreads();
@@ -235,7 +235,7 @@ Octahedron(double *state, int globalTimeStep)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-            //step(state,gid,globalTimeStep);
+            step(state,gid,globalTimeStep);
             // state[gid+TIMES]=1;
         }
         __syncthreads();
@@ -270,7 +270,7 @@ DownPyramid(double *state, int globalTimeStep)
     {
         if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
         {
-          //step(state,gid,globalTimeStep);
+          step(state,gid,globalTimeStep);
         }
         __syncthreads();
         gid+=TIMES;

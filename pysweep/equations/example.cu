@@ -27,19 +27,14 @@ void step(double * shared_state, int idx, int globalTimeStep)
   int coeff = cond ? 1 : 0;
 
   double cpoint[NVC];
-  getPoint(cpoint,shared_state,idx-TIMES*coeff);
-
+  getPoint(cpoint,shared_state,idx);
+//   printf("%f\n",cpoint[0]);
   double tval[NVC]={0,0,0,0};
-   __syncthreads();
-
 
    for (int i = 0; i < NVC; i++)
    {
-
        tval[i] = cpoint[i]+1;
    }
-
-  __syncthreads();
 
   for (int i = 0; i < NVC; i++)
   {
