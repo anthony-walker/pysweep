@@ -13,11 +13,11 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/anthony-walker/pysweep-git",
-    # entry_points={
-    #     'console_scripts': [
-    #         'pysweep=pyplume.commandline:pst',
-    #         ]
-    # },
+    entry_points={
+        'console_scripts': [
+            'pysweep=pysweep.utils.commandline:commandLine',
+            ]
+    },
     packages=setuptools.find_packages(),
     include_package_data=True,
     # package_data={'pyplume': ['mechanisms/*','originals/*','tests/*']},
