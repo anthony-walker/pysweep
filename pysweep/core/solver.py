@@ -35,23 +35,23 @@ class Solver(object):
         process.setupMPI(self)
         self.moments.append(time.time())
 
-        # #Creating time step data
-        # io.verbosePrint(self,'Creating time step data...\n')
-        # self.createTimeStepData()
-        # self.moments.append(time.time())
-        #
-        # #Creating simulatneous input and output file
-        # io.verbosePrint(self,'Creating output file...\n')
-        # io.createOutputFile(self)
-        # self.moments.append(time.time())
-        # # Creating shared array
-        # io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
-        # if self.simulation:
-        #     block.sweptBlock(self)
-        # else:
-        #     block.standardBlock(self)
+        #Creating time step data
+        io.verbosePrint(self,'Creating time step data...\n')
+        self.createTimeStepData()
+        self.moments.append(time.time())
+        
+        #Creating simulatneous input and output file
+        io.verbosePrint(self,'Creating output file...\n')
+        io.createOutputFile(self)
+        self.moments.append(time.time())
+        # Creating shared array
+        io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
+        if self.simulation:
+            block.sweptBlock(self)
+        else:
+            block.standardBlock(self)
         # sgs.setGlobalModule(self)
-        # self.moments.append(time.time())
+        self.moments.append(time.time())
         # #Cleaning up unneeded variables
         # io.verbosePrint(self,'Cleaning up solver...\n')
         # self.solverCleanUp()
@@ -62,8 +62,8 @@ class Solver(object):
         # else:
         #     self.standardSolve()
         # #Process cleanup
-        # io.verbosePrint(self,'Cleaning up processes...\n')
-        # process.cleanupProcesses(self,self.moments[start],self.moments[stop])
+        io.verbosePrint(self,'Cleaning up processes...\n')
+        process.cleanupProcesses(self,self.moments[start],self.moments[stop])
 
     def __str__(self):
         """Use this function to print the object."""
