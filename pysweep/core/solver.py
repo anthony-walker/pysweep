@@ -1,17 +1,18 @@
 import sys, os, yaml, numpy, warnings, subprocess, traceback, time,  mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
-import pysweep.core.sgs as sgs
 import pysweep.core.process as process
 import pysweep.core.functions as functions
 import pysweep.core.block as block
-
+from itertools import cycle
+#TEMPORARY
+import warnings
+warnings.simplefilter("ignore")
 
 class Solver(object):
     """docstring for Solver."""
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
-        sgs.initializeGlobals()
         self.moments = [time.time(),]
         self.initialConditions = initialConditions
         self.arrayShape = numpy.shape(initialConditions)
@@ -50,20 +51,22 @@ class Solver(object):
             block.sweptBlock(self)
         else:
             block.standardBlock(self)
-        # sgs.setGlobalModule(self)
         self.moments.append(time.time())
-        # #Cleaning up unneeded variables
-        # io.verbosePrint(self,'Cleaning up solver...\n')
-        # self.solverCleanUp()
-        # #Running simulation
-        # io.verbosePrint(self,'Running simulation...\n')
-        # if self.simulation:
-        #     self.sweptSolve()
-        # else:
-        #     self.standardSolve()
-        # #Process cleanup
+        #Cleaning up unneeded variables
+        io.verbosePrint(self,'Cleaning up solver...\n')
+        self.solverCleanUp()
+        self.moments.append(time.time())
+        #Running simulation
+        io.verbosePrint(self,'Running simulation...\n')
+        if self.simulation:
+            self.sweptSolve()
+        else:
+            self.standardSolve()
+        self.moments.append(time.time())
+        #Process cleanup
         io.verbosePrint(self,'Cleaning up processes...\n')
         process.cleanupProcesses(self,self.moments[start],self.moments[stop])
+        io.verbosePrint(self,'Done in {} seconds...\n'.format(self.moments[-1]-self.moments[0]))
 
     def __str__(self):
         """Use this function to print the object."""
@@ -79,64 +82,63 @@ class Solver(object):
             self.maxGlobalSweptStep = int(self.intermediate*(self.timeSteps-self.maxPyramidSize)/(self.maxPyramidSize)+1)  #Global swept step  #THIS ASSUMES THAT timeSteps > MOSS
             self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
             self.maxOctSize = 2*self.maxPyramidSize
-        self.arrayShape = (self.maxOctSize+self.intermediate+1,)+self.arrayShape
+            self.sharedShape = (self.maxOctSize+self.intermediate+1,)+self.sharedShape
+        else:
+            self.sharedShape = (self.intermediate+1,)+self.sharedShape
+        self.arrayShape = (self.timeSteps,)+self.arrayShape
 
     def solverCleanUp(self):
         """Use this function to remove unvariables not needed for computation."""
-        if self.clusterMasterBool:
-            del self.gpuRank
-            del self.initialConditions
-            del self.yamlFile
-            del self.yamlFileName
-            del self.rank
-            del self.nodeMaster
-            del self.nodeComm
-            del self.clusterMaster
-            del self.clusterComm
-            del self.nodeInfo
-            del self.timeSteps
-            # del self.sharedArray #TEMPORARY
-            # print(self.__dict__)
+        # if self.clusterMasterBool:
+        del self.gpuRank
+        del self.initialConditions
+        del self.yamlFile
+        del self.yamlFileName
+        del self.rank
+        del self.timeSteps
+        # del self.sharedArray #TEMPORARY
+        # del self.blocks #TEMPORARY
+        # del self.edgeblocks #TEMPORARY
+        # print(self.__dict__)
 
     def sweptSolve(self):
         """Use this function to begin the simulation."""
         # -------------------------------SWEPT RULE---------------------------------------------#
+        #setting global time step to zero
+        self.globalTimeStep=0
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
-        # node_comm.Barrier()
-        # functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
-        # #Loop variables
-        # cwt = 1 #Current write time
-        # gts = 0 #Initialization of global time step
-        # del Up #Deleting Up object after FirstPrism
-        # #-------------------------------SWEPT LOOP--------------------------------------------#
-        # step = cycle([functions.send_backward,functions.send_forward])
-        # for i in range(MGST):
-        #     functions.UpPrism(GRB,Xb,Yb,Oct,mpiPool,blocks,sarr,garr,total_cpu_block)
-        #     node_comm.Barrier()
-        #     cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,gts,TSO,MPSS,total_cpu_block)
-        #     gts+=MPSS
+        self.nodeComm.Barrier()
+        functions.firstForward(self)
+        #Loop variables
+        cwt = 1 #Current write time
+        del self.Up #Deleting Up object after FirstPrism
+        #-------------------------------SWEPT LOOP--------------------------------------------#
+        step = cycle([functions.sendBackward,functions.sendForward])
+        for i in range(1):#MGST):
+            functions.UpPrism(self)
+            self.nodeComm.Barrier()
+            cwt = next(step)(cwt,self)
         # #Do LastPrism Here then Write all of the remaining data
-        # Down.gts = Oct.gts
-        # functions.LastPrism(GRB,Xb,Down,mpiPool,blocks,sarr,garr,total_cpu_block)
-        # node_comm.Barrier()
-        # next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,gts,TSO,MPSS,total_cpu_block)
+        functions.LastPrism(self)
+        self.nodeComm.Barrier()
+        next(step)(cwt,self)
 
 
-    def standardSolve():
-        # -------------------------------Standard Decomposition---------------------------------------------#
-        node_comm.Barrier()
-        cwt = 1
-        for i in range(TSO*timeSteps):
-            functions.Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj)
-            node_comm.Barrier()
-            #Write data and copy down a step
-            if (i+1)%TSO==0 and NMB:
-                hdf5_data[cwt,i1,i2,i3] = sarr[TSO,:,OPS:-OPS,OPS:-OPS]
-                sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
-                cwt+=1
-            elif NMB:
-                sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
-            node_comm.Barrier()
-            #Communicate
-            functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
+    # def standardSolve():
+    #     # -------------------------------Standard Decomposition---------------------------------------------#
+    #     node_comm.Barrier()
+    #     cwt = 1
+    #     for i in range(TSO*timeSteps):
+    #         functions.Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj)
+    #         node_comm.Barrier()
+    #         #Write data and copy down a step
+    #         if (i+1)%TSO==0 and NMB:
+    #             hdf5_data[cwt,i1,i2,i3] = sarr[TSO,:,OPS:-OPS,OPS:-OPS]
+    #             sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
+    #             cwt+=1
+    #         elif NMB:
+    #             sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
+    #         node_comm.Barrier()
+    #         #Communicate
+    #         functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)

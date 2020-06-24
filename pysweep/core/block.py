@@ -1,14 +1,14 @@
 
-import numpy,mpi4py.MPI as MPI,multiprocessing as mp,ctypes,os
-import pysweep.core.functions as functions
+import numpy,mpi4py.MPI as MPI,ctypes,os
+import pysweep.core.geometry as geometry
 import pysweep.core.io as io
-import pysweep.core.sgs as sgs
 from itertools import product
 
 try:
     import pycuda.driver as cuda
 except Exception as e:
-    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    # print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    pass
 
 def createCPUSharedArray(solver,arrayBytes):
     """Use this function to create shared memory arrays for node communication."""
@@ -16,212 +16,101 @@ def createCPUSharedArray(solver,arrayBytes):
     #Creating MPI Window for shared memory
     win = MPI.Win.Allocate_shared(arrayBytes, itemsize, comm=solver.nodeComm)
     sharedBuffer, itemsize = win.Shared_query(0)
-    solver.sharedArray = numpy.ndarray(buffer=sharedBuffer, dtype=solver.dtype.type, shape=solver.arrayShape)
+    solver.sharedArray = numpy.ndarray(buffer=sharedBuffer, dtype=solver.dtype.type, shape=solver.sharedShape)
 
-def createSweptSharedArray(solver):
-    """Use this function to create and fill the shared array for the swept solver."""
-    #---------------------------Creating and Filling Shared Array-------------#
-    createCPUSharedArray(solver,numpy.zeros(solver.arrayShape,dtype=solver.dtype).nbytes)
-    #Making blocks match array other dimensions
-    bsls = [slice(0,i,1) for i in solver.arrayShape]
-    solver.blocks = (bsls[0],bsls[1],solver.blocks,bsls[3])
-    #Filling shared array
-    if solver.nodeMasterBool:
-        gsc = (slice(0,solver.arrayShape[2],1),slice(int(solver.nodeInfo[0]*solver.blocksize[0]),int(solver.nodeInfo[1]*solver.blocksize[0]),1),slice(0,solver.arrayShape[3],1))
-        solver.sharedArray[solver.intermediate-1,:,:,:] =  solver.initialConditions[gsc]
-        solver.sharedArray[0,:,:,:] =  solver.initialConditions[gsc]
-    else:
-        gsc = None
+#-----------------------------Swept functions----------------------------------------#
 
 def sweptBlock(solver):
     """This is the entry point for the swept portion of the block module."""
-    createSweptSharedArray(solver) #This creates shared array
+    #Create and fill shared array
+    createCPUSharedArray(solver,numpy.zeros(solver.sharedShape,dtype=solver.dtype).nbytes)
+    solver.sharedArray[solver.intermediate-1,:,:,:] =  solver.initialConditions[solver.globalBlock]
+    solver.sharedArray[0,:,:,:] =  solver.initialConditions[solver.globalBlock]
+    #Create phase objects
+    solver.Up = geometry.Geometry() 
+    solver.Down = geometry.Geometry() 
+    solver.Xb = geometry.Geometry()
+    solver.Yb = geometry.Geometry()
+    solver.Oct = geometry.Geometry() 
+
     if solver.gpuBool:
         # Creating cuda device and context
         cuda.init()
         cuda_device = cuda.Device(solver.gpuRank)
         solver.cuda_context = cuda_device.make_context()
         setupGPUSwept(solver)
-        solver.mpiPool,solver.totalCPUBlock = None,None
-    else:
-        solver.gpu,solver.GPUArray = None,None
-        setupCPUSwept(solver)
-        poolSize = min(len(solver.blocks[0]), os.cpu_count()-solver.nodeComm.Get_size()+1)
-        solver.mpiPool = mp.Pool(poolSize)
+
+    setupCPUSwept(solver)
     solver.comm.Barrier() #Ensure all processes are
 
 
 def setupCPUSwept(solver):
-    """Use this function to execute core cpu only processes"""
-    solver.blocks,solver.totalCPUBlock = makeCPUBlocksSwept(solver.blocks,solver.blocksize,solver.arrayShape)
-    solver.blocks = makeECPUBlocksSwept(solver.blocks,solver.arrayShape,solver.blocksize)
+    """Use this function to execute core cpu only proceysses"""
+    timeSlice = slice(0,solver.sharedShape[0],1)
+    solver.blocks = [(timeSlice,)+tuple(block) for block in solver.blocks]
+    solver.edgeblocks = makeEdgeBlocksSwept(solver.blocks,solver.arrayShape,solver.blocksize)
     solver.cpu.set_globals(False,*solver.globals)
     #Creating sets for cpu calculation
     up_sets = createUpPyramidSets(solver.blocksize,solver.operating)
     down_sets = createDownPyramidSets(solver.blocksize,solver.operating)
     oct_sets = down_sets+up_sets
     y_sets,x_sets = createBridgeSets(solver.blocksize,solver.operating,solver.maxPyramidSize)
-    #Shared array
-    sgs.CPUArray = createSharedPoolArray(solver.sharedArray[solver.totalCPUBlock].shape)
-    sgs.CPUArray[:,:,:,:] = solver.sharedArray[solver.totalCPUBlock]
-    sgs.CPUArray[:,:,:,:] = solver.sharedArray[solver.totalCPUBlock]
     #Create function objects
-    solver.Up = functions.GeometryCPU(0,up_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Down = functions.GeometryCPU(0,down_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Xb = functions.GeometryCPU(0,x_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Yb = functions.GeometryCPU(0,y_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Oct = functions.GeometryCPU(0,oct_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
+    solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate,solver.intermediate-1) 
+    solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate,solver.intermediate-1)
+    solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate,solver.intermediate-1)
+    solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate,solver.intermediate-1)
+    solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate,solver.intermediate-1)
 
 def setupGPUSwept(solver):
     """Use this function to execute core gpu only processes"""
-    block_shape = [i.stop-i.start for i in solver.blocks]
-    block_shape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
+    solver.gpuBlock = (slice(0,solver.sharedShape[0],1),)+solver.gpuBlock
+    blockShape =[element.stop for element in solver.gpuBlock]
+    blockShape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
     # Creating local GPU array with split
-    solver.grid = (int((block_shape[2])/solver.blocksize[0]),int((block_shape[3])/solver.blocksize[1]))   #Grid size
+    solver.grid = (int((blockShape[2])/solver.blocksize[0]),int((blockShape[3])/solver.blocksize[1]))   #Grid size
     #Creating constants
-    solver.NV = block_shape[1]
-    solver.SX = block_shape[2]
-    solver.SY = block_shape[3]
+    solver.NV = blockShape[1]
+    solver.SX = blockShape[2]
+    solver.SY = blockShape[3]
     solver.VARS =  int(solver.SX*solver.SY)
     solver.TIMES =solver.VARS*solver.NV
     const_dict = ({"NV":solver.NV,"VARS":solver.VARS,"TIMES":solver.TIMES,"MPSS":solver.maxPyramidSize,"MOSS":solver.maxOctSize,"OPS":solver.operating,"TSO":solver.intermediate,'SX':solver.SX,'SY':solver.SY})
-    solver.GPUArray = createLocalGPUArray(block_shape)
+    solver.GPUArray = createLocalGPUArray(blockShape)
     solver.GPUArray = cuda.mem_alloc(solver.GPUArray.nbytes)
     #Building CUDA source code
     solver.gpu = io.buildGPUSource(solver.gpu)
     io.copySweptConstants(solver.gpu,const_dict) #This copys swept constants not global constants
     solver.cpu.set_globals(solver.gpuBool,*solver.globals,source_mod=solver.gpu)
     # Make GPU geometry
-    solver.Up = functions.GeometryGPU(0,solver.gpu.get_function("UpPyramid"),solver.blocksize,solver.grid,solver.maxPyramidSize,block_shape)
-    solver.Down = functions.GeometryGPU(0,solver.gpu.get_function("DownPyramid"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,block_shape)
-    solver.Yb = functions.GeometryGPU(0,solver.gpu.get_function("YBridge"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,block_shape)
-    solver.Xb = functions.GeometryGPU(0,solver.gpu.get_function("XBridge"),solver.blocksize,solver.grid,solver.maxPyramidSize,block_shape)
-    solver.Oct = functions.GeometryGPU(0,solver.gpu.get_function("Octahedron"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,block_shape)
+    solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,solver.grid,blockShape)
+    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),blockShape)
+    solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),blockShape)
+    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,solver.grid,blockShape)
+    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),blockShape)
 
-
-def standardBlock(solver):
-    """This is the entry point for the standard portion of the block module."""
-    #---------------------------Creating and Filling Shared Array-------------#
-    shared_shape = (TSO+1,arr0.shape[0],int(sum(solver.nodeInfo[2:])*BS[0]+2*OPS),arr0.shape[2]+2*OPS)
-    sarr = decomp.create_CPU_sarray(node_comm,shared_shape,dType,numpy.zeros(shared_shape).nbytes)
-    #Making blocks match array other dimensions
-    bsls = [slice(0,i,1) for i in shared_shape]
-    blocks = (bsls[0],bsls[1],blocks,slice(bsls[3].start+OPS,bsls[3].stop-OPS,1))
-    GRB = True if gpu_rank is not None else False
-    #Filling shared array
-    if NMB:
-        gsc = (slice(0,arr0.shape[0],1),slice(int(solver.nodeInfo[0]*BS[0]),int(solver.nodeInfo[1]*BS[0]),1),slice(0,arr0.shape[2],1))
-        i1,i2,i3 = gsc
-        #TSO STEP and BOUNDARIES
-        sarr[TSO-1,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
-        sarr[TSO-1,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS-1:-1]
-        sarr[TSO-1,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
-        #INITIAL STEP AND BOUNDARIES
-        sarr[0,:,OPS:-OPS,OPS:-OPS] =  arr0[gsc]
-        sarr[0,:,OPS:-OPS,:OPS] = arr0[gsc[0],gsc[1],-OPS-1:-1]
-        sarr[0,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
-    else:
-        gsc = None
-
-
-def standardCore():
-    # ------------------- Operations specifically for GPus and CPUs------------------------#
-    if GRB:
-        # Creating cuda device and context
-        cuda.init()
-        cuda_device = cuda.Device(gpu_rank)
-        cuda_context = cuda_device.make_context()
-        DecompObj,garr = dcore.gpu_core(blocks,BS,OPS,gargs,GRB,TSO)
-        mpi_pool= None
-    else:
-        garr = None
-        DecompObj,blocks= dcore.cpu_core(sarr,blocks,shared_shape,OPS,BS,GRB,TSO,gargs)
-        pool_size = min(len(blocks), os.cpu_count()-node_comm.Get_size()+1)
-        mpi_pool = mp.Pool(pool_size)
-    functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
-    comm.Barrier() #Ensure all processes are prepared to solve
-
-def standard_cpu_core(sarr,totalCPUBlock,shared_shape,OPS,BS,GRB,TSO,gargs):
-    """Use this function to execute core cpu only processes"""
-    xslice = slice(shared_shape[2]-OPS-(totalCPUBlock[2].stop-totalCPUBlock[2].start),shared_shape[2]-OPS,1)
-    swb = (totalCPUBlock[0],totalCPUBlock[1],xslice,totalCPUBlock[3])
-    blocks,totalCPUBlock = decomp.create_cpu_blocks(totalCPUBlock,BS,shared_shape,OPS)
-    cpu.set_globals(GRB,*gargs,source_mod=None)
-    #Creating sets for cpu calculation
-    DecompObj = functions.DecompCPU(0,[(x+OPS,y+OPS) for x,y in numpy.ndindex((BS[0],BS[1]))],TSO-1,cwrite=swb,cread=totalCPUBlock)
-    sgs.CPUArray = decomp.createSharedPoolArray(sarr[totalCPUBlock].shape)
-    return DecompObj,blocks
-
-def standard_gpu_core(blocks,BS,OPS,gargs,GRB,TSO):
-    """Use this function to execute core gpu only processes"""
-    block_shape = [i.stop-i.start for i in blocks[:2]]+[i.stop-i.start+2*OPS for i in blocks[2:]]
-    gwrite = blocks
-    gread = blocks[:2]
-    gread+=tuple([slice(i.start-OPS,i.stop+OPS,1) for i in blocks[2:]])
-    # Creating local GPU array with split
-    GRD = (int((block_shape[2]-2*OPS)/BS[0]),int((block_shape[3]-2*OPS)/BS[1]))   #Grid size
-    #Creating constants
-    NV = block_shape[1]
-    SX = block_shape[2]
-    SY = block_shape[3]
-    VARS =  block_shape[2]*(block_shape[3])
-    TIMES = VARS*NV
-    const_dict = ({"NV":NV,"VARS":VARS,"TIMES":TIMES,"OPS":OPS,"TSO":TSO,"SX":SX,"SY":SY})
-    garr = decomp.createLocalGPUArray(block_shape)
-    #Building CUDA source code
-    SM = source.buildGPUSource(os.path.dirname(__file__))
-    source.decomp_constant_copy(SM,const_dict)
-    cpu.set_globals(GRB,*gargs,source_mod=SM)
-    DecompObj  = functions.DecompGPU(0,SM.get_function("Decomp"),GRD,BS,gread,gwrite,garr)
-    return DecompObj,garr
-
-def createLocalGPUArray(block_shape):
+def createLocalGPUArray(blockShape):
     """Use this function to create the local gpu array"""
-    arr = numpy.zeros(block_shape)
+    arr = numpy.zeros(blockShape)
     arr = arr.astype(numpy.float64)
     arr = numpy.ascontiguousarray(arr)
     return arr
 
-def createSharedPoolArray(shared_shape):
-    """Use this function to create the shared array for the process pool."""
-    sarr_base = mp.Array(ctypes.c_double, int(numpy.prod(shared_shape)),lock=False)
-    sarr = numpy.ctypeslib.as_array(sarr_base)
-    sarr = sarr.reshape(shared_shape)
-    return sarr
-
-def makeCPUBlocksSwept(totalCPUBlock,BS,shared_shape):
-    """Use this function to create blocks."""
-    row_range = numpy.arange(0,totalCPUBlock[2].stop-totalCPUBlock[2].start,BS[1],dtype=numpy.intc)
-    column_range = numpy.arange(totalCPUBlock[3].start,totalCPUBlock[3].stop,BS[1],dtype=numpy.intc)
-    xslice = slice(shared_shape[2]-(totalCPUBlock[2].stop-totalCPUBlock[2].start),shared_shape[2],1)
-    ntcb = (totalCPUBlock[0],totalCPUBlock[1],xslice,totalCPUBlock[3])
-    return [(totalCPUBlock[0],totalCPUBlock[1],slice(x,x+BS[0],1),slice(y,y+BS[1],1)) for x,y in product(row_range,column_range)],ntcb
-
-def create_standard_cpu_blocks(totalCPUBlock,BS,shared_shape,ops):
-    """Use this function to create blocks."""
-    row_range = numpy.arange(ops,totalCPUBlock[2].stop-totalCPUBlock[2].start+ops,BS[1],dtype=numpy.intc)
-    column_range = numpy.arange(ops,totalCPUBlock[3].stop-totalCPUBlock[3].start+ops,BS[1],dtype=numpy.intc)
-    xslice = slice(shared_shape[2]-2*ops-(totalCPUBlock[2].stop-totalCPUBlock[2].start),shared_shape[2],1)
-    yslice = slice(totalCPUBlock[3].start-ops,totalCPUBlock[3].stop+ops,1)
-    #There is an issue with total cpu block for decomp on cluster
-    ntcb = (totalCPUBlock[0],totalCPUBlock[1],xslice,yslice)
-    return [(totalCPUBlock[0],totalCPUBlock[1],slice(x-ops,x+BS[0]+ops,1),slice(y-ops,y+BS[1]+ops,1)) for x,y in product(row_range,column_range)],ntcb
-
-def makeECPUBlocksSwept(cpu_blocks,shared_shape,BS):
+def makeEdgeBlocksSwept(cpuBlocks,sharedShape,blocksize):
     """Use this function to create shift blocks and edge blocks."""
     #This handles edge blocks in the y direction
-    shift = int(BS[1]/2)
+    shift = int(blocksize[1]/2)
     #Creating shift blocks and edges
-    shift_blocks = [(block[0],block[1],block[2],slice(block[3].start+shift,block[3].stop+shift,1)) for block in cpu_blocks]
-    for i,block in enumerate(shift_blocks):
+    shiftBlocks = [(block[0],block[1],block[2],slice(block[3].start+shift,block[3].stop+shift,1)) for block in cpuBlocks]
+    for i,block in enumerate(shiftBlocks):
         if block[3].start < 0:
-            new_block = (block[0],block[0],block[2],numpy.arange(block[3].start,block[3].stop))
-            shift_blocks[i] = new_block
-        elif block[3].stop > shared_shape[3]:
+            newBlock = (block[0],block[0],block[2],numpy.arange(block[3].start,block[3].stop))
+            shiftBlocks[i] = newBlock
+        elif block[3].stop > sharedShape[3]:
             ny = numpy.concatenate((numpy.arange(block[3].start,block[3].stop-shift),numpy.arange(0,shift,1)))
-            new_block = (block[0],block[0],block[2],ny)
-            shift_blocks[i] = new_block
-    return cpu_blocks,shift_blocks
+            newBlock = (block[0],block[1],block[2],ny) #Changed 1 from 0 here, if bug hunting later
+            shiftBlocks[i] = newBlock
+    return shiftBlocks
 
 
 def createUpPyramidSets(blocksize,operating):
@@ -266,3 +155,5 @@ def createBridgeSets(blocksize,operating,MPSS):
         ydl-=operating
         yul+=operating
     return sets,sets[::-1]
+
+#-----------------------------Standard functions----------------------------------------#

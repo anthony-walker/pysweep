@@ -13,7 +13,7 @@ from collections.abc import Iterable
 import matplotlib.animation as animation
 from mpl_toolkits import mplot3d
 from matplotlib.patches import FancyArrowPatch
-from pysweep.distributed.sweep.dcore import block
+
 
 colors = ['dodgerblue','orange','dodgerblue','orange','dodgerblue','orange']
 symbols = cycle(['o','o','o','o'])

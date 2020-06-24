@@ -82,7 +82,7 @@ def createOutputFile(solver):
     solver.hdf5.create_dataset("exid",(len(solver.exid),),data=solver.exid)
     solver.hdf5.create_dataset("globals",(len(solver.globals),),data=solver.globals)
     solver.clocktime = solver.hdf5.create_dataset("clocktime",(1,),data=0.0)
-    solver.data = solver.hdf5.create_dataset("data",(solver.timeSteps,)+solver.arrayShape[1:],dtype=solver.dtype)
+    solver.data = solver.hdf5.create_dataset("data",solver.arrayShape,dtype=solver.dtype)
     if solver.clusterMasterBool:
         solver.data[0,:,:,:] = solver.initialConditions[:,:,:]
     solver.comm.Barrier()
@@ -122,17 +122,17 @@ def getSolverPrint(solver):
     return returnString
 
 
-def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS):
+def sweptWrite(cwt,solver):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
-    i1,i2,i3=gsc #Unpack global tuple
-    for si,i in enumerate(range(gts+1,gts+1+MPSS,1),start=TSO):
-        if i%TSO==0:
-            hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
+    iv,ix,iy = solver.globalBlock #Unpack global tuple
+    for si,i in enumerate(range(solver.globalTimeStep+1,solver.globalTimeStep+1+solver.maxPyramidSize,1),start=solver.intermediate):
+        if i%solver.intermediate==0:
+            solver.data[cwt,iv,ix,iy] = solver.sharedArray[si,:,:,:]
             cwt+=1
-    nte = sarr.shape[0]-MPSS
-    sarr[:nte,:,:,:] = sarr[MPSS:,:,:,:]
-    sarr[nte:,:,:,:] = 0
+    nte = solver.sharedShape[0]-solver.maxPyramidSize
+    solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
+    solver.sharedArray[nte:,:,:,:] = 0
     return cwt
 
 def buildGPUSource(sourcefile):
@@ -174,45 +174,3 @@ def copySweptConstants(source_mod,const_dict):
         c_ptr,_ = source_mod.get_global(key)
         cst = const_dict[key]
         cuda.memcpy_htod(c_ptr,casters[type(cst)](cst))
-
-def getDeviceAttrs(devNum=0,print_device = False):
-    """Use this function to get device attributes and print them"""
-    device = cuda.Device(devNum)
-    dev_name = device.name()
-    dev_pci_bus_id = device.pci_bus_id()
-    dev_attrs = device.get_attributes()
-    dev_attrs["DEVICE_NAME"]=dev_name
-    if print_device:
-        for x in dev_attrs:
-            print(x,": ",dev_attrs[x])
-    return dev_attrs
-
-class pysweep_printer(object):
-    """This function will store the master rank and print given values."""
-
-    def __init__(self, rank,master_rank):
-        self.rank = rank
-        self.master = master_rank
-
-    def __call__(self, args,p_iter=False,p_ranks=False,end="\n"):
-
-        if (self.rank == self.master or p_ranks) and p_iter:
-            if isinstance(args,Iterable):
-                for item in args:
-                    sys.stdout.write("[ ")
-                    for si in item:
-                        sys.stdout.write("%.0f"%si+", ")
-                    sys.stdout.write("]\n")
-            else:
-                args = args,
-                for item in args:
-                    print(item,end=end)
-        elif self.rank == self.master or p_ranks:
-            print(args,end=end)
-
-def pm(arr,i,iv=0,ps="%d"):
-    for item in arr[i,iv,:,:]:
-        sys.stdout.write("[ ")
-        for si in item:
-            sys.stdout.write(ps%si+", ")
-        sys.stdout.write("]\n")
