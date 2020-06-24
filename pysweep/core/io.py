@@ -1,12 +1,11 @@
 import sys, os, h5py, time, yaml, numpy, importlib.util
 from datetime import datetime
 from collections import Iterable
+from pycuda.compiler import SourceModule
 try:
-    from pycuda.compiler import SourceModule
     import pycuda.driver as cuda
 except Exception as e:
-    # print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
-    pass
+    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
 
 def updateLogFile(solver,clocktime):
     """Use this function to update log.yaml"""
@@ -83,7 +82,7 @@ def createOutputFile(solver):
     solver.hdf5.create_dataset("exid",(len(solver.exid),),data=solver.exid)
     solver.hdf5.create_dataset("globals",(len(solver.globals),),data=solver.globals)
     solver.clocktime = solver.hdf5.create_dataset("clocktime",(1,),data=0.0)
-    solver.data = solver.hdf5.create_dataset("data",(solver.timeSteps,)+solver.arrayShape[1:],dtype=solver.dtype)
+    solver.data = solver.hdf5.create_dataset("data",solver.arrayShape,dtype=solver.dtype)
     if solver.clusterMasterBool:
         solver.data[0,:,:,:] = solver.initialConditions[:,:,:]
     solver.comm.Barrier()

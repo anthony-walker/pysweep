@@ -41,8 +41,8 @@ class Solver(object):
         self.moments.append(time.time())
         
         # #Creating simulatneous input and output file
-        # io.verbosePrint(self,'Creating output file...\n')
-        # io.createOutputFile(self)
+        io.verbosePrint(self,'Creating output file...\n')
+        io.createOutputFile(self)
         self.moments.append(time.time())
         # Creating shared array
         io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
@@ -61,9 +61,9 @@ class Solver(object):
         #     self.sweptSolve()
         # else:
         #     self.standardSolve()
-        # #Process cleanup
-        # io.verbosePrint(self,'Cleaning up processes...\n')
-        # process.cleanupProcesses(self,self.moments[start],self.moments[stop])
+        #Process cleanup
+        io.verbosePrint(self,'Cleaning up processes...\n')
+        process.cleanupProcesses(self,self.moments[start],self.moments[stop])
 
     def __str__(self):
         """Use this function to print the object."""
@@ -82,6 +82,7 @@ class Solver(object):
             self.sharedShape = (self.maxOctSize+self.intermediate+1,)+self.sharedShape
         else:
             self.sharedShape = (self.intermediate+1,)+self.sharedShape
+        self.arrayShape = (self.timeSteps,)+self.arrayShape
 
     def solverCleanUp(self):
         """Use this function to remove unvariables not needed for computation."""

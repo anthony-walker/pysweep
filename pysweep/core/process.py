@@ -91,7 +91,6 @@ def MinorSplit(solver,nodeInfo,gpuRank):
     stop = int((gpuSize+cpuSize)*solver.blocksize[0]) #Convert to actual array size
     solver.sharedShape = solver.arrayShape[0],stop,solver.arrayShape[2]
     gpuBlock = slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) #total GPU slice of shared array
-    cpuBlock = slice(intersection,stop,1),slice(0,solver.arrayShape[-1],1) #total CPU slice of shared array
     individualBlocks = list() #For CPU 
     #MAY NEED TO ADD IF STATEMENT FOR DECOMP
     for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
@@ -99,11 +98,9 @@ def MinorSplit(solver,nodeInfo,gpuRank):
             currBlock = slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1) #Getting current block
             individualBlocks.append(currBlock) #appending to individual blocks
     dividedBlocks = numpy.array_split(individualBlocks,ranksPerNode) #-len(gpuRank) #Potentially add use some nodes for both CPU and GPU
-
     while len(gpuRank)<len(dividedBlocks):
         gpuRank.append(None)
-
-    return gpuBlock,cpuBlock,dividedBlocks,gpuRank
+    return gpuBlock,dividedBlocks,gpuRank
 
 def MajorSplit(solver,nodeID):
     """
@@ -131,6 +128,9 @@ def MajorSplit(solver,nodeID):
     #Get cpu boundaries
     cpuLowerBound,cpuUpperBound = getBlockBoundaries(CPURows,numOfNodes,nodeID,"CPU",cpuMult)
     #Compiling info into ranges and magnitudes
+    start = int((gpuLowerBound+cpuLowerBound)*solver.blocksize[0])
+    stop = int((gpuUpperBound+cpuUpperBound)*solver.blocksize[0])
+    solver.globalBlock = slice(0,solver.arrayShape[0],1),slice(start,stop,1),slice(0,solver.arrayShape[-1],1) #part of initial conditions for this node
     nodeInfo = gpuUpperBound-gpuLowerBound,cpuUpperBound-cpuLowerBound #low range, high range, gpu magnitude, cpu magnitude
     #Testing ranks and number of gpus to ensure simulation is viable
     assert totalGPUs < solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
@@ -186,16 +186,16 @@ def setupMPI(solver):
             nodeID = None
         nodeID = solver.clusterComm.scatter(nodeID)
         #Splitting data across cluster (Major)
-        gpuBlock,cpuBlock,blocks,gpuRank =  MajorSplit(solver,nodeID)
+        gpuBlock,blocks,gpuRank =  MajorSplit(solver,nodeID)
         #Getting neighboring ranks for communication
         getNeighborRanks(solver,nodeID) 
     else:
-       gpuRank,gpuBlock,cpuBlock,blocks,solver.sharedShape = None,None,None,None,None
+       gpuRank,gpuBlock,solver.globalBlock,blocks,solver.sharedShape = None,None,None,None,None
     #Broadcasting gpu information
     solver.blocks = solver.nodeComm.scatter(blocks)
-    gpuRank = solver.nodeComm.scatter(gpuRank)
+    solver.gpuRank = solver.nodeComm.scatter(gpuRank)
     solver.gpuBlock = solver.nodeComm.bcast(gpuBlock) #total gpu block in shared array
-    solver.cpuBlock = solver.nodeComm.bcast(cpuBlock) #total cpu block in shared array
+    solver.globalBlock = solver.nodeComm.bcast(solver.globalBlock) #total cpu block in shared array
     solver.sharedShape = solver.nodeComm.bcast(solver.sharedShape) #shape of node shared array
     solver.gpuBool = True if gpuRank is not None else False
     #----------------------Warning Empty MPI Processes------------------------#
