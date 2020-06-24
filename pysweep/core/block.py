@@ -27,13 +27,14 @@ def sweptBlock(solver):
     createCPUSharedArray(solver,numpy.zeros(solver.sharedShape,dtype=solver.dtype).nbytes)
     solver.sharedArray[solver.intermediate-1,:,:,:] =  solver.initialConditions[solver.globalBlock]
     solver.sharedArray[0,:,:,:] =  solver.initialConditions[solver.globalBlock]
-
+   
     if solver.gpuBool:
         # Creating cuda device and context
+        print(solver.gpuRank)
         cuda.init()
         cuda_device = cuda.Device(solver.gpuRank)
-        solver.cuda_context = cuda_device.make_context()
-        setupGPUSwept(solver)
+        # solver.cuda_context = cuda_device.make_context()
+        # setupGPUSwept(solver)
         solver.mpiPool,solver.totalCPUBlock = None,None
     else:
         solver.gpu,solver.GPUArray = None,None
@@ -66,34 +67,34 @@ def setupCPUSwept(solver):
 
 def setupGPUSwept(solver):
     """Use this function to execute core gpu only processes"""
-    #PICK UP HERE
-    # block_shape = [i.stop-i.start for i in solver.blocks]
-    # block_shape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
+    blockShape = [element.stop for element in solver.gpuBlock]
+    blockShape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
+    print(blockShape)
     # # Creating local GPU array with split
-    # solver.grid = (int((block_shape[2])/solver.blocksize[0]),int((block_shape[3])/solver.blocksize[1]))   #Grid size
-    #Creating constants
-    solver.NV = block_shape[1]
-    solver.SX = block_shape[2]
-    solver.SY = block_shape[3]
-    solver.VARS =  int(solver.SX*solver.SY)
-    solver.TIMES =solver.VARS*solver.NV
-    const_dict = ({"NV":solver.NV,"VARS":solver.VARS,"TIMES":solver.TIMES,"MPSS":solver.maxPyramidSize,"MOSS":solver.maxOctSize,"OPS":solver.operating,"TSO":solver.intermediate,'SX':solver.SX,'SY':solver.SY})
-    solver.GPUArray = createLocalGPUArray(block_shape)
-    solver.GPUArray = cuda.mem_alloc(solver.GPUArray.nbytes)
-    #Building CUDA source code
-    solver.gpu = io.buildGPUSource(solver.gpu)
-    io.copySweptConstants(solver.gpu,const_dict) #This copys swept constants not global constants
-    solver.cpu.set_globals(solver.gpuBool,*solver.globals,source_mod=solver.gpu)
-    # Make GPU geometry
-    solver.Up = functions.GeometryGPU(0,solver.gpu.get_function("UpPyramid"),solver.blocksize,solver.grid,solver.maxPyramidSize,block_shape)
-    solver.Down = functions.GeometryGPU(0,solver.gpu.get_function("DownPyramid"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,block_shape)
-    solver.Yb = functions.GeometryGPU(0,solver.gpu.get_function("YBridge"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,block_shape)
-    solver.Xb = functions.GeometryGPU(0,solver.gpu.get_function("XBridge"),solver.blocksize,solver.grid,solver.maxPyramidSize,block_shape)
-    solver.Oct = functions.GeometryGPU(0,solver.gpu.get_function("Octahedron"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,block_shape)
+    # solver.grid = (int((blockShape[2])/solver.blocksize[0]),int((blockShape[3])/solver.blocksize[1]))   #Grid size
+    # #Creating constants
+    # solver.NV = blockShape[1]
+    # solver.SX = blockShape[2]
+    # solver.SY = blockShape[3]
+    # solver.VARS =  int(solver.SX*solver.SY)
+    # solver.TIMES =solver.VARS*solver.NV
+    # const_dict = ({"NV":solver.NV,"VARS":solver.VARS,"TIMES":solver.TIMES,"MPSS":solver.maxPyramidSize,"MOSS":solver.maxOctSize,"OPS":solver.operating,"TSO":solver.intermediate,'SX':solver.SX,'SY':solver.SY})
+    # solver.GPUArray = createLocalGPUArray(blockShape)
+    # solver.GPUArray = cuda.mem_alloc(solver.GPUArray.nbytes)
+    # #Building CUDA source code
+    # solver.gpu = io.buildGPUSource(solver.gpu)
+    # io.copySweptConstants(solver.gpu,const_dict) #This copys swept constants not global constants
+    # solver.cpu.set_globals(solver.gpuBool,*solver.globals,source_mod=solver.gpu)
+    # # Make GPU geometry
+    # solver.Up = functions.GeometryGPU(0,solver.gpu.get_function("UpPyramid"),solver.blocksize,solver.grid,solver.maxPyramidSize,blockShape)
+    # solver.Down = functions.GeometryGPU(0,solver.gpu.get_function("DownPyramid"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,blockShape)
+    # solver.Yb = functions.GeometryGPU(0,solver.gpu.get_function("YBridge"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,blockShape)
+    # solver.Xb = functions.GeometryGPU(0,solver.gpu.get_function("XBridge"),solver.blocksize,solver.grid,solver.maxPyramidSize,blockShape)
+    # solver.Oct = functions.GeometryGPU(0,solver.gpu.get_function("Octahedron"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,blockShape)
 
-def createLocalGPUArray(block_shape):
+def createLocalGPUArray(blockShape):
     """Use this function to create the local gpu array"""
-    arr = numpy.zeros(block_shape)
+    arr = numpy.zeros(blockShape)
     arr = arr.astype(numpy.float64)
     arr = numpy.ascontiguousarray(arr)
     return arr
