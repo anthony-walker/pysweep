@@ -1,6 +1,6 @@
 
 import numpy,mpi4py.MPI as MPI,ctypes,os
-import pysweep.core.functions as functions
+import pysweep.core.geometry as geometry
 import pysweep.core.io as io
 import pysweep.core.sgs as sgs
 from itertools import product
@@ -28,11 +28,11 @@ def sweptBlock(solver):
     solver.sharedArray[solver.intermediate-1,:,:,:] =  solver.initialConditions[solver.globalBlock]
     solver.sharedArray[0,:,:,:] =  solver.initialConditions[solver.globalBlock]
     #Create phase objects
-    solver.Up = functions.Geometry() 
-    solver.Down = functions.Geometry() 
-    solver.Xb = functions.Geometry()
-    solver.Yb = functions.Geometry()
-    solver.Oct = functions.Geometry() 
+    solver.Up = geometry.Geometry() 
+    solver.Down = geometry.Geometry() 
+    solver.Xb = geometry.Geometry()
+    solver.Yb = geometry.Geometry()
+    solver.Oct = geometry.Geometry() 
 
     if solver.gpuBool:
         # Creating cuda device and context
@@ -40,15 +40,15 @@ def sweptBlock(solver):
         cuda_device = cuda.Device(solver.gpuRank)
         solver.cuda_context = cuda_device.make_context()
         setupGPUSwept(solver)
-    else:
-        solver.gpu,solver.GPUArray = None,None
 
     setupCPUSwept(solver)
     solver.comm.Barrier() #Ensure all processes are
 
 
 def setupCPUSwept(solver):
-    """Use this function to execute core cpu only processes"""
+    """Use this function to execute core cpu only proceysses"""
+    timeSlice = slice(0,solver.sharedShape[0],1)
+    solver.blocks = [(timeSlice,)+tuple(block) for block in solver.blocks]
     solver.edgeblocks = makeEdgeBlocksSwept(solver.blocks,solver.arrayShape,solver.blocksize)
     solver.cpu.set_globals(False,*solver.globals)
     #Creating sets for cpu calculation
@@ -57,15 +57,16 @@ def setupCPUSwept(solver):
     oct_sets = down_sets+up_sets
     y_sets,x_sets = createBridgeSets(solver.blocksize,solver.operating,solver.maxPyramidSize)
     #Create function objects
-    solver.Up.initializeCPU(up_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1) 
-    solver.Down.initializeCPU(down_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Xb.initializeCPU(x_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Yb.initializeCPU(y_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Oct.initializeCPU(oct_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
+    solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1) 
+    solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
+    solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
+    solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
+    solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
 
 def setupGPUSwept(solver):
     """Use this function to execute core gpu only processes"""
-    blockShape =[solver.sharedShape[0],]+[element.stop for element in solver.gpuBlock]
+    solver.gpuBlock = (slice(0,solver.sharedShape[0],1),)+solver.gpuBlock
+    blockShape =[element.stop for element in solver.gpuBlock]
     blockShape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
     # Creating local GPU array with split
     solver.grid = (int((blockShape[2])/solver.blocksize[0]),int((blockShape[3])/solver.blocksize[1]))   #Grid size
@@ -96,21 +97,21 @@ def createLocalGPUArray(blockShape):
     arr = numpy.ascontiguousarray(arr)
     return arr
 
-def makeEdgeBlocksSwept(cpu_blocks,shared_shape,BS):
+def makeEdgeBlocksSwept(cpuBlocks,sharedShape,blocksize):
     """Use this function to create shift blocks and edge blocks."""
     #This handles edge blocks in the y direction
-    shift = int(BS[1]/2)
+    shift = int(blocksize[1]/2)
     #Creating shift blocks and edges
-    shift_blocks = [(block[0],block[1],slice(block[2].start+shift,block[2].stop+shift,1)) for block in cpu_blocks]
-    for i,block in enumerate(shift_blocks):
-        if block[2].start < 0:
-            new_block = (block[0],block[1],numpy.arange(block[2].start,block[2].stop))
-            shift_blocks[i] = new_block
-        elif block[2].stop > shared_shape[3]:
-            ny = numpy.concatenate((numpy.arange(block[2].start,block[2].stop-shift),numpy.arange(0,shift,1)))
-            new_block = (block[0],block[1],ny)
-            shift_blocks[i] = new_block
-    return shift_blocks
+    shiftBlocks = [(block[0],block[1],block[2],slice(block[3].start+shift,block[3].stop+shift,1)) for block in cpuBlocks]
+    for i,block in enumerate(shiftBlocks):
+        if block[3].start < 0:
+            newBlock = (block[0],block[0],block[2],numpy.arange(block[3].start,block[3].stop))
+            shiftBlocks[i] = newBlock
+        elif block[3].stop > sharedShape[3]:
+            ny = numpy.concatenate((numpy.arange(block[3].start,block[3].stop-shift),numpy.arange(0,shift,1)))
+            newBlock = (block[0],block[1],block[2],ny) #Changed 1 from 0 here, if bug hunting later
+            shiftBlocks[i] = newBlock
+    return shiftBlocks
 
 
 def createUpPyramidSets(blocksize,operating):

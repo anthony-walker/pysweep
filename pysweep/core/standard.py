@@ -83,3 +83,42 @@ def standardBlock(solver):
         sarr[0,:,OPS:-OPS,-OPS:] = arr0[gsc[0],gsc[1],1:OPS+1]
     else:
         gsc = None
+
+
+# FUNCTIONS
+def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
+    """
+    This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
+    arr-the array that will be solved (t,v,x,y)
+    fcn - the function that solves the problem in question
+    OPS -  the number of atomic operations
+    """
+    #Splitting between cpu and gpu
+    if solver.gpuBool:
+        DecompObj(garr)
+        sarr[DecompObj.gwrite]=garr[:,:,OPS:-OPS,OPS:-OPS]
+    else:   #CPUs do this
+        mpi_pool.map(DecompObj,blocks)
+        #Copy result to MPI shared process array
+        sarr[DecompObj.cwrite] = sgs.CPUArray[:,:,OPS:-OPS,OPS:-OPS]
+    DecompObj.gts+=1 #Update global time step
+
+def send_edges(sarr,NMB,GRB,nodeComm,cluster_comm,comranks,ops,garr,DecompObj):
+    """Use this function to communicate data between nodes"""
+    if NMB:
+        sarr[:,:,ops:-ops,:ops] = sarr[:,:,ops:-ops,-2*ops-1:-ops-1]
+        sarr[:,:,ops:-ops,-ops:] = sarr[:,:,ops:-ops,1:ops+1]
+        bufffor = numpy.copy(sarr[:,:,-2*ops-1:-ops-1,:])
+        buffback = numpy.copy(sarr[:,:,ops+1:2*ops+1,:])
+        bufferf = cluster_comm.sendrecv(sendobj=bufffor,dest=comranks[1],source=comranks[0])
+        bufferb = cluster_comm.sendrecv(sendobj=buffback,dest=comranks[0],source=comranks[1])
+        cluster_comm.Barrier()
+        sarr[:,:,:ops,:] = bufferf[:,:,:,:]
+        sarr[:,:,-ops:,:] = bufferb[:,:,:,:]
+    solver.nodeComm.Barrier()
+
+    if solver.gpuBool:
+        garr[:,:,:,:] = sarr[DecompObj.gread]
+    else:
+        sgs.CPUArray[:,:,:,:] = sarr[DecompObj.cread]
+

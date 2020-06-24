@@ -5,7 +5,8 @@ import pysweep.core.sgs as sgs
 import pysweep.core.process as process
 import pysweep.core.functions as functions
 import pysweep.core.block as block
-
+import warnings
+warnings.simplefilter("ignore")
 
 class Solver(object):
     """docstring for Solver."""
@@ -85,18 +86,17 @@ class Solver(object):
 
     def solverCleanUp(self):
         """Use this function to remove unvariables not needed for computation."""
-        if self.clusterMasterBool:
-            del self.gpuRank
-            del self.initialConditions
-            del self.yamlFile
-            del self.yamlFileName
-            del self.rank
-            del self.clusterComm
-            del self.timeSteps
-            # del self.sharedArray #TEMPORARY
-            # del self.blocks #TEMPORARY
-            # del self.edgeblocks #TEMPORARY
-            # print(self.__dict__)
+        # if self.clusterMasterBool:
+        del self.gpuRank
+        del self.initialConditions
+        del self.yamlFile
+        del self.yamlFileName
+        del self.rank
+        del self.timeSteps
+        # del self.sharedArray #TEMPORARY
+        # del self.blocks #TEMPORARY
+        # del self.edgeblocks #TEMPORARY
+        # print(self.__dict__)
 
     def sweptSolve(self):
         """Use this function to begin the simulation."""
@@ -104,7 +104,7 @@ class Solver(object):
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
         self.nodeComm.Barrier()
-        # functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
+        functions.firstForward(self)
         # #Loop variables
         # cwt = 1 #Current write time
         # gts = 0 #Initialization of global time step

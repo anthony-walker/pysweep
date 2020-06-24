@@ -19,7 +19,7 @@ def pseudoGPU(gpuRank,rank):
     if rank < 2:
         return gpuRank
     elif rank < 4:
-        return gpuRank
+        return list() #gpuRank
     elif rank < 6:
          return list()
     elif rank < 8:
@@ -96,7 +96,7 @@ def MinorSplit(solver,nodeInfo,gpuRank):
     #MAY NEED TO ADD IF STATEMENT FOR DECOMP
     for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
         for i in range(intersection,stop,solver.blocksize[0]):
-            currBlock = variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1) #Getting current block
+            currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
             individualBlocks.append(currBlock) #appending to individual blocks
     dividedBlocks = numpy.array_split(individualBlocks,ranksPerNode) #-len(gpuRank) #Potentially add use some nodes for both CPU and GPU
     while len(gpuRank)<len(dividedBlocks):
@@ -147,7 +147,7 @@ def getNeighborRanks(solver,nodeID):
     ranks = [None,]+solver.clusterComm.allgather(solver.rank)
     ranks[0] = ranks[-1] #Set first rank to last rank
     ranks.append(ranks[1]) #Add first rank to end
-    solver.neighbors = (ranks[nodeID-1],ranks[nodeID+1]) #communicating neighbors
+    return (ranks[nodeID-1],ranks[nodeID+1]) #communicating neighbors
 
 def setupCommunicators(solver):
     """Use this function to create MPI communicators for all ranks, node ranks, and cluster ranks
@@ -157,7 +157,7 @@ def setupCommunicators(solver):
     solver.comm = MPI.COMM_WORLD
     solver.rank = solver.comm.Get_rank()  #current rank
     nodeProcessor = MPI.Get_processor_name()
-    nodeProcessor = pseudoCluster(solver.rank) #TEMPORARY
+    # nodeProcessor = pseudoCluster(solver.rank) #TEMPORARY
     processors = list(set(solver.comm.allgather(nodeProcessor))) #temporarily replace processor with hostname to treat vc as different nodes
     processors.sort()
     colors = {proc:i for i,proc in enumerate(processors)}
@@ -189,9 +189,9 @@ def setupMPI(solver):
         #Splitting data across cluster (Major)
         gpuBlock,blocks,gpuRank =  MajorSplit(solver,nodeID)
         #Getting neighboring ranks for communication
-        getNeighborRanks(solver,nodeID) 
+        solver.neighbors = getNeighborRanks(solver,nodeID) 
     else:
-       gpuRank,gpuBlock,solver.globalBlock,blocks,solver.sharedShape = None,None,None,None,None
+       gpuRank,gpuBlock,solver.globalBlock,blocks,solver.sharedShape,solver.neighbors = None,None,None,None,None,None
     #Broadcasting gpu information
     solver.blocks = solver.nodeComm.scatter(blocks)
     solver.gpuRank = solver.nodeComm.scatter(gpuRank)
