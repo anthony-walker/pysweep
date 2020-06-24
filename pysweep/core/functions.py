@@ -2,6 +2,7 @@
 #This file contains all of the necessary functions for implementing the swept rule.
 #------------------------------Decomp Functions----------------------------------
 import numpy
+import pysweep.core.io as io
 
 
 try:
@@ -21,17 +22,16 @@ def FirstPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.Up.blocksize)
+        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.blocksize)
         cuda.memcpy_htod(solver.GPUArray,localGPUArray)
-        solver.Up.callGPU(solver.GPUArray)
-        solver.Yb.callGPU(solver.GPUArray)
+        solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
+        solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
-    solver.Up.callCPU(solver.sharedArray,solver.blocks)
-    solver.Yb.callCPU(solver.sharedArray,solver.edgeblocks)
+    solver.Up.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    solver.Yb.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     #Add to global time step after operations
-    solver.Up.gts+=solver.Up.maxPyramidSteps
-    solver.Yb.gts+=solver.Yb.maxPyramidSteps
-    solver.Yb.start += solver.Yb.maxPyramidSteps #Change starting location for UpPrism
+    solver.globalTimeStep+=solver.maxPyramidSize
+    solver.Yb.start += solver.maxPyramidSize #Change starting location for UpPrism
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
@@ -48,19 +48,17 @@ def UpPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.Up.blocksize)
+        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Oct.shape),solver.gpuBlock,solver.blocksize)
         cuda.memcpy_htod(solver.GPUArray,localGPUArray)  
-        solver.Xb.callGPU(solver.GPUArray)
-        solver.Oct.callGPU(solver.GPUArray)
-        solver.Yb.callGPU(solver.GPUArray)    
+        solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
+        solver.Oct.callGPU(solver.GPUArray,solver.globalTimeStep)
+        solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU  Operations
-    solver.Xb.callCPU(solver.sharedArray,solver.blocks)
-    solver.Oct.callCPU(solver.sharedArray,solver.edgeblocks)
-    solver.Yb.callCPU(solver.sharedArray,solver.blocks)  
+    solver.Xb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    solver.Oct.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
+    solver.Yb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
     #Add to global time step after operations
-    solver.Xb.gts+=solver.maxPyramidSteps
-    solver.Oct.gts+=solver.maxPyramidSteps
-    solver.Yb.gts+=solver.maxPyramidSteps
+    solver.globalTimeStep+=solver.maxPyramidSize
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
@@ -78,13 +76,13 @@ def LastPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.Up.blocksize)
+        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Oct.shape),solver.gpuBlock,solver.blocksize)
         cuda.memcpy_htod(solver.GPUArray,localGPUArray)  
-        solver.Xb.callGPU(solver.GPUArray)
-        solver.Down.callGPU(solver.GPUArray)
+        solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
+        solver.Down.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
-    solver.Xb.callCPU(solver.sharedArray,solver.blocks)
-    solver.Down.callCPU(solver.sharedArray,solver.edgeblocks)
+    solver.Xb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    solver.Down.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
@@ -104,19 +102,19 @@ def firstForward(solver):
     solver.nodeComm.Barrier()
 
 
-def sendForward(solver):
+def sendForward(cwt,solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:
-        cwt = decomp.swept_write(cwt,solver.sharedArray,hdf5_data,gsc,gts,TSO,maxPyramidSteps)
-        buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
-        buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
-        solver.clusterComm.Barrier()
-        solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
-        solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
+        cwt = io.sweptWrite(cwt,solver)
+        # buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
+        # buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
+        # solver.clusterComm.Barrier()
+        # solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
+        # solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
     solver.nodeComm.Barrier()
     return cwt
 
-def sendBackward(solver):
+def sendBackward(cwt,solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:
         buff = numpy.copy(solver.sharedArray[:,:,:solver.splitx,:])
@@ -124,7 +122,7 @@ def sendBackward(solver):
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,:-solver.splitx,:] = solver.sharedArray[:,:,solver.splitx:,:] #Shift solver.sharedArray backward data by solver.splitx
         solver.sharedArray[:,:,-solver.splitx:,:] = buffer[:,:,:,:]
-        cwt = decomp.swept_write(cwt,solver.sharedArray,hdf5_data,gsc,gts,TSO,MPSS)
+        cwt = io.sweptWrite(cwt,solver)
     solver.nodeComm.Barrier()
     return cwt
 

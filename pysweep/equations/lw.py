@@ -35,12 +35,12 @@ dtdy = 0
 gM1 = 0
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,iidx,ts,gts):
+def step(state,iidx,ts,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
     ts - the current time step
-    gts - a step counter that allows implementation of the scheme
+    globalTimeStep - a step counter that allows implementation of the scheme
     """
 
 
@@ -366,12 +366,12 @@ dtdy = 0
 gM1 = 0
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,iidx,ts,gts):
+def step(state,iidx,ts,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
     ts - the current time step
-    gts - a step counter that allows implementation of the scheme
+    globalTimeStep - a step counter that allows implementation of the scheme
     """
     ops=2
     tso = 4

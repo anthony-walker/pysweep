@@ -45,11 +45,8 @@ def getGPUInfo(solver):
     if solver.share>0:  
         lim = ranksPerNode if solver.share==1 else ranksPerNode-1
         gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=lim) #getting devices by load
-        
-        gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
-
+        #gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
         numberOfGPUs = len(gpuRank)
-    
     else:
         gpuRank = []
         numberOfGPUs = 0

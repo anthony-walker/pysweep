@@ -101,7 +101,7 @@ def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
         mpi_pool.map(DecompObj,blocks)
         #Copy result to MPI shared process array
         sarr[DecompObj.cwrite] = sgs.CPUArray[:,:,OPS:-OPS,OPS:-OPS]
-    DecompObj.gts+=1 #Update global time step
+    DecompObj.globalTimeStep+=1 #Update global time step
 
 def send_edges(sarr,NMB,GRB,nodeComm,cluster_comm,comranks,ops,garr,DecompObj):
     """Use this function to communicate data between nodes"""

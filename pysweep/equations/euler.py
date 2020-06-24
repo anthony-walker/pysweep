@@ -35,18 +35,18 @@ dtdy = 0
 gM1 = 0
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,iidx,ts,gts):
+def step(state,iidx,ts,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
     ts - the current time step
-    gts - a step counter that allows implementation of the scheme
+    globalTimeStep - a step counter that allows implementation of the scheme
     """
     half = 0.5
     ops=2
     vs = slice(0,state.shape[1],1)
-    sidx = ts-1 if (gts+1)%2==0 else ts #scheme index
-    coef = 1 if (gts+1)%2==0 else 0.5 #scheme index
+    sidx = ts-1 if (globalTimeStep+1)%2==0 else ts #scheme index
+    coef = 1 if (globalTimeStep+1)%2==0 else 0.5 #scheme index
     #Making pressure vector
     l1,l2 = tuple(zip(*iidx))
     l1 = range(min(l1)-ops,max(l1)+ops+1,1)

@@ -1,10 +1,10 @@
 import sys, os, yaml, numpy, warnings, subprocess, traceback, time,  mpi4py.MPI as MPI
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
-import pysweep.core.sgs as sgs
 import pysweep.core.process as process
 import pysweep.core.functions as functions
 import pysweep.core.block as block
+from itertools import cycle
 import warnings
 warnings.simplefilter("ignore")
 
@@ -12,7 +12,6 @@ class Solver(object):
     """docstring for Solver."""
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
-        sgs.initializeGlobals()
         self.moments = [time.time(),]
         self.initialConditions = initialConditions
         self.arrayShape = numpy.shape(initialConditions)
@@ -101,26 +100,25 @@ class Solver(object):
     def sweptSolve(self):
         """Use this function to begin the simulation."""
         # -------------------------------SWEPT RULE---------------------------------------------#
+        #setting global time step to zero
+        self.globalTimeStep=0
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
         self.nodeComm.Barrier()
         functions.firstForward(self)
-        # #Loop variables
-        # cwt = 1 #Current write time
-        # gts = 0 #Initialization of global time step
-        # del Up #Deleting Up object after FirstPrism
-        # #-------------------------------SWEPT LOOP--------------------------------------------#
-        # step = cycle([functions.send_backward,functions.send_forward])
-        # for i in range(MGST):
-        #     functions.UpPrism(GRB,Xb,Yb,Oct,mpiPool,blocks,sarr,garr,total_cpu_block)
-        #     node_comm.Barrier()
-        #     cwt = next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,gts,TSO,MPSS,total_cpu_block)
-        #     gts+=MPSS
+        #Loop variables
+        cwt = 1 #Current write time
+        del self.Up #Deleting Up object after FirstPrism
+        #-------------------------------SWEPT LOOP--------------------------------------------#
+        step = cycle([functions.sendBackward,functions.sendForward])
+        for i in range(1):#MGST):
+            functions.UpPrism(self)
+            self.nodeComm.Barrier()
+            cwt = next(step)(cwt,self)
         # #Do LastPrism Here then Write all of the remaining data
-        # Down.gts = Oct.gts
-        # functions.LastPrism(GRB,Xb,Down,mpiPool,blocks,sarr,garr,total_cpu_block)
-        # node_comm.Barrier()
-        # next(step)(cwt,sarr,hdf5_data,gsc,NMB,GRB,node_comm,cluster_comm,comranks,SPLITX,gts,TSO,MPSS,total_cpu_block)
+        functions.LastPrism(self)
+        self.nodeComm.Barrier()
+        next(step)(cwt,self)
 
 
     # def standardSolve():

@@ -8,12 +8,12 @@ try:
 except Exception as e:
     pass
 
-def step(state,iidx,ts,gts):
+def step(state,iidx,ts,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
     ts - the current time step
-    gts - a step counter that allows implementation of the scheme
+    globalTimeStep - a step counter that allows implementation of the scheme
     """
     half = 0.5
     TSO = 2
@@ -22,7 +22,7 @@ def step(state,iidx,ts,gts):
         ntidx = (ts+1,vSlice,idx,idy)  #next step index
         cidx = (ts,vSlice,idx,idy)
         pidx = (ts-1,vSlice,idx,idy) #next step index
-        if (gts+1)%TSO==0: #Corrector
+        if (globalTimeStep+1)%TSO==0: #Corrector
             state[ntidx] = (state[pidx])+1
         else: #Predictor
             state[ntidx] = state[cidx]+1

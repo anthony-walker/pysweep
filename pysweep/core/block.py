@@ -2,7 +2,6 @@
 import numpy,mpi4py.MPI as MPI,ctypes,os
 import pysweep.core.geometry as geometry
 import pysweep.core.io as io
-import pysweep.core.sgs as sgs
 from itertools import product
 
 try:
@@ -57,11 +56,11 @@ def setupCPUSwept(solver):
     oct_sets = down_sets+up_sets
     y_sets,x_sets = createBridgeSets(solver.blocksize,solver.operating,solver.maxPyramidSize)
     #Create function objects
-    solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1) 
-    solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
-    solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate,solver.maxPyramidSize,solver.intermediate-1)
+    solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate,solver.intermediate-1) 
+    solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate,solver.intermediate-1)
+    solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate,solver.intermediate-1)
+    solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate,solver.intermediate-1)
+    solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate,solver.intermediate-1)
 
 def setupGPUSwept(solver):
     """Use this function to execute core gpu only processes"""
@@ -84,11 +83,11 @@ def setupGPUSwept(solver):
     io.copySweptConstants(solver.gpu,const_dict) #This copys swept constants not global constants
     solver.cpu.set_globals(solver.gpuBool,*solver.globals,source_mod=solver.gpu)
     # Make GPU geometry
-    solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,solver.grid,solver.maxPyramidSize,blockShape)
-    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,blockShape)
-    solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,blockShape)
-    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,solver.grid,solver.maxPyramidSize,blockShape)
-    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),solver.maxPyramidSize,blockShape)
+    solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,solver.grid,blockShape)
+    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),blockShape)
+    solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),blockShape)
+    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,solver.grid,blockShape)
+    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(solver.grid[0],solver.grid[1]-1),blockShape)
 
 def createLocalGPUArray(blockShape):
     """Use this function to create the local gpu array"""

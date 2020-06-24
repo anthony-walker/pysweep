@@ -122,17 +122,17 @@ def getSolverPrint(solver):
     return returnString
 
 
-def swept_write(cwt,sarr,hdf_data,gsc,gts,TSO,MPSS):
+def sweptWrite(cwt,solver):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
-    i1,i2,i3=gsc #Unpack global tuple
-    for si,i in enumerate(range(gts+1,gts+1+MPSS,1),start=TSO):
-        if i%TSO==0:
-            hdf_data[cwt,i1,i2,i3] = sarr[si,:,:,:]
+    iv,ix,iy = solver.globalBlock #Unpack global tuple
+    for si,i in enumerate(range(solver.globalTimeStep+1,solver.globalTimeStep+1+solver.maxPyramidSize,1),start=solver.intermediate):
+        if i%solver.intermediate==0:
+            solver.data[cwt,iv,ix,iy] = solver.sharedArray[si,:,:,:]
             cwt+=1
-    nte = sarr.shape[0]-MPSS
-    sarr[:nte,:,:,:] = sarr[MPSS:,:,:,:]
-    sarr[nte:,:,:,:] = 0
+    nte = solver.sharedShape[0]-solver.maxPyramidSize
+    solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
+    solver.sharedArray[nte:,:,:,:] = 0
     return cwt
 
 def buildGPUSource(sourcefile):
