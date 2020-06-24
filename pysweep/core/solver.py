@@ -40,7 +40,7 @@ class Solver(object):
         self.createTimeStepData()
         self.moments.append(time.time())
         
-        # #Creating simulatneous input and output file
+        #Creating simulatneous input and output file
         io.verbosePrint(self,'Creating output file...\n')
         io.createOutputFile(self)
         self.moments.append(time.time())
@@ -50,17 +50,16 @@ class Solver(object):
             block.sweptBlock(self)
         else:
             block.standardBlock(self)
-        # sgs.setGlobalModule(self)
-        # self.moments.append(time.time())
-        # #Cleaning up unneeded variables
-        # io.verbosePrint(self,'Cleaning up solver...\n')
-        # self.solverCleanUp()
-        # #Running simulation
-        # io.verbosePrint(self,'Running simulation...\n')
-        # if self.simulation:
-        #     self.sweptSolve()
-        # else:
-        #     self.standardSolve()
+        self.moments.append(time.time())
+        #Cleaning up unneeded variables
+        io.verbosePrint(self,'Cleaning up solver...\n')
+        self.solverCleanUp()
+        #Running simulation
+        io.verbosePrint(self,'Running simulation...\n')
+        if self.simulation:
+            self.sweptSolve()
+        else:
+            self.standardSolve()
         #Process cleanup
         io.verbosePrint(self,'Cleaning up processes...\n')
         process.cleanupProcesses(self,self.moments[start],self.moments[stop])
@@ -92,13 +91,11 @@ class Solver(object):
             del self.yamlFile
             del self.yamlFileName
             del self.rank
-            del self.nodeMaster
-            del self.nodeComm
-            del self.clusterMaster
             del self.clusterComm
-            del self.nodeInfo
             del self.timeSteps
             # del self.sharedArray #TEMPORARY
+            # del self.blocks #TEMPORARY
+            # del self.edgeblocks #TEMPORARY
             # print(self.__dict__)
 
     def sweptSolve(self):
@@ -106,7 +103,7 @@ class Solver(object):
         # -------------------------------SWEPT RULE---------------------------------------------#
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
-        # node_comm.Barrier()
+        self.nodeComm.Barrier()
         # functions.first_forward(NMB,GRB,node_comm,cluster_comm,comranks,sarr,SPLITX,total_cpu_block)
         # #Loop variables
         # cwt = 1 #Current write time

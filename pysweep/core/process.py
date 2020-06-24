@@ -163,10 +163,10 @@ def setupCommunicators(solver):
     colors = {proc:i for i,proc in enumerate(processors)}
     solver.nodeComm =solver.comm.Split(colors[nodeProcessor])
     nodeRanks = solver.nodeComm.allgather(solver.rank) 
-    solver.nodeMaster = nodeRanks[0]
-    solver.nodeMasterBool = solver.rank == solver.nodeMaster
+    nodeMaster = nodeRanks[0]
+    solver.nodeMasterBool = solver.rank == nodeMaster
     #Create cluster comm
-    clusterRanks = list(set(solver.comm.allgather(solver.nodeMaster)))
+    clusterRanks = list(set(solver.comm.allgather(nodeMaster)))
     clusterRanks.sort() #sets are unsorted, so list needs to be sorted
     clusterMaster = clusterRanks[0]
     cluster_group = solver.comm.group.Incl(clusterRanks)
