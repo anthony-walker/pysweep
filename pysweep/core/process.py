@@ -86,16 +86,17 @@ def MinorSplit(solver,nodeInfo,gpuRank):
     """
     ranksPerNode = solver.nodeComm.Get_size() #getting number of ranks per node
     gpuSize, cpuSize = nodeInfo
+    variableSlice = slice(0,solver.arrayShape[0],1)
     start = 0 #Convert to actual array size
     intersection = int(gpuSize*solver.blocksize[0]) #gpu-cpu intersection on a node
     stop = int((gpuSize+cpuSize)*solver.blocksize[0]) #Convert to actual array size
     solver.sharedShape = solver.arrayShape[0],stop,solver.arrayShape[2]
-    gpuBlock = slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) #total GPU slice of shared array
+    gpuBlock = variableSlice,slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) #total GPU slice of shared array
     individualBlocks = list() #For CPU 
     #MAY NEED TO ADD IF STATEMENT FOR DECOMP
     for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
         for i in range(intersection,stop,solver.blocksize[0]):
-            currBlock = slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1) #Getting current block
+            currBlock = variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1) #Getting current block
             individualBlocks.append(currBlock) #appending to individual blocks
     dividedBlocks = numpy.array_split(individualBlocks,ranksPerNode) #-len(gpuRank) #Potentially add use some nodes for both CPU and GPU
     while len(gpuRank)<len(dividedBlocks):
@@ -197,7 +198,8 @@ def setupMPI(solver):
     solver.gpuBlock = solver.nodeComm.bcast(gpuBlock) #total gpu block in shared array
     solver.globalBlock = solver.nodeComm.bcast(solver.globalBlock) #total cpu block in shared array
     solver.sharedShape = solver.nodeComm.bcast(solver.sharedShape) #shape of node shared array
-    solver.gpuBool = True if gpuRank is not None else False
+    solver.gpuBool = True if solver.gpuRank is not None else False
+    
     #----------------------Warning Empty MPI Processes------------------------#
     if len(solver.blocks)==0:
         warnings.warn('rank {} was not given any blocks to solve.'.format(solver.rank))

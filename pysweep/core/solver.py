@@ -41,8 +41,8 @@ class Solver(object):
         self.moments.append(time.time())
         
         # #Creating simulatneous input and output file
-        # io.verbosePrint(self,'Creating output file...\n')
-        # io.createOutputFile(self)
+        io.verbosePrint(self,'Creating output file...\n')
+        io.createOutputFile(self)
         self.moments.append(time.time())
         # Creating shared array
         io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
@@ -63,7 +63,7 @@ class Solver(object):
         #     self.standardSolve()
         #Process cleanup
         io.verbosePrint(self,'Cleaning up processes...\n')
-        # process.cleanupProcesses(self,self.moments[start],self.moments[stop])
+        process.cleanupProcesses(self,self.moments[start],self.moments[stop])
 
     def __str__(self):
         """Use this function to print the object."""
