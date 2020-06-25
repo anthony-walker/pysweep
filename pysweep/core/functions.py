@@ -24,8 +24,8 @@ def FirstPrism(solver):
     if solver.gpuBool:
         localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.blocksize)
         cuda.memcpy_htod(solver.GPUArray,localGPUArray)
-        solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
-        solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
+        # solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
+        # solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     
     #Do CPU Operations
     solver.Up.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
@@ -37,7 +37,7 @@ def FirstPrism(solver):
         cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
         solver.Yb.gfunction = solver.gpu.get_function("YBT") #Change to new ybridge function
-
+        solver.Yb.grid = solver.Up.grid
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
     solver.Yb.start += solver.maxPyramidSize #Change starting location for UpPrism
@@ -50,6 +50,7 @@ def UpPrism(solver):
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
+    
     #Start GPU Operations
     if solver.gpuBool:
         localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Oct.shape),solver.gpuBlock,solver.blocksize)
@@ -66,8 +67,8 @@ def UpPrism(solver):
     if solver.gpuBool:
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
+        solver.debugSimulations(arr=localGPUArray)
         solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
-        solver.Yb.gfunction = solver.gpu.get_function("YBT") #Change to new ybridge function
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
 
@@ -93,7 +94,6 @@ def LastPrism(solver):
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
-        solver.Yb.gfunction = solver.gpu.get_function("YBT") #Change to new ybridge function
 
 
 def firstForward(solver):
@@ -111,11 +111,11 @@ def sendForward(cwt,solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:
         cwt = io.sweptWrite(cwt,solver)
-        # buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
-        # buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
-        # solver.clusterComm.Barrier()
-        # solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
-        # solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
+        buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
+        buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
+        solver.clusterComm.Barrier()
+        solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
+        solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
     solver.nodeComm.Barrier()
     return cwt
 
@@ -128,7 +128,7 @@ def sendBackward(cwt,solver):
         solver.sharedArray[:,:,:-solver.splitx,:] = solver.sharedArray[:,:,solver.splitx:,:] #Shift solver.sharedArray backward data by solver.splitx
         solver.sharedArray[:,:,-solver.splitx:,:] = buffer[:,:,:,:]
         cwt = io.sweptWrite(cwt,solver)
-    solver.nodeComm.Barrier()
+    solver.comm.Barrier()
     return cwt
 
 def getLocalExtendedArray(sharedArray,arr,blocks,blocksize):

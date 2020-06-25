@@ -23,7 +23,7 @@ void getPoint(double * curr_point,double *shared_state, int idx)
 __device__
 void step(double * shared_state, int idx, int globalTimeStep)
 {
-  bool cond = ((globalTimeStep+1)%TSO==0);
+  bool cond = ((globalTimeStep+1)%ITS==0);
   int coeff = cond ? 1 : 0;
 
   double cpoint[NVC];

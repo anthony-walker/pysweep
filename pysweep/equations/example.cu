@@ -15,29 +15,12 @@ __device__
 void getPoint(double * curr_point,double *shared_state, int idx)
 {
     curr_point[0]=shared_state[idx];
-    curr_point[1]=shared_state[idx+VARS];
-    curr_point[2]=shared_state[idx+VARS*2];
-    curr_point[3]=shared_state[idx+VARS*3];
 }
 
 __device__
 void step(double * shared_state, int idx, int globalTimeStep)
 {
-  bool cond = ((globalTimeStep+1)%TSO==0);
-  int coeff = cond ? 1 : 0;
-
   double cpoint[NVC];
   getPoint(cpoint,shared_state,idx);
-//   printf("%f\n",cpoint[0]);
-  double tval[NVC]={0,0,0,0};
-
-   for (int i = 0; i < NVC; i++)
-   {
-       tval[i] = cpoint[i]+1;
-   }
-
-  for (int i = 0; i < NVC; i++)
-  {
-      shared_state[idx+TIMES+i*VARS]=tval[i];
-  }
+  shared_state[idx+TIMES]=5;//cpoint[0]+1;
 }

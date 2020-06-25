@@ -114,6 +114,18 @@ class Solver(object):
         except Exception as e:
             pass
 
+    def debugSimulations(self,arr=None):
+        """Use this function to help debug"""
+        if self.clusterMasterBool: 
+            ci = 0
+            while ci != -1:
+                if arr is None:
+                    print(self.sharedArray[ci,0,:,:])
+                else:
+                    print(arr[ci,0,:,:])
+                ci = int(input())
+        self.comm.Barrier()
+
     def sweptSolve(self):
         """Use this function to begin the simulation."""
         # -------------------------------SWEPT RULE---------------------------------------------#
@@ -121,8 +133,9 @@ class Solver(object):
         self.globalTimeStep=0
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
-        self.nodeComm.Barrier()
+        self.comm.Barrier()
         functions.firstForward(self)
+        self.comm.Barrier()
         #Loop variables
         cwt = 1 #Current write time
         del self.Up #Deleting Up object after FirstPrism
@@ -130,27 +143,29 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
-            self.nodeComm.Barrier()
+            self.comm.Barrier()
             cwt = next(step)(cwt,self)
-        # #Do LastPrism Here then Write all of the remaining data
-        functions.LastPrism(self)
-        self.nodeComm.Barrier()
-        next(step)(cwt,self)
+            
+        # # #Do LastPrism Here then Write all of the remaining data
+        # self.comm.Barrier()
+        # functions.LastPrism(self)
+        # self.comm.Barrier()
+        # next(step)(cwt,self)
 
     # def standardSolve():
     #     # -------------------------------Standard Decomposition---------------------------------------------#
     #     node_comm.Barrier()
     #     cwt = 1
-    #     for i in range(TSO*timeSteps):
+    #     for i in range(ITS*timeSteps):
     #         functions.Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj)
     #         node_comm.Barrier()
     #         #Write data and copy down a step
-    #         if (i+1)%TSO==0 and NMB:
-    #             hdf5_data[cwt,i1,i2,i3] = sarr[TSO,:,OPS:-OPS,OPS:-OPS]
-    #             sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
+    #         if (i+1)%ITS==0 and NMB:
+    #             hdf5_data[cwt,i1,i2,i3] = sarr[ITS,:,OPS:-OPS,OPS:-OPS]
+    #             sarr = numpy.roll(sarr,ITS,axis=0) #Copy down
     #             cwt+=1
     #         elif NMB:
-    #             sarr = numpy.roll(sarr,TSO,axis=0) #Copy down
+    #             sarr = numpy.roll(sarr,ITS,axis=0) #Copy down
     #         node_comm.Barrier()
     #         #Communicate
     #         functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)

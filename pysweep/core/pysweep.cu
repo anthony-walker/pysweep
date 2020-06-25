@@ -16,7 +16,7 @@ __device__ __constant__  int MPSS; //max pyramid swept steps
 __device__ __constant__  int MOSS; //max octahedron swept steps
 __device__ __constant__  int NV; //number of variables
 __device__ __constant__ int OPS; //number of atomic operations
-__device__ __constant__ int TSO; //Time scheme order
+__device__ __constant__ int ITS; //Number of intermediate time steps
 __device__ __constant__ int SX; //Space in x
 __device__ __constant__ int SY; //Space in y
 //GPU Constants
@@ -41,15 +41,27 @@ __device__ int get_idx(int tmod)
 }
 
 /*
+    Use this function to check the value of global constants
+*/
+__device__ void checkConstants()
+{
+    if (threadIdx.x==1 && threadIdx.y==1)
+    {
+        printf("%d,%d,%d,%d,%d,%d,%d,%d,%d\n",NV,SX,SY,VARS,TIMES,ITS,OPS,MPSS,MOSS);
+    }
+}
+
+/*
     Use this function to create and return the GPU UpPyramid
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 UpPyramid(double *state, int globalTimeStep)
 {
-
+    
     //Other quantities for indexing
-    int gid = get_idx(TSO-1); //global index
+    int gid = get_idx(ITS-1); //global index
+
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ly = OPS; // Lower y swept bound
@@ -57,10 +69,10 @@ UpPyramid(double *state, int globalTimeStep)
     int uy = blockDim.y-OPS; //upper y
     //Swept loop
     for (int k = 0; k < MPSS; k++)
-    {
+    {   
         //Putting sweep values into next time step
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
-        {
+        {   
             // Solving step function
             step(state,gid,globalTimeStep);
         }
@@ -84,7 +96,7 @@ __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly redu
 YBridge(double *state, int globalTimeStep)
 {
 
-    int gid = get_idx(TSO-1)+blockDim.x/2; //global index
+    int gid = get_idx(ITS-1)+blockDim.x/2; //global index
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ux = blockDim.x-OPS; //upper x
@@ -119,8 +131,7 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 YBT(double *state, int globalTimeStep)
 {
-    int gid = get_idx(MPSS+1); //global index
-    //globalTimeStep-=1; //Subtract 1 so that TSO works
+    int gid = get_idx(MPSS); //global index
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ux = blockDim.x-OPS; //upper x
@@ -132,7 +143,6 @@ YBT(double *state, int globalTimeStep)
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             step(state,gid,globalTimeStep);
-            // state[gid+TIMES]=3;
         }
         __syncthreads();
         //Updating global time step
@@ -155,7 +165,7 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 XBridge(double *state, int globalTimeStep)
 {
-    int gid = get_idx(TSO-1); //global index
+    int gid = get_idx(ITS-1); //global index
     //Creating swept boundaries
     int ly = OPS; //Lower x swept bound
     int uy = blockDim.y-OPS; //upper x
@@ -187,8 +197,8 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 Octahedron(double *state, int globalTimeStep)
 {
-    int gid = get_idx(TSO-1)-2*SY-OPS+blockDim.y/2; //global index
-    //globalTimeStep-=1; //Subtract 1 so that TSO works
+    int gid = get_idx(ITS-1)+blockDim.y/2-OPS-SY; //global index
+    //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
@@ -253,8 +263,8 @@ DownPyramid(double *state, int globalTimeStep)
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
-    int gid = get_idx(TSO-1)+blockDim.x/2; //global index
-    //globalTimeStep-=1; //Subtract 1 so that TSO works
+    int gid = get_idx(ITS-1)+blockDim.x/2; //global index
+    //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
@@ -303,7 +313,7 @@ __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly redu
 Standard(double *state, int globalTimeStep)
 {
 
-    int gid = get_gid()+(TSO-1)*TIMES; //global index
+    int gid = get_gid()+(ITS-1)*TIMES; //global index
     // Solving step function
     step(state,gid,globalTimeStep);
     // Place values back in original matrix

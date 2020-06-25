@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #This file contains a test step function for debugging the swept rule
 
-import numpy, h5py
+import numpy, h5py, mpi4py.MPI as MPI
 try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
@@ -16,14 +16,14 @@ def step(state,iidx,ts,globalTimeStep):
     globalTimeStep - a step counter that allows implementation of the scheme
     """
     half = 0.5
-    TSO = 2
+    ITS = 2
     vSlice = slice(0,state.shape[1],1)
     for idx,idy in iidx:
         ntidx = (ts+1,vSlice,idx,idy)  #next step index
         cidx = (ts,vSlice,idx,idy)
         pidx = (ts-1,vSlice,idx,idy) #next step index
         state[ntidx] = state[cidx]+1
-        # if (globalTimeStep+1)%TSO==0: #Corrector
+        # if (globalTimeStep+1)%ITS==0: #Corrector
         #     state[ntidx] = (state[pidx])+1
         # else: #Predictor
         #     state[ntidx] = state[cidx]+1
@@ -31,8 +31,9 @@ def step(state,iidx,ts,globalTimeStep):
 
 def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file."""
-    with h5py.File(filename,"w") as f:
-        f.create_dataset("data",(nv,nx,ny),data=numpy.ones((nv,nx,ny)))
+    comm = MPI.COMM_WORLD
+    with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
+        hf.create_dataset("data",(nv,nx,ny),data=numpy.ones((nv,nx,ny)))
     return filename
 
 def set_globals(gpu,*args,source_mod=None):

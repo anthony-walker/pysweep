@@ -364,8 +364,8 @@ if __name__ == "__main__":
             MPSS = 2
             MOSS = 4
             OPS = ops
-            TSO = 2
-            const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+            ITS = 2
+            const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"ITS":ITS,"STS":STS})
 
             #Source Modules
             SM = source.build_gpu_source(os.path.join(path,'euler.h'))
@@ -456,8 +456,8 @@ if __name__ == "__main__":
             MPSS = 2
             MOSS = 4
             OPS = ops
-            TSO = 2
-            const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"TSO":TSO,"STS":STS})
+            ITS = 2
+            const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"ITS":ITS,"STS":STS})
 
             #Source Modules
             SM = source.build_gpu_source(os.path.join(path,'euler.h'))

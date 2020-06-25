@@ -5,7 +5,7 @@
 
   verbose: True
 
-  blocksize: 12
+  blocksize: 8
 
   share: 0.25
 

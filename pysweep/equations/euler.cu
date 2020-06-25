@@ -240,7 +240,7 @@ void step(double *state, int idx, int globalTimeStep)
   get_dfdx(dfdx,state,idx,(SY)); //Need plus 2 ops in actual setting
   get_dfdy(dfdy,state,idx,(1));
   //These variables determine predictor or corrector
-  bool cond = ((globalTimeStep+1)%TSO==0);
+  bool cond = ((globalTimeStep+1)%ITS==0);
   int sidx =  cond ? 1 : 0;
   double coeff = cond ? 1.0 : 0.5; //Corrector step
   // printf("%f\n", coeff);
@@ -270,7 +270,7 @@ void step(double *state, int idx, int globalTimeStep)
 //     get_dfdy(dfdy,shared_state,idx,(1));
 //     // printf("%0.3f,%0.3f,%0.3f,%0.3f\n",dfdx[0],dfdx[1],dfdx[2],dfdx[3]);
 //     //These variables determine predictor or corrector
-//     bool cond = ((globalTimeStep+1)%TSO==0);
+//     bool cond = ((globalTimeStep+1)%ITS==0);
 //     int sidx =  cond ? 1 : 0;
 //     double coeff = cond ? 1.0 : 0.5; //Corrector step
 //     __syncthreads();
