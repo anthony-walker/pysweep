@@ -1,4 +1,4 @@
-import sys, os, yaml, numpy, warnings, subprocess, traceback, time,  mpi4py.MPI as MPI
+import sys, os, yaml, numpy, warnings, subprocess, traceback, time,  mpi4py.MPI as MPI, h5py
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
 import pysweep.core.process as process
@@ -14,15 +14,12 @@ class Solver(object):
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
         self.moments = [time.time(),]
-        self.initialConditions = initialConditions
-        self.arrayShape = numpy.shape(initialConditions)
-
+        self.assignInitialConditions(initialConditions)
 
         if yamlFileName is not None:
             self.yamlFileName = yamlFileName
             #Managing inputs
             io.yamlManager(self)
-            self.initialConditions = self.initialConditions.astype(self.dtype)
         else:
             if sendWarning:
                 warnings.warn('yaml not specified, requires manual input.')
@@ -73,6 +70,17 @@ class Solver(object):
         """Use this function to print the object."""
         return io.getSolverPrint(self)
 
+    def assignInitialConditions(self,initialConditions):
+        """Use this function to optionally assign initial conditions as an hdf5 file."""
+        if type(initialConditions) == str:
+            hf =  h5py.File(initialConditions,"r")#, driver='mpio', comm=self.comm)
+            self.initialConditions = hf.get('data')
+            self.arrayShape = hf.get('data').shape
+            self.hf = hf
+        else:
+            self.initialConditions = initialConditions
+            self.arrayShape = numpy.shape(initialConditions)
+
     def createTimeStepData(self):
         """Use this function to create timestep data."""
         self.timeSteps = int((self.globals[1]-self.globals[0])/self.globals[2])  #Number of time steps
@@ -97,7 +105,11 @@ class Solver(object):
         del self.yamlFileName
         del self.rank
         del self.timeSteps
-        
+        #Close ICS if it is a file.
+        try:
+            self.hf.close()
+        except Exception as e:
+            pass
 
     def sweptSolve(self):
         """Use this function to begin the simulation."""

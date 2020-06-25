@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #This file contains a test step function for debugging the swept rule
 
-import numpy as np
+import numpy, h5py
 try:
     import pycuda.driver as cuda
     from pycuda.compiler import SourceModule
@@ -29,13 +29,19 @@ def step(state,iidx,ts,globalTimeStep):
         #     state[ntidx] = state[cidx]+1
     return state
 
+def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
+    """Use this function to create a set of initial conditions in an hdf5 file."""
+    with h5py.File(filename,"w") as f:
+        f.create_dataset("data",(nv,nx,ny),data=numpy.ones((nv,nx,ny)))
+    return filename
+
 def set_globals(gpu,*args,source_mod=None):
     """Use this function to set cpu global variables"""
     t0,tf,dt,dx,dy = args
     if gpu:
         keys = "DT","DX","DY"
         nargs = args[2:]
-        fc = lambda x:np.float32(x)
+        fc = lambda x:numpy.float32(x)
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
             cuda.memcpy_htod(ckey,fc(nargs[i]))
