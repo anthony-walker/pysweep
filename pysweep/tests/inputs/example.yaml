@@ -3,7 +3,7 @@
 
   filename: "example.hdf5"
 
-  verbose: False
+  verbose: True
 
   blocksize: 12
 

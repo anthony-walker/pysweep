@@ -14,6 +14,7 @@ class Solver(object):
     def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
         self.moments = [time.time(),]
+        process.setupCommunicators(self) #This function creates necessary variables for MPI to use
         self.assignInitialConditions(initialConditions)
 
         if yamlFileName is not None:
@@ -30,7 +31,8 @@ class Solver(object):
         self.moments.append(time.time())
 
         #set up MPI
-        process.setupMPI(self)
+        io.verbosePrint(self,"Setting up processes...\n")
+        process.setupProcesses(self)
         self.moments.append(time.time())
 
         #Creating time step data
@@ -42,6 +44,7 @@ class Solver(object):
         io.verbosePrint(self,'Creating output file...\n')
         io.createOutputFile(self)
         self.moments.append(time.time())
+
         # Creating shared array
         io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
         if self.simulation:
@@ -73,7 +76,7 @@ class Solver(object):
     def assignInitialConditions(self,initialConditions):
         """Use this function to optionally assign initial conditions as an hdf5 file."""
         if type(initialConditions) == str:
-            hf =  h5py.File(initialConditions,"r")#, driver='mpio', comm=self.comm)
+            hf =  h5py.File(initialConditions,"r", driver='mpio', comm=self.comm)
             self.initialConditions = hf.get('data')
             self.arrayShape = hf.get('data').shape
             self.hf = hf

@@ -3,11 +3,11 @@ import pysweep,numpy,sys,os,h5py
 
 path = os.path.dirname(os.path.abspath(__file__))
 
-def testExample(share=1,npx=24,npy=24):
-    filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
+def testExample(share=0.5,npx=24,npy=24):
+    # filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
-    testSolver = pysweep.Solver(filename,yfile)
+    testSolver = pysweep.Solver("exampleConditions.hdf5",yfile)
     testSolver.share = share
     testSolver()
 

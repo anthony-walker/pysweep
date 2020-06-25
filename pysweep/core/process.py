@@ -169,10 +169,7 @@ def setupCommunicators(solver):
     solver.clusterMasterBool = solver.rank == clusterMaster
 
 
-def setupMPI(solver):
-    #-------------MPI SETUP----------------------------#
-    setupCommunicators(solver) #This function creates necessary variables for MPI to use
-    io.verbosePrint(solver,"Setting up MPI...\n")
+def setupProcesses(solver):
     #Assumes all nodes have the same number of cores in CPU
     if solver.nodeMasterBool:
         #Giving each node an id
