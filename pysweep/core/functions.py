@@ -3,14 +3,12 @@
 #------------------------------Decomp Functions----------------------------------
 import numpy
 import pysweep.core.io as io
-
-
+#Try to import pycuda
 try:
     import pycuda.driver as cuda
 except Exception as e:
-    # print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
-    pass
-
+    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+    
 #------------------------------Swept Functions----------------------------------
 
 def FirstPrism(solver):
@@ -22,8 +20,8 @@ def FirstPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.blocksize)
-        cuda.memcpy_htod(solver.GPUArray,localGPUArray)
+        fillLocalExtendedArray(solver.sharedArray,solver.localGPUArray,solver.gpuBlock,solver.blocksize[0])
+        cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)
         solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
@@ -32,8 +30,8 @@ def FirstPrism(solver):
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
-        cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
-        solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
+        cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
+        solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
         solver.Yb.setSweptStep(solver.maxPyramidSize)
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
@@ -50,8 +48,8 @@ def UpPrism(solver):
     
     #Start GPU Operations
     if solver.gpuBool:
-        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Oct.shape),solver.gpuBlock,solver.blocksize)
-        cuda.memcpy_htod(solver.GPUArray,localGPUArray)  
+        fillLocalExtendedArray(solver.sharedArray,solver.localGPUArray,solver.gpuBlock,solver.blocksize[0])
+        cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
         solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Oct.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
@@ -62,8 +60,8 @@ def UpPrism(solver):
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
-        cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
-        solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
+        cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
+        solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
 
@@ -77,8 +75,8 @@ def LastPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Oct.shape),solver.gpuBlock,solver.blocksize)
-        cuda.memcpy_htod(solver.GPUArray,localGPUArray)  
+        fillLocalExtendedArray(solver.sharedArray,solver.localGPUArray,solver.gpuBlock,solver.blocksize[0])
+        cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
         solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Down.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
@@ -87,8 +85,8 @@ def LastPrism(solver):
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
-        cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
-        solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
+        cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
+        solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
 
 def firstForward(solver):
     """Use this function to communicate data between nodes"""
@@ -98,7 +96,7 @@ def firstForward(solver):
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
-    solver.nodeComm.Barrier()
+    solver.comm.Barrier()
 
 
 def sendForward(cwt,solver):
@@ -110,7 +108,7 @@ def sendForward(cwt,solver):
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
-    solver.nodeComm.Barrier()
+    solver.comm.Barrier()
     return cwt
 
 def sendBackward(cwt,solver):
@@ -122,52 +120,60 @@ def sendBackward(cwt,solver):
         solver.sharedArray[:,:,:-solver.splitx,:] = solver.sharedArray[:,:,solver.splitx:,:] #Shift solver.sharedArray backward data by solver.splitx
         solver.sharedArray[:,:,-solver.splitx:,:] = buffer[:,:,:,:]
         cwt = io.sweptWrite(cwt,solver)
-    solver.comm.Barrier()
+    solver.nodeComm.Barrier()
     return cwt
 
-def getLocalExtendedArray(sharedArray,arr,blocks,blocksize):
+def fillLocalExtendedArray(sharedArray,arr,blocks,adjustment):
     """Use this function to copy the shared array to the local array and extend each end by one block."""
     it,iv,ix,iy = blocks
-    arr[:,:,:,blocksize[0]:-blocksize[0]] = sharedArray[:,iv,ix,iy]
-    arr[:,:,:,0:blocksize[0]] = sharedArray[:,iv,ix,-blocksize[0]:]
-    arr[:,:,:,-blocksize[0]:] = sharedArray[:,iv,ix,:blocksize[0]]
-    return arr
+    arr[:,:,:,adjustment:-adjustment] = sharedArray[:,iv,ix,iy]
+    arr[:,:,:,0:adjustment] = sharedArray[:,iv,ix,-adjustment:]
+    arr[:,:,:,-adjustment:] = sharedArray[:,iv,ix,:adjustment]
+
+def fillLocalExtendedArrayStandard(sharedArray,arr,blocks,adjustment):
+    """Use this function to copy the shared array to the local array and extend each end by one block."""
+    it,iv,ix,iy = blocks
+    arr[:,:,adjustment:-adjustment,adjustment:-adjustment] = sharedArray[:,iv,ix,iy]
+    arr[:,:,adjustment:-adjustment,0:adjustment] = sharedArray[:,iv,ix,-adjustment:]
+    arr[:,:,adjustment:-adjustment,-adjustment:] = sharedArray[:,iv,ix,:adjustment]
+    arr[:,:,0:adjustment,adjustment:-adjustment] = sharedArray[:,iv,-adjustment:,iy]
+    arr[:,:,-adjustment:,adjustment:-adjustment] = sharedArray[:,iv,:adjustment,iy]
+
 
 #----------------------------------Standard Functions----------------------------------------------#
-# FUNCTIONS
-def Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj):
+def StandardFunction(solver):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
     arr-the array that will be solved (t,v,x,y)
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    #Splitting between cpu and gpu
+    #Calling Standard GPU
     if solver.gpuBool:
-        DecompObj(garr)
-        sarr[DecompObj.gwrite]=garr[:,:,OPS:-OPS,OPS:-OPS]
-    else:   #CPUs do this
-        mpi_pool.map(DecompObj,blocks)
-        #Copy result to MPI shared process array
-        sarr[DecompObj.cwrite] = sgs.CPUArray[:,:,OPS:-OPS,OPS:-OPS]
-    DecompObj.globalTimeStep+=1 #Update global time step
+        fillLocalExtendedArrayStandard(solver.sharedArray,solver.localGPUArray,solver.gpuBlock,solver.operating)
+        cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
+        solver.standard.callStandardGPU(solver.GPUArray,solver.globalTimeStep)      
+    #Calling standard CPU 
+    solver.standard.callStandardCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    #Clean up GPU processes
+    if solver.gpuBool:
+        cuda.Context.synchronize()
+        cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
+        solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
+    solver.globalTimeStep+=1 #Update global time step
 
-def send_edges(sarr,NMB,GRB,nodeComm,cluster_comm,comranks,ops,garr,DecompObj):
+def sendEdges(solver):
     """Use this function to communicate data between nodes"""
-    if NMB:
-        sarr[:,:,ops:-ops,:ops] = sarr[:,:,ops:-ops,-2*ops-1:-ops-1]
-        sarr[:,:,ops:-ops,-ops:] = sarr[:,:,ops:-ops,1:ops+1]
-        bufffor = numpy.copy(sarr[:,:,-2*ops-1:-ops-1,:])
-        buffback = numpy.copy(sarr[:,:,ops+1:2*ops+1,:])
-        bufferf = cluster_comm.sendrecv(sendobj=bufffor,dest=comranks[1],source=comranks[0])
-        bufferb = cluster_comm.sendrecv(sendobj=buffback,dest=comranks[0],source=comranks[1])
-        cluster_comm.Barrier()
-        sarr[:,:,:ops,:] = bufferf[:,:,:,:]
-        sarr[:,:,-ops:,:] = bufferb[:,:,:,:]
+    ops = solver.operating
+    if solver.nodeMasterBool:
+        solver.sharedArray[:,:,ops:-ops,:ops] = solver.sharedArray[:,:,ops:-ops,-2*ops-1:-ops-1]
+        solver.sharedArray[:,:,ops:-ops,-ops:] = solver.sharedArray[:,:,ops:-ops,1:ops+1]
+        bufffor = numpy.copy(solver.sharedArray[:,:,-2*ops-1:-ops-1,:])
+        buffback = numpy.copy(solver.sharedArray[:,:,ops+1:2*ops+1,:])
+        bufferf = solver.clusterComm.sendrecv(sendobj=bufffor,dest=solver.neighbors[1],source=solver.neighbors[0])
+        bufferb = solver.clusterComm.sendrecv(sendobj=buffback,dest=solver.neighbors[0],source=solver.neighbors[1])
+        solver.clusterComm.Barrier()
+        solver.sharedArray[:,:,:ops,:] = bufferf[:,:,:,:]
+        solver.sharedArray[:,:,-ops:,:] = bufferb[:,:,:,:]
     solver.nodeComm.Barrier()
-
-    if solver.gpuBool:
-        garr[:,:,:,:] = sarr[DecompObj.gread]
-    else:
-        sgs.CPUArray[:,:,:,:] = sarr[DecompObj.cread]
 

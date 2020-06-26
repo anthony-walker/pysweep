@@ -95,9 +95,10 @@ class Solver(object):
             self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
             self.maxOctSize = 2*self.maxPyramidSize
             self.sharedShape = (self.maxOctSize+self.intermediate+1,)+self.sharedShape
+            self.arrayShape = (self.timeSteps,)+self.arrayShape
         else:
             self.sharedShape = (self.intermediate+1,)+self.sharedShape
-        self.arrayShape = (self.timeSteps,)+self.arrayShape
+            self.arrayShape = (self.timeSteps+1,)+self.arrayShape
 
     def solverCleanUp(self):
         """Use this function to remove unvariables not needed for computation."""
@@ -107,7 +108,6 @@ class Solver(object):
         del self.yamlFile
         del self.yamlFileName
         del self.rank
-        del self.timeSteps
         #Close ICS if it is a file.
         try:
             self.hf.close()
@@ -153,20 +153,27 @@ class Solver(object):
         self.comm.Barrier()
         next(step)(cwt,self)
 
-    def standardSolve():
+    def standardSolve(self):
         # -------------------------------Standard Decomposition---------------------------------------------#
-        node_comm.Barrier()
+        #setting global time step to zero
+        self.globalTimeStep=0
+        #Unpacking globalBlock
+        iv,ix,iy = self.globalBlock #Unpack global tuple
+        #Send Boundary points
+        functions.sendEdges(self)
+        self.comm.Barrier() #Ensure all processes are
         cwt = 1
-        for i in range(ITS*timeSteps):
-            functions.Decomposition(GRB,OPS,sarr,garr,blocks,mpi_pool,DecompObj)
-            node_comm.Barrier()
+        for i in range(self.intermediate*self.timeSteps):
+            functions.StandardFunction(self)
+            self.clusterComm.Barrier()
             #Write data and copy down a step
-            if (i+1)%ITS==0 and NMB:
-                hdf5_data[cwt,i1,i2,i3] = sarr[ITS,:,OPS:-OPS,OPS:-OPS]
-                sarr = numpy.roll(sarr,ITS,axis=0) #Copy down
+            if (i+1)%self.intermediate==0 and self.nodeMasterBool:
+                self.data[cwt,iv,ix,iy] = self.sharedArray[self.intermediate,:,self.operating:-self.operating,self.operating:-self.operating]
+                self.sharedArray = numpy.roll(self.sharedArray,self.intermediate,axis=0) #Copy down
                 cwt+=1
-            elif NMB:
-                sarr = numpy.roll(sarr,ITS,axis=0) #Copy down
-            node_comm.Barrier()
+            elif self.nodeMasterBool:
+                self.sharedArray = numpy.roll(self.sharedArray,self.intermediate,axis=0) #Copy down
+            self.clusterComm.Barrier()
             #Communicate
-            functions.send_edges(sarr,NMB,GRB,node_comm,cluster_comm,comranks,OPS,garr,DecompObj)
+            functions.sendEdges(self)
+            self.clusterComm.Barrier()

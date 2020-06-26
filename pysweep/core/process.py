@@ -75,36 +75,32 @@ def getBlockBoundaries(Rows,Devices,nodeID,deviceType,multiplier):
     return getBound(multiplier[nodeID-1]),getBound(multiplier[nodeID])
 
 
-def MinorSplit(solver,nodeInfo,gpuRank):
+def MinorSplit(solver,nodeInfo,gpuRank,adjustment):
     """
         This function splits the total number of blocks up on the node level 
+        args:
+        solver: solver object containing simulation data
+        nodeInfo: information about the nodes starting and stopping points
+        gpuRank: list containing gpu device info
+        adjustment: used to adjust standard solver for boundary condition purposes
 
     """
     ranksPerNode = solver.nodeComm.Get_size() #getting number of ranks per node
     gpuSize, cpuSize = nodeInfo
     variableSlice = slice(0,solver.arrayShape[0],1)
-    start = 0 #Convert to actual array size
-    intersection = int(gpuSize*solver.blocksize[0]) #gpu-cpu intersection on a node
-    stop = int((gpuSize+cpuSize)*solver.blocksize[0]) #Convert to actual array size
+    start = adjustment #Convert to actual array size
+    intersection = int(gpuSize*solver.blocksize[0]+adjustment) #gpu-cpu intersection on a node
+    stop = int((gpuSize+cpuSize)*solver.blocksize[0]+adjustment) #Convert to actual array size
     #Creating shared shape based on swept or not
-    if solver.simulation:
-        solver.sharedShape = solver.arrayShape[0],stop,solver.arrayShape[2] 
-    else: 
-        solver.sharedShape = solver.arrayShape[0],int(stop+2*solver.operating),int(solver.arrayShape[2]+2*solver.operating)
+    solver.sharedShape = solver.arrayShape[0],stop+adjustment,solver.arrayShape[2]+2*adjustment 
     #total GPU slice of shared array
-    gpuBlock = variableSlice,slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) 
+    gpuBlock = variableSlice,slice(start,intersection,1),slice(adjustment,solver.arrayShape[-1]+adjustment,1) 
     individualBlocks = list() #For CPU 
-    #Getting blocks for swept or standard
-    if solver.simulation:
-        for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
-            for i in range(intersection,stop,solver.blocksize[0]):
-                currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
-                individualBlocks.append(currBlock) #appending to individual blocks
-    else:
-        for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
-            for i in range(intersection,stop,solver.blocksize[0]):
-                currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
-                individualBlocks.append(currBlock) #appending to individual blocks
+    #Getting blocks
+    for j in range(adjustment,solver.arrayShape[-1]+adjustment,solver.blocksize[1]): #column for loop
+        for i in range(intersection,stop,solver.blocksize[0]):
+            currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
+            individualBlocks.append(currBlock) #appending to individual blocks
     #Splitting blocks
     dividedBlocks = numpy.array_split(individualBlocks,ranksPerNode) #-len(gpuRank) #Potentially add use some nodes for both CPU and GPU
     while len(gpuRank)<len(dividedBlocks):
@@ -147,7 +143,8 @@ def MajorSplit(solver,nodeID):
     assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
     assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
     #Splitting up blocks at node level and returning results
-    return MinorSplit(solver,nodeInfo,gpuRank) 
+    adjustment = 0 if solver.simulation else solver.operating
+    return MinorSplit(solver,nodeInfo,gpuRank,adjustment) 
 
 def getNeighborRanks(solver,nodeID):
     #Get communicating ranks

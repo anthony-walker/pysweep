@@ -88,4 +88,9 @@ def analytical(npx,npy,t):
     return u
 
 if __name__ == "__main___":
-    uIC = analytical(0.1,0.1,1)
+    dt = 0.1
+    npx = 11
+    npy = 11
+    t = 0
+    uIC = analytical(npx,npy,t)
+    

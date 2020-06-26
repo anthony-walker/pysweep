@@ -36,10 +36,10 @@ def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
         hf.create_dataset("data",(nv,nx,ny),data=numpy.ones((nv,nx,ny)))
     return filename
 
-def set_globals(gpu,*args,source_mod=None):
+def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
     t0,tf,dt,dx,dy = args
-    if gpu:
+    if source_mod is not None:
         keys = "DT","DX","DY"
         nargs = args[2:]
         fc = lambda x:numpy.float32(x)
