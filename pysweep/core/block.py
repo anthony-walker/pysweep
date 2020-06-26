@@ -80,7 +80,7 @@ def setupGPUSwept(solver):
     solver.cpu.set_globals(solver.gpuBool,*solver.globals,source_mod=solver.gpu)
     # Make GPU geometry
     solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,grid,blockShape)
-    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
+    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,grid,blockShape)
     solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
     solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
     solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(grid),blockShape)

@@ -90,7 +90,6 @@ def LastPrism(solver):
         cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
 
-
 def firstForward(solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:

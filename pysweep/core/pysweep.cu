@@ -226,36 +226,34 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
-    //Other quantities for indexing
-    int tidx = threadIdx.x+OPS;
-    int tidy = threadIdx.y+OPS;
-    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
+     int gid = get_idx(sweptStep)-OPS-SY; //global index
     //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
-
     //Creating swept boundaries
     int lx =(blockDim.x+TOPS)/RTWO-OPS; //lower x
     int ly = (blockDim.y+TOPS)/RTWO-OPS; //lower y
     int ux =(blockDim.x+TOPS)/RTWO+OPS; //upper x
     int uy = (blockDim.y+TOPS)/RTWO+OPS; //upper y
-    __syncthreads(); //Sync threads here to ensure all initial values are copied
-    // printf("%d\n",MDSS );
+    //Calculate Down Pyramid - Down Step
     for (int k = 0; k < MDSS; k++)
     {
-        if (tidx<ux && tidx>=lx && tidy<uy && tidy>=ly)
-        {
+      // Solving step function
+      if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
+      {
           step(state,gid,globalTimeStep);
-        }
-        __syncthreads();
-        gid+=TIMES;
-        globalTimeStep += 1;   //Update globalTimeStep
-        //Update swept bounds
-        ux += OPS;
-        uy += OPS;
-        lx -= OPS;
-        ly -= OPS;
+          // state[gid+TIMES]=1;
+      }
+      __syncthreads();
+      //Updating global time step
+      globalTimeStep+=1;
+      gid+=TIMES; //Updating gid so it works for next step
+      //Update swept bounds
+      ux += OPS;
+      uy += OPS;
+      lx -= OPS;
+      ly -= OPS;
     }
 }
 /*

@@ -147,9 +147,9 @@ class Solver(object):
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         self.comm.Barrier()
-        self.debugSimulations()
+        # self.debugSimulations()
         functions.LastPrism(self)
-        self.debugSimulations()
+        # self.debugSimulations()
         self.comm.Barrier()
         next(step)(cwt,self)
 
