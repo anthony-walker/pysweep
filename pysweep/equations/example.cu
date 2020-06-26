@@ -22,5 +22,5 @@ void step(double * shared_state, int idx, int globalTimeStep)
 {
   double cpoint[NVC];
   getPoint(cpoint,shared_state,idx);
-  shared_state[idx+TIMES]=5;//cpoint[0]+1;
+  shared_state[idx+TIMES]=cpoint[0]+1;
 }

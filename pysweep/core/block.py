@@ -82,8 +82,8 @@ def setupGPUSwept(solver):
     solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,grid,blockShape)
     solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
     solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
-    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,grid,blockShape)
-    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
+    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,(grid[0],grid[1]-1),blockShape)
+    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(grid),blockShape)
 
 def createLocalGPUArray(blockShape):
     """Use this function to create the local gpu array"""

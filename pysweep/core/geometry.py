@@ -8,10 +8,15 @@ class Geometry(object):
     def initializeCPU(self,*args):
         """Use this function to initialize CPU arguments."""
         self.cpu,self.sets,self.tso,self.start = args
+        self.sweptStep = numpy.int32(self.tso-1)
 
     def initializeGPU(self,*args):
         """Use this function to initialize GPU arguments."""
         self.gfunction,self.blocksize,self.grid,self.shape = args
+
+    def setSweptStep(self,value):
+        """Use this function to set the swept step."""
+        self.sweptStep = numpy.int32(value)
 
     def callCPU(self,sharedArray,blocks,globalTimeStep):
         """Use this function to build the Up Pyramid."""
@@ -28,7 +33,7 @@ class Geometry(object):
     def callGPU(self,GPUArray,globalTimeStep):
         """Use this function to build the Up Pyramid."""
         #UpPyramid of Swept Step
-        self.gfunction(GPUArray,numpy.int32(globalTimeStep),grid=self.grid, block=self.blocksize)
+        self.gfunction(GPUArray,numpy.int32(globalTimeStep),self.sweptStep,grid=self.grid, block=self.blocksize)
 
 class DecompCPU(object):
     """This class computes the octahedron of the swept rule"""

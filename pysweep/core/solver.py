@@ -145,12 +145,13 @@ class Solver(object):
             functions.UpPrism(self)
             self.comm.Barrier()
             cwt = next(step)(cwt,self)
-            
-        # # #Do LastPrism Here then Write all of the remaining data
-        # self.comm.Barrier()
-        # functions.LastPrism(self)
-        # self.comm.Barrier()
-        # next(step)(cwt,self)
+        #Do LastPrism Here then Write all of the remaining data
+        self.comm.Barrier()
+        self.debugSimulations()
+        functions.LastPrism(self)
+        self.debugSimulations()
+        self.comm.Barrier()
+        next(step)(cwt,self)
 
     # def standardSolve():
     #     # -------------------------------Standard Decomposition---------------------------------------------#

@@ -24,20 +24,17 @@ def FirstPrism(solver):
     if solver.gpuBool:
         localGPUArray = getLocalExtendedArray(solver.sharedArray,numpy.zeros(solver.Up.shape),solver.gpuBlock,solver.blocksize)
         cuda.memcpy_htod(solver.GPUArray,localGPUArray)
-        # solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
-        # solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
-    
+        solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
+        solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
     solver.Up.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
     solver.Yb.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
-    
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
-        solver.Yb.gfunction = solver.gpu.get_function("YBT") #Change to new ybridge function
-        solver.Yb.grid = solver.Up.grid
+        solver.Yb.setSweptStep(solver.maxPyramidSize)
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
     solver.Yb.start += solver.maxPyramidSize #Change starting location for UpPrism
@@ -62,12 +59,10 @@ def UpPrism(solver):
     solver.Xb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
     solver.Oct.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     solver.Yb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
-    
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(localGPUArray,solver.GPUArray)
-        solver.debugSimulations(arr=localGPUArray)
         solver.sharedArray[solver.gpuBlock]=localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize

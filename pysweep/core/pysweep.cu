@@ -56,11 +56,11 @@ __device__ void checkConstants()
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-UpPyramid(double *state, int globalTimeStep)
+UpPyramid(double *state, int globalTimeStep, int sweptStep)
 {
     
     //Other quantities for indexing
-    int gid = get_idx(ITS-1); //global index
+    int gid = get_idx(sweptStep); //global index
 
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
@@ -93,10 +93,10 @@ UpPyramid(double *state, int globalTimeStep)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-YBridge(double *state, int globalTimeStep)
+YBridge(double *state, int globalTimeStep, int sweptStep)
 {
 
-    int gid = get_idx(ITS-1)+blockDim.x/2; //global index
+    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ux = blockDim.x-OPS; //upper x
@@ -129,43 +129,9 @@ YBridge(double *state, int globalTimeStep)
 */
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-YBT(double *state, int globalTimeStep)
+XBridge(double *state, int globalTimeStep, int sweptStep)
 {
-    int gid = get_idx(MPSS); //global index
-    //Creating swept boundaries
-    int lx = OPS; //Lower x swept bound
-    int ux = blockDim.x-OPS; //upper x
-    int ly = blockDim.y/2-OPS; // Lower y swept bound
-    int uy = blockDim.y/2+OPS; //upper y
-    for (int k = 0; k < MPSS; k++)
-    {
-        // Solving step function
-        if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
-        {
-            step(state,gid,globalTimeStep);
-        }
-        __syncthreads();
-        //Updating global time step
-        globalTimeStep+=1;
-        gid+=TIMES; //Updating gid so it works for next step
-        //Update swept bounds
-        lx+=OPS;
-        ux-=OPS;
-        ly-=OPS;
-        uy+=OPS;
-        __syncthreads(); //Sync threads here to ensure all initial values are copied
-    }
-
-}
-
-/*
-    Use this function to create and return the GPU Y-Bridge
-*/
-__global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-XBridge(double *state, int globalTimeStep)
-{
-    int gid = get_idx(ITS-1); //global index
+    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
     //Creating swept boundaries
     int ly = OPS; //Lower x swept bound
     int uy = blockDim.y-OPS; //upper x
@@ -195,9 +161,9 @@ XBridge(double *state, int globalTimeStep)
 
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-Octahedron(double *state, int globalTimeStep)
+Octahedron(double *state, int globalTimeStep, int sweptStep)
 {
-    int gid = get_idx(ITS-1)+blockDim.y/2-OPS-SY; //global index
+    int gid = get_idx(sweptStep)-OPS-SY; //global index
     //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
@@ -258,12 +224,12 @@ Octahedron(double *state, int globalTimeStep)
 
 __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
-DownPyramid(double *state, int globalTimeStep)
+DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
     //Other quantities for indexing
     int tidx = threadIdx.x+OPS;
     int tidy = threadIdx.y+OPS;
-    int gid = get_idx(ITS-1)+blockDim.x/2; //global index
+    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
     //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
