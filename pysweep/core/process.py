@@ -86,14 +86,26 @@ def MinorSplit(solver,nodeInfo,gpuRank):
     start = 0 #Convert to actual array size
     intersection = int(gpuSize*solver.blocksize[0]) #gpu-cpu intersection on a node
     stop = int((gpuSize+cpuSize)*solver.blocksize[0]) #Convert to actual array size
-    solver.sharedShape = solver.arrayShape[0],stop,solver.arrayShape[2]
-    gpuBlock = variableSlice,slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) #total GPU slice of shared array
+    #Creating shared shape based on swept or not
+    if solver.simulation:
+        solver.sharedShape = solver.arrayShape[0],stop,solver.arrayShape[2] 
+    else: 
+        solver.sharedShape = solver.arrayShape[0],int(stop+2*solver.operating),int(solver.arrayShape[2]+2*solver.operating)
+    #total GPU slice of shared array
+    gpuBlock = variableSlice,slice(start,intersection,1),slice(0,solver.arrayShape[-1],1) 
     individualBlocks = list() #For CPU 
-    #MAY NEED TO ADD IF STATEMENT FOR DECOMP
-    for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
-        for i in range(intersection,stop,solver.blocksize[0]):
-            currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
-            individualBlocks.append(currBlock) #appending to individual blocks
+    #Getting blocks for swept or standard
+    if solver.simulation:
+        for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
+            for i in range(intersection,stop,solver.blocksize[0]):
+                currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
+                individualBlocks.append(currBlock) #appending to individual blocks
+    else:
+        for j in range(0,solver.arrayShape[-1],solver.blocksize[1]): #column for loop
+            for i in range(intersection,stop,solver.blocksize[0]):
+                currBlock = (variableSlice,slice(i,i+solver.blocksize[0],1),slice(j,j+solver.blocksize[0],1)) #Getting current block
+                individualBlocks.append(currBlock) #appending to individual blocks
+    #Splitting blocks
     dividedBlocks = numpy.array_split(individualBlocks,ranksPerNode) #-len(gpuRank) #Potentially add use some nodes for both CPU and GPU
     while len(gpuRank)<len(dividedBlocks):
         gpuRank.append(None)

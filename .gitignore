@@ -1,5 +1,6 @@
 #Dont Track These
 former/
+*.yaml
 *.pyc
 *__pycache__/
 *.m
