@@ -227,7 +227,6 @@ def standardBlock(solver):
         solver.cuda_context = cuda_device.make_context()
         setupGPUStandard(solver)
     #Setup CPU
-    if solver.share < 1:
-        setupCPUStandard(solver)
+    setupCPUStandard(solver)
     solver.comm.Barrier()
 

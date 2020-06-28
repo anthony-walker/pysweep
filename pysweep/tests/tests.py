@@ -3,7 +3,8 @@ import pysweep,numpy,sys,os,h5py
 
 path = os.path.dirname(os.path.abspath(__file__))
 
-def testExample(share=1,npx=8,npy=8):
+
+def testExample(share=0,npx=24,npy=24):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
@@ -16,13 +17,12 @@ def testExample(share=1,npx=8,npy=8):
         with h5py.File(testSolver.output,"r") as f:
             data = f["data"]
             for i in range(1,testSolver.arrayShape[0]+1):
-                assert numpy.all(data[i-1,0,:,:]==i)
-                # try:
-                #     assert numpy.all(data[i-1,0,:,:]==i)
-                # except Exception as e:
-                #     print("Simulation failed on index: {}.".format(i))
-                #     print(data[i-1,0,:,:])
-                #     input()
+                try:
+                    assert numpy.all(data[i-1,0,:,:]==i)
+                except Exception as e:
+                    print("Simulation failed on index: {}.".format(i))
+                    print(data[i-1,0,:,:])
+                    input()
 
 def testHeat(share=0.5,npx=16,npy=16):
     filename = pysweep.equations.heat.createInitialConditions(npx,npy)

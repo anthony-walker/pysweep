@@ -61,7 +61,6 @@ def UpPrism(solver):
     if solver.gpuBool:
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
-        solver.debugSimulations(arr=solver.localGPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
