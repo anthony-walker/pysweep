@@ -26,6 +26,7 @@ def FirstPrism(solver):
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
     solver.Up.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Yb.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     #Cleanup GPU Operations
     if solver.gpuBool:
@@ -55,7 +56,9 @@ def UpPrism(solver):
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU  Operations
     solver.Xb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Oct.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
+    solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Yb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
     #Cleanup GPU Operations
     if solver.gpuBool:
@@ -81,6 +84,7 @@ def LastPrism(solver):
         solver.Down.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
     solver.Xb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Down.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     #Cleanup GPU Operations
     if solver.gpuBool:
@@ -96,7 +100,7 @@ def firstForward(solver):
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
-    solver.comm.Barrier()
+    solver.nodeComm.Barrier()
 
 
 def sendForward(cwt,solver):
@@ -108,7 +112,7 @@ def sendForward(cwt,solver):
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
-    solver.comm.Barrier()
+    solver.nodeComm.Barrier()
     return cwt
 
 def sendBackward(cwt,solver):
@@ -120,7 +124,7 @@ def sendBackward(cwt,solver):
         solver.sharedArray[:,:,:-solver.splitx,:] = solver.sharedArray[:,:,solver.splitx:,:] #Shift solver.sharedArray backward data by solver.splitx
         solver.sharedArray[:,:,-solver.splitx:,:] = buffer[:,:,:,:]
         cwt = io.sweptWrite(cwt,solver)
-    solver.comm.Barrier()
+    solver.nodeComm.Barrier()
     return cwt
 
 def fillLocalExtendedArray(solver):

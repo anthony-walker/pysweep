@@ -4,7 +4,7 @@ import pysweep,numpy,sys,os,h5py
 path = os.path.dirname(os.path.abspath(__file__))
 
 
-def testExample(share=0,npx=24,npy=24):
+def testExample(share=0.5,npx=768,npy=768):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
