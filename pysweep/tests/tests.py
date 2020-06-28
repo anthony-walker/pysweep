@@ -10,7 +10,7 @@ def testExample(share=0.5,npx=768,npy=768):
     yfile = os.path.join(yfile,"example.yaml")
     testSolver = pysweep.Solver(filename,yfile)
     testSolver.share = share
-    testSolver.simulation=True
+    testSolver.simulation=False
     testSolver()
 
     if testSolver.clusterMasterBool:

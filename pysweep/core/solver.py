@@ -165,7 +165,7 @@ class Solver(object):
         cwt = 1
         for i in range(self.intermediate*self.timeSteps):
             functions.StandardFunction(self)
-            self.clusterComm.Barrier()
+            self.comm.Barrier()
             #Write data and copy down a step
             if (i+1)%self.intermediate==0 and self.nodeMasterBool:
                 self.data[cwt,iv,ix,iy] = self.sharedArray[self.intermediate,:,self.operating:-self.operating,self.operating:-self.operating]
@@ -173,7 +173,7 @@ class Solver(object):
                 cwt+=1
             elif self.nodeMasterBool:
                 self.sharedArray = numpy.roll(self.sharedArray,self.intermediate,axis=0) #Copy down
-            self.clusterComm.Barrier()
+            self.comm.Barrier()
             #Communicate
             functions.sendEdges(self)
-            self.clusterComm.Barrier()
+            self.comm.Barrier()
