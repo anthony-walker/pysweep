@@ -4,13 +4,13 @@ import pysweep,numpy,sys,os,h5py
 path = os.path.dirname(os.path.abspath(__file__))
 
 
-def testExample(share=0.5,npx=768,npy=768):
+def testExample(share=0,npx=48,npy=48):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
     testSolver = pysweep.Solver(filename,yfile)
     testSolver.share = share
-    testSolver.simulation=False
+    testSolver.simulation=True
     testSolver()
 
     if testSolver.clusterMasterBool:

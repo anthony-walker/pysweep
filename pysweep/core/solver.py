@@ -157,23 +157,13 @@ class Solver(object):
         # -------------------------------Standard Decomposition---------------------------------------------#
         #setting global time step to zero
         self.globalTimeStep=0
-        #Unpacking globalBlock
-        iv,ix,iy = self.globalBlock #Unpack global tuple
         #Send Boundary points
         functions.sendEdges(self)
         self.comm.Barrier() #Ensure all processes are
         cwt = 1
         for i in range(self.intermediate*self.timeSteps):
             functions.StandardFunction(self)
-            self.comm.Barrier()
-            #Write data and copy down a step
-            if (i+1)%self.intermediate==0 and self.nodeMasterBool:
-                self.data[cwt,iv,ix,iy] = self.sharedArray[self.intermediate,:,self.operating:-self.operating,self.operating:-self.operating]
-                self.sharedArray = numpy.roll(self.sharedArray,self.intermediate,axis=0) #Copy down
-                cwt+=1
-            elif self.nodeMasterBool:
-                self.sharedArray = numpy.roll(self.sharedArray,self.intermediate,axis=0) #Copy down
-            self.comm.Barrier()
+            cwt = io.standardWrite(cwt,self)
             #Communicate
             functions.sendEdges(self)
             self.comm.Barrier()
