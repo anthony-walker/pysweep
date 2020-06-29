@@ -72,6 +72,11 @@ def yamlManager(solver):
     solver.cpu  = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(solver.cpu)
 
+def loadCPUModule(solver):
+    """Use this function to set the cpu module externally."""
+    spec = importlib.util.spec_from_file_location("module.step", solver.cpu)
+    solver.cpu  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(solver.cpu)
 
 def createOutputFile(solver):
     """Use this function to create output file which will act as the input file as well."""

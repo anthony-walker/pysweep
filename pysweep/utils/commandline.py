@@ -28,6 +28,7 @@ def commandLine():
     parser.add_argument("-n","--processes",nargs="?",type=int,help="This is the number of processes to execute.")
     parser.add_argument("--hostfile",nargs="?",type=str,help="This is a file containing hosts to run on.")
     parser.add_argument("-y","--yaml",nargs="?",choices=fmap,type=str,help="This generates a yaml file based on the provided equation packages.")
+    
     args = parser.parse_args()
     
     if args.filename is not None and args.processes is not None: #Executing simulation
@@ -35,3 +36,8 @@ def commandLine():
     
     if args.yaml is not None: #Generating yaml
         pysweep.generateInputFile(args.yaml)
+    
+    #MPIEXEC ENTRY
+    # comm = MPI.COMM_SELF.Spawn("/home/anthony-walker/miniconda3/envs/pysweep-dev/bin/pysweep",
+    #                        args=["-h",],
+    #                        maxprocs=2)
