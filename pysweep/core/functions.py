@@ -21,6 +21,7 @@ def FirstPrism(solver):
     #Start GPU Operations
     if solver.gpuBool:
         fillLocalExtendedArray(solver)
+        solver.debugSimulations(arr=solver.localGPUArray)
         cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)
         solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
