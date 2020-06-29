@@ -8,18 +8,17 @@ from itertools import cycle
 
 class Solver(object):
     """docstring for Solver."""
-    def __init__(self, initialConditions=None, yamlFileName=None,sendWarning=True):
+    def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
         self.moments = [time.time(),]
         process.setupCommunicators(self) #This function creates necessary variables for MPI to use
-        
+        self.assignInitialConditions(initialConditions)
+
         if yamlFileName is not None:
             self.yamlFileName = yamlFileName
-            self.assignInitialConditions(initialConditions)
             #Managing inputs
             io.yamlManager(self)
         else:
-            self.yamlFileName = yamlFileName
             if sendWarning:
                 warnings.warn('yaml not specified, requires manual input.')
 
@@ -67,7 +66,6 @@ class Solver(object):
         process.cleanupProcesses(self,self.moments[start],self.moments[stop])
         io.verbosePrint(self,'Done in {} seconds...\n'.format(self.moments[-1]-self.moments[0]))
 
-
     def __str__(self):
         """Use this function to print the object."""
         return io.getSolverPrint(self)
@@ -104,11 +102,11 @@ class Solver(object):
         # if self.clusterMasterBool:
         del self.gpuRank
         del self.initialConditions
+        del self.yamlFile
         del self.yamlFileName
         del self.rank
         #Close ICS if it is a file.
         try:
-            del self.yamlFile
             self.hf.close()
         except Exception as e:
             pass
@@ -146,7 +144,9 @@ class Solver(object):
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         self.comm.Barrier()
+        # self.debugSimulations()
         functions.LastPrism(self)
+        # self.debugSimulations()
         self.comm.Barrier()
         next(step)(cwt,self)
 

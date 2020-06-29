@@ -85,6 +85,28 @@ def testExample(*args,**kwargs):
 def testGPUProcessDestruction():
     """Use this function to check that node processes will be destroyed if GPUs' are not available."""
 
+def testSimple(share=1,npx=384,npy=384):
+    filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
+    yfile = os.path.join(path,"inputs")
+    yfile = os.path.join(yfile,"example.yaml")
+    testSolver = pysweep.Solver(filename,yfile)
+    testSolver.share = share
+    testSolver.simulation=True
+    testSolver()
+
+    if testSolver.clusterMasterBool:
+        with h5py.File(testSolver.output,"r") as f:
+            data = f["data"]
+            for i in range(1,testSolver.arrayShape[0]+1):
+                try:
+                    assert numpy.all(data[i-1,0,:,:]==i)
+                except Exception as e:
+                    print("Simulation failed on index: {}.".format(i))
+                    print(data[i-1,0,:,:])
+                    input()
+
+
+
 def testHeat(share=0.5,npx=16,npy=16):
     filename = pysweep.equations.heat.createInitialConditions(npx,npy)
     yfile = os.path.join(path,"inputs")

@@ -1,4 +1,4 @@
-import numpy,time, warnings, mpi4py.MPI as MPI
+import numpy,time, warnings, mpi4py.MPI as MPI,traceback
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
 
@@ -141,7 +141,13 @@ def MajorSplit(solver,nodeID):
     assert totalGPUs <= solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
     assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
     assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
-    assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
+    try:
+        assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
+    except Exception as e:
+        if solver.nodeMasterBool:
+            tb = traceback.format_exc()
+            addOn = "There are more processes than GPUs with a share of 1, {} processes will not contribute to the computation.".format(solver.nodeComm.Get_size()-totalGPUs)
+            warnings.warn(tb+addOn)
     #Splitting up blocks at node level and returning results
     adjustment = 0 if solver.simulation else solver.operating
     return MinorSplit(solver,nodeInfo,gpuRank,adjustment) 
@@ -202,5 +208,5 @@ def setupProcesses(solver):
     solver.gpuBool = True if solver.gpuRank is not None else False
     
     #----------------------Warning Empty MPI Processes------------------------#
-    if len(solver.blocks)==0:
-        warnings.warn('rank {} was not given any blocks to solve.'.format(solver.rank))
+    if len(solver.blocks)==0 and not solver.gpuBool:
+        warnings.warn('rank {} was not given any CPU blocks to solve and does not have any GPUs available.'.format(solver.rank))
