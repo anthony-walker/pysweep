@@ -73,6 +73,7 @@ def setupCPUSwept(solver):
 def setupGPUSwept(solver):
     """Use this function to execute core gpu only processes"""
     solver.gpuBlock = (slice(0,solver.sharedShape[0],1),)+solver.gpuBlock
+    # solver.gpuReadBlock = solver.gpuBlock[:2]+tuple([slice(cs.start-solver.blocksize,cs.stop+solver.blocksize[0],1) for cs in solver.gpuBlock[2:]])
     blockShape =[element.stop for element in solver.gpuBlock]
     blockShape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
     # Creating local GPU array with split
@@ -191,6 +192,7 @@ def setupGPUStandard(solver):
     """Use this function to execute core gpu only processes"""
     #Correct GPU block
     solver.gpuBlock = (slice(0,solver.sharedShape[0],1),)+solver.gpuBlock
+    solver.gpuReadBlock = solver.gpuBlock[:2]+tuple([slice(cs.start-solver.operating,cs.stop+solver.operating,1) for cs in solver.gpuBlock[2:]])
     blockShape =[element.stop-element.start for element in solver.gpuBlock]
     blockShape[-1] += int(2*solver.operating) #Adding 2 blocks in the column direction
     blockShape[-2] += int(2*solver.operating) #Adding 2 blocks in the column direction

@@ -135,16 +135,6 @@ def fillLocalExtendedArray(solver):
     solver.localGPUArray[:,:,:,0:adj] = solver.sharedArray[:,iv,ix,-adj:]
     solver.localGPUArray[:,:,:,-adj:] = solver.sharedArray[:,iv,ix,:adj]
 
-def fillLocalExtendedArrayStandard(sharedArray,arr,blocks,adjustment):
-    """Use this function to copy the shared array to the local array and extend each end by one block."""
-    it,iv,ix,iy = blocks
-    arr[:,:,adjustment:-adjustment,adjustment:-adjustment] = sharedArray[:,iv,ix,iy]
-    arr[:,:,adjustment:-adjustment,0:adjustment] = sharedArray[:,iv,ix,-adjustment:]
-    arr[:,:,adjustment:-adjustment,-adjustment:] = sharedArray[:,iv,ix,:adjustment]
-    arr[:,:,0:adjustment,adjustment:-adjustment] = sharedArray[:,iv,-adjustment:,iy]
-    arr[:,:,-adjustment:,adjustment:-adjustment] = sharedArray[:,iv,:adjustment,iy]
-
-
 #----------------------------------Standard Functions----------------------------------------------#
 def StandardFunction(solver):
     """
@@ -155,7 +145,7 @@ def StandardFunction(solver):
     """
     #Calling Standard GPU
     if solver.gpuBool:
-        fillLocalExtendedArrayStandard(solver.sharedArray,solver.localGPUArray,solver.gpuBlock,solver.operating)
+        solver.localGPUArray[:,:,:,:] = solver.sharedArray[solver.gpuReadBlock]
         cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
         solver.standard.callStandardGPU(solver.GPUArray,solver.globalTimeStep)      
     #Calling standard CPU 
@@ -171,10 +161,10 @@ def sendEdges(solver):
     """Use this function to communicate data between nodes"""
     ops = solver.operating
     if solver.nodeMasterBool:
-        solver.sharedArray[:,:,ops:-ops,:ops] = solver.sharedArray[:,:,ops:-ops,-2*ops-1:-ops-1]
-        solver.sharedArray[:,:,ops:-ops,-ops:] = solver.sharedArray[:,:,ops:-ops,1:ops+1]
-        bufffor = numpy.copy(solver.sharedArray[:,:,-2*ops-1:-ops-1,:])
-        buffback = numpy.copy(solver.sharedArray[:,:,ops+1:2*ops+1,:])
+        solver.sharedArray[:,:,ops:-ops,:ops] = solver.sharedArray[:,:,ops:-ops,-2*ops:-ops] #Copy y boundaries
+        solver.sharedArray[:,:,ops:-ops,-ops:] = solver.sharedArray[:,:,ops:-ops,ops:2*ops]
+        bufffor = numpy.copy(solver.sharedArray[:,:,-2*ops:-ops,:])
+        buffback = numpy.copy(solver.sharedArray[:,:,ops:2*ops,:])
         bufferf = solver.clusterComm.sendrecv(sendobj=bufffor,dest=solver.neighbors[1],source=solver.neighbors[0])
         bufferb = solver.clusterComm.sendrecv(sendobj=buffback,dest=solver.neighbors[0],source=solver.neighbors[1])
         solver.clusterComm.Barrier()

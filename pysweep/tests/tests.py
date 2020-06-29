@@ -99,7 +99,7 @@ def testSimple(share=0.5,npx=384,npy=384):
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
 
-def testChecker(share=0.5,npx=384,npy=384):
+def testChecker(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"checker.yaml")
@@ -127,7 +127,7 @@ def testChecker(share=0.5,npx=384,npy=384):
                         assert numpy.all(data[i,0,:,:]==pattern2)
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
-                    # print(data[i,0,:,:])
+                    print(data[i,0,:,:])
                     input()
 
 def testHeat(share=0.5,npx=16,npy=16):

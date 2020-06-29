@@ -49,6 +49,5 @@ class Geometry(object):
         for block in blocks:
             writeblock,readblock = block
             CPUArray = numpy.copy(sharedArray[readblock])
-            #Calculating Step
             CPUArray = self.cpu.step(CPUArray,self.sets,self.start,globalTimeStep)
             sharedArray[writeblock] = CPUArray[:,:,self.adj:-self.adj,self.adj:-self.adj]
