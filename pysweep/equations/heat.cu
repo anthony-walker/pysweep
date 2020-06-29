@@ -28,7 +28,7 @@ __device__ void forwardEuler(double * shared_state, int idx, int globalTimeStep)
 {
   double cpoint[NVC];
   getPoint(cpoint,shared_state,idx);
-  shared_state[idx+TIMES]=shared_state[idx+TIMES]+ALPHA*DT*centralDifference(shared_state,idx);
+  shared_state[idx+TIMES]=shared_state[idx]+ALPHA*DT*centralDifference(shared_state,idx);
 }
 
 

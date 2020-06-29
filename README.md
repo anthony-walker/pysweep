@@ -132,7 +132,7 @@ The main entry point for the code is a script paired with an input yaml file. St
     - 0.1
   intermediate_steps: 1
   operating_points: 1
-  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/example.py
+  cpu: ./pysweep-git/pysweep/equations/example.py
   gpu: ./pysweep-git/pysweep/equations/example.cu
 ```
 

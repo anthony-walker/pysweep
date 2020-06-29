@@ -1,5 +1,10 @@
 
-import numpy, h5py, mpi4py.MPI as MPI
+import numpy, h5py 
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from mpl_toolkits import mplot3d
+from matplotlib import animation, rc
+# import mpi4py.MPI as MPI
 try:
     import pycuda.driver as cuda
 except Exception as e:
@@ -22,7 +27,7 @@ def step(state,iidx,ts,globalTimeStep):
 
 def set_globals(gpu,*args,source_mod=None):
     """Use this function to set cpu global variables"""
-    global dt,dx,dy,alpha,scheme
+    global dt,dx,dy,alpha,scheme #true for FE
     t0,tf,dt,dx,dy,alpha,scheme = args
     if gpu:
         keys = "DT","DX","DY","ALPHA"
@@ -49,8 +54,9 @@ def rungeKutta2(state,iidx,ts,globalTimeStep):
 
 def centralDifference(state,ts,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""
-    secondDerivativeX = (state[ts,0,idx+1,idy]-2*state[ts,0,idx,idy]+state[ts,0,idx-1,idy])/(dx*dx)
-    secondDerivativeY = (state[ts,0,idx,idy+1]-2*state[ts,0,idx,idy]+state[ts,0,idx,idy-1])/(dy*dy)
+    nt,nv,nx,ny = state.shape
+    secondDerivativeX = (state[ts,0,(idx+1)%nx,idy]-2*state[ts,0,idx,idy]+state[ts,0,(idx-1)%nx,idy])/(dx*dx)
+    secondDerivativeY = (state[ts,0,idx,(idy+1)%ny]-2*state[ts,0,idx,idy]+state[ts,0,idx,(idy-1)%ny])/(dy*dy)
     return secondDerivativeX,secondDerivativeY
 
 def createInitialConditions(npx,npy,t=0,filename="heatConditions.hdf5"):
@@ -75,8 +81,8 @@ def analytical(npx,npy,t):
     npy: number of points in y
     t: time of interest
     """
-    X = numpy.linspace(0,1,npx)
-    Y = numpy.linspace(0,1,npy)
+    X = numpy.linspace(0,1,npx,endpoint=False)
+    Y = numpy.linspace(0,1,npy,endpoint=False)
     uShape = (1,numpy.shape(X)[0],numpy.shape(Y)[0])
     u = numpy.zeros(uShape)
     pi = numpy.pi
@@ -85,12 +91,59 @@ def analytical(npx,npy,t):
     for i,x in enumerate(X):
         for j,y in enumerate(Y):
             u[0,i,j] = numpy.sin(m*pi*x)*numpy.sin(n*pi*y)*numpy.exp(-(m^2+n^2)*t)
-    return u
+    return u,X,Y
 
-if __name__ == "__main___":
+class HeatGIF(object):
+    
+    def __init__(self):
+        super(HeatGIF,self).__init__()
+        self.cT = []
+
+    def appendTemp(self,T):
+        self.cT.append(T)
+
+    def setXY(self,X,Y):
+        """Use this function to set X and Y."""
+        self.X = X
+        self.Y = Y
+    
+    def makeGif(self):
+        fig =  plt.figure()
+        ax = plt.axes(projection='3d')
+        ax.view_init(elev=45, azim=25)
+        ax.set_ylim(numpy.amin(self.Y), numpy.amax(self.Y))
+        ax.set_ylim(numpy.amin(self.Y), numpy.amax(self.Y))
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=numpy.linspace(-1,1,10))
+        animate = lambda i: ax.plot_surface(self.X,self.Y,self.cT[i],cmap=cm.inferno)
+        frames = len(self.cT)
+        anim = animation.FuncAnimation(fig,animate,frames)
+        anim.save("heat.gif",writer="imagemagick")
+
+if __name__ == "__main__":
+    alpha = 1 #0.00016563 #Of pure silver
     dt = 0.1
     npx = 11
     npy = 11
-    t = 0
-    uIC = analytical(npx,npy,t)
-    
+    t0 = 0
+    tf = 10
+    uIC,X,Y = analytical(npx,npy,t0)
+    dx = X[1]-X[0]
+    dy = Y[1]-Y[0]
+    globs = t0,tf,dt,
+    set_globals(False,t0,tf,dt,dx,dy,alpha,True)
+    U = numpy.zeros((2,)+uIC.shape)
+    U[0,:,:,:] = uIC[:,:,:]
+    idxs = numpy.ndindex((npx,npy))
+    X, Y = numpy.meshgrid(X, Y)
+    hgf = HeatGIF()
+    hgf.setXY(X,Y)
+    for i,time in enumerate(numpy.arange(t0,tf,dt)):
+        U = step(U,idxs,0,i)
+        uA,_,__ = analytical(npx,npy,time)
+        # print(U[1]-U[0])
+        U[0] = U[1]
+        hgf.appendTemp(uA[0])
+    hgf.makeGif()

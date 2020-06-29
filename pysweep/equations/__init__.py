@@ -1,1 +1,1 @@
-from pysweep.equations import example, euler, heat
+from pysweep.equations import example, euler, heat,checker

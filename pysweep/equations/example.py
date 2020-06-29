@@ -31,6 +31,7 @@ def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
 
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
+    global dt,dx,dy,scheme #true for one step
     t0,tf,dt,dx,dy = args
     if source_mod is not None:
         keys = "DT","DX","DY"
@@ -39,8 +40,3 @@ def set_globals(*args,source_mod=None):
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
             cuda.memcpy_htod(ckey,fc(nargs[i]))
-    else:
-        global dtdx
-        dtdx = dt/dx
-        global dtdy
-        dtdy = dt/dy

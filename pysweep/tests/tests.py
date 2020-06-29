@@ -81,10 +81,6 @@ def testExample(*args,**kwargs):
         input()
     solver.comm.Barrier()
 
-
-def testGPUProcessDestruction():
-    """Use this function to check that node processes will be destroyed if GPUs' are not available."""
-
 def testSimple(share=0.5,npx=384,npy=384):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
@@ -102,10 +98,37 @@ def testSimple(share=0.5,npx=384,npy=384):
                     assert numpy.all(data[i-1,0,:,:]==i)
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
-                    print(data[i-1,0,:,:])
+
+def testChecker(share=0.5,npx=384,npy=384):
+    filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)
+    yfile = os.path.join(path,"inputs")
+    yfile = os.path.join(yfile,"checker.yaml")
+    testSolver = pysweep.Solver(filename,yfile)
+    testSolver()
+    if testSolver.clusterMasterBool:
+        with h5py.File(testSolver.output,"r") as f:
+            data = f["data"]
+            nt,nv,nx,ny = numpy.shape(data)
+            pattern1 = numpy.zeros((nx,ny))
+            pattern2 = numpy.zeros((nx,ny))
+            for i in range(0,nx,2):
+                for j in range(0,ny,2):
+                    pattern1[i,j]=1
+                    pattern2[i+1,j]=1
+            for i in range(1,nx,2):
+                for j in range(1,ny,2):
+                    pattern1[i,j]=1
+                    pattern2[i-1,j]=1
+            for i in range(0,testSolver.arrayShape[0]):
+                try:
+                    if i%2==0:
+                        assert numpy.all(data[i,0,:,:]==pattern1)
+                    else:
+                        assert numpy.all(data[i,0,:,:]==pattern2)
+                except Exception as e:
+                    print("Simulation failed on index: {}.".format(i))
+                    # print(data[i,0,:,:])
                     input()
-
-
 
 def testHeat(share=0.5,npx=16,npy=16):
     filename = pysweep.equations.heat.createInitialConditions(npx,npy)
