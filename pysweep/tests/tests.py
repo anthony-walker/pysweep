@@ -85,7 +85,7 @@ def testExample(*args,**kwargs):
 def testGPUProcessDestruction():
     """Use this function to check that node processes will be destroyed if GPUs' are not available."""
 
-def testSimple(share=1,npx=384,npy=384):
+def testSimple(share=0.5,npx=384,npy=384):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")

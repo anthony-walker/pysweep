@@ -5,11 +5,7 @@
 __device__ __constant__  double DX;
 __device__ __constant__  double DY;
 __device__ __constant__  double DT;
-__device__ __constant__ double DTDX;
-__device__ __constant__ double DTDY;
-__device__ __constant__ double GAMMA; //Gamma
-__device__ __constant__ double GAM_M1;
-__device__ __constant__ const int NVC=4; //Number of variables
+__device__ __constant__ const int NVC=1; //Number of variables
 
 __device__
 void getPoint(double * curr_point,double *shared_state, int idx)

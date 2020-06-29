@@ -41,42 +41,146 @@ python setup.py build
 python setup.py install
 ```
 
-<!--
+
 # Constraints
 - The grid used is uniform and rectangular.
-- block_size should be (2^n,2^n,1) and constrained by your GPU. Note the block_size should have the same x and y dimension.
+- block_size should be 2^n and constrained by your GPU. It is also constrained by the relation mod(b,2*k)==0.
 - A total of three functions must be named accordingly and take specific arguments.
 - This code is currently limited to periodic boundary conditions
 
+
+The first two functions are python functions, a `step` function and a `set_globals` function. These functions will be used as they are named to take a step and to set global variables for the simulation; simple examples are provided below.
+
+```python
+
+#Step function in example.py
+
+def step(state,iidx,arrayTimeIdx,globalTimeStep):
+    """This is the method that will be called by the swept solver.
+    state - 4D numpy array(t,v,x,y (v is variables length))
+    iidx -  an iterable of indexs
+    arrayTimeIdx - index to be used to update the state array appropriately
+    globalTimeStep - a step counter that allows implementation of the scheme
+    """
+    vSlice = slice(0,state.shape[1],1)
+    for idx,idy in iidx:
+        ntidx = (ts+1,vSlice,idx,idy)  #next step index
+        cidx = (ts,vSlice,idx,idy)
+        state[ntidx] = state[cidx]+1
+    return state
+
+```
+
+```python
+#set_globals in example.py
+
+def set(state,iidx,arrayTimeIdx,globalTimeStep):
+    """This is the method that will be called by the swept solver.
+    state - 4D numpy array(t,v,x,y (v is variables length))
+    iidx -  an iterable of indexs
+    arrayTimeIdx - index to be used to update the state array appropriately
+    globalTimeStep - a step counter that allows implementation of the scheme
+    """
+    vSlice = slice(0,state.shape[1],1)
+    for idx,idy in iidx:
+        ntidx = (ts+1,vSlice,idx,idy)  #next step index
+        cidx = (ts,vSlice,idx,idy)
+        state[ntidx] = state[cidx]+1
+    return state
+```
+
+The final function is a CUDA function for the GPU.
+```cpp
+//code in example.cu
+__device__ __constant__  double DX;
+__device__ __constant__  double DY;
+__device__ __constant__  double DT;
+__device__ __constant__ const int NVC=1; //Number of variables
+
+__device__
+void getPoint(double * curr_point,double *shared_state, int idx)
+{
+    curr_point[0]=shared_state[idx];
+}
+
+__device__
+void step(double * shared_state, int idx, int globalTimeStep)
+{
+  double cpoint[NVC];
+  getPoint(cpoint,shared_state,idx);
+  shared_state[idx+TIMES]=cpoint[0]+1;
+}
+
+```
+
+# Usage of the code
+
+The main entry point for the code is a script paired with an input yaml file. Staying with the current example, `example.yaml` could look like this
+
+```yaml
+  swept: True
+  filename: "example.hdf5"
+  verbose: True
+  blocksize: 8
+  share: 0.5
+  dtype: float64
+  globals:
+    - 0
+    - 10
+    - 0.1
+    - 0.1
+    - 0.1
+  intermediate_steps: 1
+  operating_points: 1
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/example.py
+  gpu: ./pysweep-git/pysweep/equations/example.cu
+```
+
+The associated script portion would look like
+```python
+    filename = pysweep.equations.example.createInitialConditions(1,384,384)
+    yfile = os.path.join(path,"inputs")
+    yfile = os.path.join(yfile,"example.yaml")
+    testSolver = pysweep.Solver(filename,yfile)
+    testSolver.simulation=True
+    testSolver()
+```
+
+The output of calling the solver object will look something like this
+
+```shell
+Setting up processes...
+
+Creating time step data...
+
+Creating output file...
+
+Creating shared memory arrays and process functions...
+
+Cleaning up solver...
+
+Running simulation...
+
+Pysweep simulation properties:
+	simulation type: swept
+	number of processes: 2
+	gpu source: ./pysweep-git/pysweep/equations/example.cu
+	cpu source: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/example.py
+	output file: example.hdf5
+	verbose: True
+	Array shape: (103, 1, 384, 384)
+	dtype: float64
+	share: 0.5
+	blocksize: 8
+	stencil size: 3
+	intermediate time steps: 1
+	time data (t0,tf,dt): (0,10,0.1)
+
+Cleaning up processes...
+
+Done in 7.3623316287994385 seconds...
+```
+
 ### General Approach
 
-#### 1.) Code Inputs
-
-#### 2.) Data Decomposition
-    - The code first splits the data to the nearest column based on block_size between the CPUs and GPUs. The number of CPU cores and GPUs is not taken into account in this split. Note, that the provided affinity will be adjusted if it cannot evenly split the data by column.
-    - Each region after the affinity split is then split amongst the number of ranks for each architecture. Note, that each GPU will occupy 1 rank (e.g.
-    running the code with 16 MPI processes and two GPUs will result in 14 CPU ranks).
-    - If there is not sufficient data for the number of ranks supplied, those ranks will be terminated.
-
-### Swept Steps
-#### 1.) UpPyramid
-    - The "UpPyramid" is the first swept calculation and it creates a pyramid of data in time. At the end of this calculation, the data is written into its standard position for the next step.
-    - The appropriate edges are communicated for the shift calculation.
-#### 2.) Bridge
-    - The "Bridge" is the next step required.
-    - The appropriate edges are communicated for the shift calculation.
-
-#### 3.) Standard Octahedron
-    - The "Octahedron" is the next calculation after the bridge.
-
-#### 4.) Reverse Bridge
-    - The "Bridge" is the next step required.
-    - The appropriate edges are communicated for the shift calculation.
-
-#### 5.) Shift Octahedron
-    - The "Octahedron" is the next calculation after the bridge.
-
-#### 6. DownPyramid
-    This is the closing pyramid of the swept rule. -->
-
-    The latex for the paper outlining the work done in this code can be found [here](https://github.com/Niemeyer-Research-Group/2019-walker-2dswept-camwa).
+This code is intended to implement the swept-time rule in two dimensions and is paired with a standard solver for comparison. 

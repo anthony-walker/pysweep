@@ -8,25 +8,18 @@ try:
 except Exception as e:
     pass
 
-def step(state,iidx,ts,globalTimeStep):
+def step(state,iidx,arrayTimeIndex,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
-    ts - the current time step
+    arrayTimeIndex - the current time step
     globalTimeStep - a step counter that allows implementation of the scheme
     """
-    half = 0.5
-    ITS = 2
     vSlice = slice(0,state.shape[1],1)
     for idx,idy in iidx:
-        ntidx = (ts+1,vSlice,idx,idy)  #next step index
-        cidx = (ts,vSlice,idx,idy)
-        pidx = (ts-1,vSlice,idx,idy) #next step index
+        ntidx = (arrayTimeIndex+1,vSlice,idx,idy)  #next step index
+        cidx = (arrayTimeIndex,vSlice,idx,idy)
         state[ntidx] = state[cidx]+1
-        # if (globalTimeStep+1)%ITS==0: #Corrector
-        #     state[ntidx] = (state[pidx])+1
-        # else: #Predictor
-        #     state[ntidx] = state[cidx]+1
     return state
 
 def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
