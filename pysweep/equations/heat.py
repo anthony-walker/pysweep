@@ -36,7 +36,7 @@ def set_globals(*args,source_mod=None):
             ckey,_ = source_mod.get_global(key)
             cuda.memcpy_htod(ckey,fc(nargs[i]))
         ckey,_ = source_mod.get_global("SCHEME")
-        cuda.memcpy_htod(ckey,bytes(scheme))
+        cuda.memcpy_htod(ckey,numpy.intc(scheme))
     
 
 def forwardEuler(state,iidx,ts,globalTimeStep):

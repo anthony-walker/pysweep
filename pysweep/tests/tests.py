@@ -133,7 +133,7 @@ def testHeat(npx=384,npy=384):
     yfile = os.path.join(yfile,"heat.yaml")
     testSolver = pysweep.Solver(filename,yfile)
     t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
-    tf = 500*dt
+    tf = 50*dt
     testSolver.globals[1] = tf #reset tf for 500 steps
     testSolver()
     
@@ -145,7 +145,7 @@ def testHeat(npx=384,npy=384):
     stepRange = testSolver.comm.scatter(stepRange)
     error = []
     testSolver.comm.Barrier()
-    with h5py.File(testSolver.output,"r") as f:
+    with h5py.File(testSolver.output,"r",driver="mpio",comm=testSolver.comm) as f:
         data = f["data"]
         for i in stepRange:
             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)

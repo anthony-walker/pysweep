@@ -6,12 +6,7 @@ __device__ __constant__  double DX;
 __device__ __constant__  double DY;
 __device__ __constant__  double DT;
 __device__ __constant__ double ALPHA; //Thermal diffusivity
-__device__ __constant__ bool SCHEME; //Determine which scheme to use
-
-__device__ void getPoint(double * curr_point,double *shared_state, int idx)
-{
-    curr_point[0]=shared_state[idx];
-}
+__device__ __constant__ int SCHEME; //Determine which scheme to use
 
 __device__ double centralDifference(double * shared_state, int idx)
 {
@@ -59,7 +54,6 @@ __device__ void rungeKutta2(double * shared_state, int idx, int globalTimeStep)
 __device__
 void step(double * shared_state, int idx, int globalTimeStep)
 {
-
  if (SCHEME)
  {
     forwardEuler(shared_state,idx,globalTimeStep);
