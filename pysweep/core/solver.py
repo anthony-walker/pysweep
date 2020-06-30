@@ -130,9 +130,7 @@ class Solver(object):
         self.globalTimeStep=0
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
-        self.comm.Barrier()
         functions.firstForward(self)
-        self.comm.Barrier()
         #Loop variables
         cwt = 1 #Current write time
         del self.Up #Deleting Up object after FirstPrism
@@ -140,12 +138,9 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
-            self.comm.Barrier()
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
-        self.comm.Barrier()
         functions.LastPrism(self)
-        self.comm.Barrier()
         next(step)(cwt,self)
 
     def standardSolve(self):
@@ -154,11 +149,9 @@ class Solver(object):
         self.globalTimeStep=0
         #Send Boundary points
         functions.sendEdges(self)
-        self.comm.Barrier() #Ensure all processes are
         cwt = 1
         for i in range(self.intermediate*self.timeSteps):
             functions.StandardFunction(self)
             cwt = io.standardWrite(cwt,self)
             #Communicate
             functions.sendEdges(self)
-            self.comm.Barrier()

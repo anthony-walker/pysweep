@@ -37,7 +37,7 @@ def FirstPrism(solver):
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
     solver.Yb.start += solver.maxPyramidSize #Change starting location for UpPrism
-    
+    solver.nodeComm.Barrier() #Node barrier here before the write
 
 def UpPrism(solver):
     """
@@ -46,7 +46,6 @@ def UpPrism(solver):
     fcn - the function that solves the problem in question
     OPS -  the number of atomic operations
     """
-    
     #Start GPU Operations
     if solver.gpuBool:
         solver.localGPUArray[:,:,:,:] = solver.sharedArray[solver.gpuReadBlock]
@@ -67,6 +66,8 @@ def UpPrism(solver):
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
     #Add to global time step after operations
     solver.globalTimeStep+=solver.maxPyramidSize
+    solver.nodeComm.Barrier() #Node barrier here before the write
+
 
 
 def LastPrism(solver):
@@ -91,16 +92,17 @@ def LastPrism(solver):
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
+    solver.nodeComm.Barrier() #Node barrier here before the write
 
 def firstForward(solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:
         buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
         buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
-        solver.clusterComm.Barrier()
+        solver.clusterComm.Barrier() #Barrier to make sure all buffers are copied before writing
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
-    solver.nodeComm.Barrier()
+    solver.nodeComm.Barrier() #Wait for copy before calculating again
 
 
 def sendForward(cwt,solver):
@@ -109,10 +111,10 @@ def sendForward(cwt,solver):
         cwt = io.sweptWrite(cwt,solver)
         buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
         buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
-        solver.clusterComm.Barrier()
+        solver.clusterComm.Barrier() #Barrier to make sure all buffers are copied before writing
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
-    solver.nodeComm.Barrier()
+    solver.nodeComm.Barrier() #Wait for copy before calculating again
     return cwt
 
 def sendBackward(cwt,solver):
@@ -120,11 +122,11 @@ def sendBackward(cwt,solver):
     if solver.nodeMasterBool:
         buff = numpy.copy(solver.sharedArray[:,:,:solver.splitx,:])
         buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[0],source=solver.neighbors[1])
-        solver.clusterComm.Barrier()
+        solver.clusterComm.Barrier() #Barrier to make sure all buffers are copied before writing
         solver.sharedArray[:,:,:-solver.splitx,:] = solver.sharedArray[:,:,solver.splitx:,:] #Shift solver.sharedArray backward data by solver.splitx
         solver.sharedArray[:,:,-solver.splitx:,:] = buffer[:,:,:,:]
         cwt = io.sweptWrite(cwt,solver)
-    solver.nodeComm.Barrier()
+    solver.nodeComm.Barrier() #Wait for copy before calculating again
     return cwt
 
 #----------------------------------Standard Functions----------------------------------------------#
@@ -148,6 +150,7 @@ def StandardFunction(solver):
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
     solver.globalTimeStep+=1 #Update global time step
+    solver.nodeComm.Barrier() #Node barrier here before the write
 
 def sendEdges(solver):
     """Use this function to communicate data between nodes"""
@@ -162,5 +165,5 @@ def sendEdges(solver):
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,:ops,:] = bufferf[:,:,:,:]
         solver.sharedArray[:,:,-ops:,:] = bufferb[:,:,:,:]
-    solver.nodeComm.Barrier()
+    solver.nodeComm.Barrier() #Wait for copy before calculating again
 

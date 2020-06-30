@@ -238,5 +238,6 @@ def standardBlock(solver):
         setupGPUStandard(solver)
     #Setup CPU
     setupCPUStandard(solver)
-    solver.comm.Barrier()
+    solver.comm.Barrier() #Ensure all processes are
+
 

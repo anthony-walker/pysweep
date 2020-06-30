@@ -50,7 +50,6 @@ def configurations(func):
     return testConfigurations
     
     
-
 @configurations
 def testExample(*args,**kwargs):
     solver,ns = args
