@@ -156,6 +156,7 @@ def testHeat(npx=384,npy=384):
             #     print("Simulation failed on index: {}.".format(i))
             #     print(data[i-1,0,:,:])
     
+    
     error = testSolver.comm.allgather(error)
     if testSolver.clusterMasterBool:
         finalError = []
