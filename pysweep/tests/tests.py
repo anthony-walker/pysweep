@@ -81,13 +81,11 @@ def testExample(*args,**kwargs):
         input()
     solver.comm.Barrier()
 
-def testSimple(share=0.5,npx=384,npy=384):
+def testSimple(npx=384,npy=384):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
     testSolver = pysweep.Solver(filename,yfile)
-    testSolver.share = share
-    testSolver.simulation=True
     testSolver()
 
     if testSolver.clusterMasterBool:
@@ -99,7 +97,7 @@ def testSimple(share=0.5,npx=384,npy=384):
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
 
-def testChecker(npx=12,npy=12):
+def testChecker(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"checker.yaml")

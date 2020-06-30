@@ -96,11 +96,11 @@ def setupGPUSwept(solver):
     io.copyConstants(solver.gpu,const_dict) #This copys cpu constants not global constants
     solver.cpu.set_globals(*solver.globals,source_mod=solver.gpu)
     # Make GPU geometry
-    solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,grid)
-    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(grid))
-    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,grid)
-    solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,(grid[0],grid[1]-1))
-    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,(grid[0],grid[1]-1))
+    solver.Up.initializeGPU(solver.gpu.get_function("UpPyramid"),solver.blocksize,(grid[0],grid[1]-1))
+    solver.Oct.initializeGPU(solver.gpu.get_function("Octahedron"),solver.blocksize,(grid[0],grid[1]-1))
+    solver.Down.initializeGPU(solver.gpu.get_function("DownPyramid"),solver.blocksize,(grid[0],grid[1]-1))
+    solver.Yb.initializeGPU(solver.gpu.get_function("YBridge"),solver.blocksize,grid)
+    solver.Xb.initializeGPU(solver.gpu.get_function("XBridge"),solver.blocksize,grid)
     
 
 def mallocGPUArray(blockShape):

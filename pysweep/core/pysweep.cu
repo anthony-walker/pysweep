@@ -60,7 +60,7 @@ UpPyramid(double *state, int globalTimeStep, int sweptStep)
 {
     
     //Other quantities for indexing
-    int gid = get_idx(sweptStep); //global index
+    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
 
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
@@ -96,7 +96,7 @@ __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly redu
 YBridge(double *state, int globalTimeStep, int sweptStep)
 {
 
-    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
+    int gid = get_idx(sweptStep);//+blockDim.x/2; //global index
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ux = blockDim.x-OPS; //upper x
@@ -112,8 +112,8 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-          value = (state[gid+1]+state[gid-1]+state[gid+SY]+state[gid-SY])/4;
-          printf("%f,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY],value);
+        //   value = (state[gid+1]+state[gid-1]+state[gid+SY]+state[gid-SY])/4;
+        //   printf("YBridge,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY]);
           step(state,gid,globalTimeStep);
         }
         __syncthreads();
@@ -137,7 +137,7 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 XBridge(double *state, int globalTimeStep, int sweptStep)
 {
-    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
+    int gid = get_idx(sweptStep);//+blockDim.x/2; //global index
     //Creating swept boundaries
     int ly = OPS; //Lower x swept bound
     int uy = blockDim.y-OPS; //upper x
@@ -149,6 +149,7 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
+        //   printf("XBridge,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY]);
           step(state,gid,globalTimeStep);
           // state[gid+TIMES]=2;
       }
@@ -162,6 +163,10 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
         ly+=OPS;
         uy-=OPS;
     }
+    // __syncthreads(); //Sync all threads so computation is done before block copy
+    // //add block copy here
+    // printf
+    // printf
 
 }
 
@@ -169,7 +174,7 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 Octahedron(double *state, int globalTimeStep, int sweptStep)
 {
-    int gid = get_idx(sweptStep)-OPS-SY; //global index
+    int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
     //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
@@ -185,6 +190,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
+        //   printf("Octahedron,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY]);
           step(state,gid,globalTimeStep);
           // state[gid+TIMES]=1;
       }
@@ -232,7 +238,7 @@ __global__ void
 __launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
-     int gid = get_idx(sweptStep)-OPS-SY; //global index
+     int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
     //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
