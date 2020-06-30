@@ -20,8 +20,7 @@ def FirstPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        fillLocalExtendedArray(solver)
-        solver.debugSimulations(arr=solver.localGPUArray)
+        solver.localGPUArray[:,:,:,:] = solver.sharedArray[solver.gpuReadBlock]
         cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)
         solver.Up.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
@@ -50,7 +49,7 @@ def UpPrism(solver):
     
     #Start GPU Operations
     if solver.gpuBool:
-        fillLocalExtendedArray(solver)
+        solver.localGPUArray[:,:,:,:] = solver.sharedArray[solver.gpuReadBlock]
         cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
         solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Oct.callGPU(solver.GPUArray,solver.globalTimeStep)
@@ -79,7 +78,7 @@ def LastPrism(solver):
     """
     #Start GPU Operations
     if solver.gpuBool:
-        fillLocalExtendedArray(solver)
+        solver.localGPUArray[:,:,:,:] = solver.sharedArray[solver.gpuReadBlock]
         cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
         solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Down.callGPU(solver.GPUArray,solver.globalTimeStep)
@@ -127,14 +126,6 @@ def sendBackward(cwt,solver):
         cwt = io.sweptWrite(cwt,solver)
     solver.nodeComm.Barrier()
     return cwt
-
-def fillLocalExtendedArray(solver):
-    """Use this function to copy the shared array to the local array and extend each end by one block."""
-    it,iv,ix,iy = solver.gpuBlock
-    adj = solver.blocksize[0]
-    solver.localGPUArray[:,:,:,adj:-adj] = solver.sharedArray[:,iv,ix,iy]
-    solver.localGPUArray[:,:,:,0:adj] = solver.sharedArray[:,iv,ix,-adj:]
-    solver.localGPUArray[:,:,:,-adj:] = solver.sharedArray[:,iv,ix,:adj]
 
 #----------------------------------Standard Functions----------------------------------------------#
 def StandardFunction(solver):

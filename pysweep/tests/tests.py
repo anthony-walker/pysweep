@@ -99,7 +99,7 @@ def testSimple(share=0.5,npx=384,npy=384):
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
 
-def testChecker(npx=384,npy=384):
+def testChecker(npx=12,npy=12):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"checker.yaml")

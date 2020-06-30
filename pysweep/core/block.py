@@ -68,12 +68,20 @@ def setupCPUSwept(solver):
     solver.Yb.setSweptStep(solver.intermediate-1)
     solver.Oct.setSweptStep(solver.intermediate-1)
 
-
-
+def getGPUReadBlockSwept(solver):
+    """Use this function to create the GPU read block."""
+    solver.gpuReadBlock = solver.gpuBlock[:-1]
+    yshape = solver.sharedShape[-1]
+    startblock = numpy.arange(yshape-solver.blocksize[0],yshape,1)
+    centerblock = numpy.arange(0,yshape,1)
+    endblock = numpy.arange(0,solver.blocksize[0],1)
+    extendedBlock = (numpy.concatenate((startblock,centerblock,endblock)),)   
+    solver.gpuReadBlock = solver.gpuReadBlock+extendedBlock
+ 
 def setupGPUSwept(solver):
     """Use this function to execute core gpu only processes"""
     solver.gpuBlock = (slice(0,solver.sharedShape[0],1),)+solver.gpuBlock
-    # solver.gpuReadBlock = solver.gpuBlock[:2]+tuple([slice(cs.start-solver.blocksize,cs.stop+solver.blocksize[0],1) for cs in solver.gpuBlock[2:]])
+    getGPUReadBlockSwept(solver) #Finish creating gpuReadBlock here
     blockShape =[element.stop for element in solver.gpuBlock]
     blockShape[-1] += int(2*solver.blocksize[0]) #Adding 2 blocks in the column direction
     # Creating local GPU array with split
