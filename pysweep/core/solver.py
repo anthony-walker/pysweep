@@ -139,9 +139,8 @@ class Solver(object):
         #-------------------------------SWEPT LOOP--------------------------------------------#
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
-            self.debugSimulations()
             functions.UpPrism(self)
-            self.debugSimulations()
+            io.systemOutDebug(self)
             self.comm.Barrier()
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data

@@ -102,12 +102,18 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
     int ux = blockDim.x-OPS; //upper x
     int ly = blockDim.y/2-OPS; // Lower y swept bound
     int uy = blockDim.y/2+OPS; //upper y
+    double value;
     for (int k = 0; k < MPSS; k++)
     {
-
+        // if (threadIdx.x==1 and threadIdx.y==1)
+        // {
+        //     printf("-------------------------------------------\n");
+        // }
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
+          value = (state[gid+1]+state[gid-1]+state[gid+SY]+state[gid-SY])/4;
+          printf("%f,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY],value);
           step(state,gid,globalTimeStep);
         }
         __syncthreads();

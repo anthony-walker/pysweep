@@ -209,3 +209,24 @@ def standardWrite(cwt,solver):
         solver.sharedArray[solver.intermediate-1,iv,ix,iy] = solver.sharedArray[solver.intermediate,iv,ix,iy]
     solver.nodeComm.Barrier()
     return cwt
+
+def systemOutDebug(solver,array=None):
+    """Use this function to write data out with standard out for more clear debugging."""
+    
+    def writeOut(arr):
+        for row in arr:
+            sys.stdout.write("[")
+            for item in row:
+                sys.stdout.write("%.5f, "%item)
+            sys.stdout.write("]\n")
+    
+    if solver.clusterMasterBool: 
+            ci = 0
+            while ci != -1:
+                if array is None:
+                    writeOut(solver.sharedArray[ci,0,:,:])
+                else:
+                    writeOut(array[ci,0,:,:])
+                ci = int(input())
+    solver.comm.Barrier()
+    
