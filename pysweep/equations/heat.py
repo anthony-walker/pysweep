@@ -1,16 +1,14 @@
 
-import numpy, h5py 
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from mpl_toolkits import mplot3d
-from matplotlib import animation, rc
-# import mpi4py.MPI as MPI
+import numpy, h5py, os, sys
+import mpi4py.MPI as MPI
 try:
     import pycuda.driver as cuda
 except Exception as e:
     print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
     
 scheme = True
+pi = numpy.pi
+piSq = pi*pi
 
 def step(state,iidx,ts,globalTimeStep):
     """This is the method that will be called by the swept solver.
@@ -20,16 +18,17 @@ def step(state,iidx,ts,globalTimeStep):
     globalTimeStep - a step counter that allows implementation of the scheme
     """
     if scheme:
-        return forwardEuler(state,iidx,ts,globalTimeStep)
+        state = forwardEuler(state,iidx,ts,globalTimeStep)
+        return state
     else:
         return rungeKutta2(state,iidx,ts,globalTimeStep)
 
 
-def set_globals(gpu,*args,source_mod=None):
+def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
     global dt,dx,dy,alpha,scheme #true for FE
     t0,tf,dt,dx,dy,alpha,scheme = args
-    if gpu:
+    if source_mod is not None:
         keys = "DT","DX","DY","ALPHA"
         nargs = args[2:]
         fc = lambda x:numpy.float64(x)
@@ -42,24 +41,35 @@ def set_globals(gpu,*args,source_mod=None):
 
 def forwardEuler(state,iidx,ts,globalTimeStep):
     """Use this function to solver the HDE with forward Euler."""
+    d2dx = numpy.zeros(state.shape[2:])
+    d2dy = numpy.zeros(state.shape[2:])
+    source = numpy.zeros(state.shape[2:])
     for idx,idy in iidx:
-        d2dx,d2dy = centralDifference(state,ts,idx,idy)
-        state[ts+1,0,idx,idy] = alpha*dt*(d2dx+d2dy) + state[ts,0,idx,idy]
+        d2dx[idx,idy],d2dy[idx,idy] = centralDifference(state[0,0],idx,idy)
+    state[ts+1,0,:,:] = d2dx[:,:]+d2dy[:,:]+state[ts,0,:,:]
     return state
+
+def writeOut(arr):
+        for row in arr:
+            sys.stdout.write("[")
+            for item in row:
+                sys.stdout.write("%.3f, "%item)
+            sys.stdout.write("]\n")
+        sys.stdout.write("\n")
+
 
 def rungeKutta2(state,iidx,ts,globalTimeStep):
     """Use this function to solve the HDE with RK2."""
     pass
 
-
-def centralDifference(state,ts,idx,idy):
+def centralDifference(state,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""
-    nt,nv,nx,ny = state.shape
-    secondDerivativeX = (state[ts,0,(idx+1)%nx,idy]-2*state[ts,0,idx,idy]+state[ts,0,(idx-1)%nx,idy])/(dx*dx)
-    secondDerivativeY = (state[ts,0,idx,(idy+1)%ny]-2*state[ts,0,idx,idy]+state[ts,0,idx,(idy-1)%ny])/(dy*dy)
+    nx,ny = state.shape
+    secondDerivativeX = alpha*dt*(state[(idx+1)%nx,idy]-2*state[idx,idy]+state[(idx-1)%nx,idy])/(dx*dx)
+    secondDerivativeY = alpha*dt*(state[idx,(idy+1)%ny]-2*state[idx,idy]+state[idx,(idy-1)%ny])/(dy*dy)
     return secondDerivativeX,secondDerivativeY
 
-def createInitialConditions(npx,npy,t=0,filename="heatConditions.hdf5"):
+def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file.
     args:
     npx: number of points in x
@@ -67,12 +77,12 @@ def createInitialConditions(npx,npy,t=0,filename="heatConditions.hdf5"):
     t: time of initial conditions
     """
     comm = MPI.COMM_WORLD
-    u = analytical(npx,npy,t)
+    u,X,Y = analytical(npx,npy,t,alpha=alpha)
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
         hf.create_dataset("data",u.shape,data=u)
     return filename
 
-def analytical(npx,npy,t):
+def analytical(npx,npy,t,alpha=0.1):
     """Use this function to generate the prescribed analytical solution analytical solution.
     x: 0->1
     y: 0->1
@@ -85,13 +95,24 @@ def analytical(npx,npy,t):
     Y = numpy.linspace(0,1,npy,endpoint=False)
     uShape = (1,numpy.shape(X)[0],numpy.shape(Y)[0])
     u = numpy.zeros(uShape)
-    pi = numpy.pi
     m = 2 #m and n = 2 makes the function periodic in 0->1
     n = 2
     for i,x in enumerate(X):
         for j,y in enumerate(Y):
-            u[0,i,j] = numpy.sin(m*pi*x)*numpy.sin(n*pi*y)*numpy.exp(-(m^2+n^2)*t)
+            u[0,i,j] = numpy.sin(m*pi*x)*numpy.sin(n*pi*y)*numpy.exp(-(m*m+n*n)*pi*pi*alpha*t)
     return u,X,Y
+
+def sourceTerm(idx,idy,globalTimeStep):
+    x = idx*dx
+    y = idy*dy
+    t = dt*globalTimeStep
+    expon = numpy.exp(-8*piSq*alpha*t)
+    trig = numpy.sin(2*pi*x)*numpy.sin(2*pi*y)
+    sx = -4*alpha*piSq*expon*trig
+    sy = -4*alpha*piSq*expon*trig
+    st = -8*piSq*alpha*expon*trig
+    sTotal = dt*(sx+sy+st)
+    return sTotal
 
 class HeatGIF(object):
     
@@ -107,28 +128,41 @@ class HeatGIF(object):
         self.X = X
         self.Y = Y
     
-    def makeGif(self):
+    def animate(self,i):
+        ax.cla() #clear off axis
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0, 1)
+        ax.set_zlim(-1, 1)
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.plot_surface(self.X,self.Y,self.cT[i],cmap=cm.inferno)
+
+    def makeGif(self,name="heat.gif"):
+        global ax
         fig =  plt.figure()
         ax = plt.axes(projection='3d')
         ax.view_init(elev=45, azim=25)
-        ax.set_ylim(numpy.amin(self.Y), numpy.amax(self.Y))
-        ax.set_ylim(numpy.amin(self.Y), numpy.amax(self.Y))
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
+        
         # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
         fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=numpy.linspace(-1,1,10))
-        animate = lambda i: ax.plot_surface(self.X,self.Y,self.cT[i],cmap=cm.inferno)
+        
         frames = len(self.cT)
-        anim = animation.FuncAnimation(fig,animate,frames)
-        anim.save("heat.gif",writer="imagemagick")
+        anim = animation.FuncAnimation(fig,self.animate,frames)
+        anim.save(name,writer="imagemagick")
+
 
 if __name__ == "__main__":
-    alpha = 1 #0.00016563 #Of pure silver
-    dt = 0.1
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+    from mpl_toolkits import mplot3d
+    from matplotlib import animation, rc
+    os.system("rm heat.gif") #Remove old heat gif
+    alpha = 0.1#0.00016563 #Of pure silver
+    dt = 0.0001
     npx = 11
     npy = 11
     t0 = 0
-    tf = 10
+    tf = 0.5
     uIC,X,Y = analytical(npx,npy,t0)
     dx = X[1]-X[0]
     dy = Y[1]-Y[0]
@@ -136,14 +170,19 @@ if __name__ == "__main__":
     set_globals(False,t0,tf,dt,dx,dy,alpha,True)
     U = numpy.zeros((2,)+uIC.shape)
     U[0,:,:,:] = uIC[:,:,:]
-    idxs = numpy.ndindex((npx,npy))
+    idxs = list(numpy.ndindex((npx,npy)))
     X, Y = numpy.meshgrid(X, Y)
     hgf = HeatGIF()
     hgf.setXY(X,Y)
-    for i,time in enumerate(numpy.arange(t0,tf,dt)):
+    hgf.appendTemp(U[0,0])
+    error = [numpy.amax(U[0]-uIC),]
+    for i,time in enumerate(numpy.arange(t0,tf+dt,dt)):
         U = step(U,idxs,0,i)
-        uA,_,__ = analytical(npx,npy,time)
-        # print(U[1]-U[0])
-        U[0] = U[1]
-        hgf.appendTemp(uA[0])
-    hgf.makeGif()
+        uA,_,__ = analytical(npx,npy,time+dt)
+        # print(numpy.amax(U[0]-U[1]))
+        U[0,:,:,:] = numpy.copy(U[1,:,:,:])
+        U[1,:,:,:] = 0
+        error.append(numpy.amax(U[0]-uA))
+        hgf.appendTemp(U[0,0])
+    print(numpy.amax(error))
+    # hgf.makeGif()

@@ -127,7 +127,7 @@ def testChecker(npx=384,npy=384):
                     print(data[i,0,:,:])
                     input()
 
-def testHeat(share=0.5,npx=16,npy=16):
+def testHeat(npx=384,npy=384):
     filename = pysweep.equations.heat.createInitialConditions(npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"heat.yaml")

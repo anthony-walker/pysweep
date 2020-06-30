@@ -7,7 +7,6 @@ __device__ __constant__  double DY;
 __device__ __constant__  double DT;
 __device__ __constant__ double ALPHA; //Thermal diffusivity
 __device__ __constant__ bool SCHEME; //Determine which scheme to use
-__device__ __constant__ const int NVC=1; //Number of variables
 
 __device__ void getPoint(double * curr_point,double *shared_state, int idx)
 {
@@ -26,8 +25,6 @@ __device__ double centralDifference(double * shared_state, int idx)
 
 __device__ void forwardEuler(double * shared_state, int idx, int globalTimeStep)
 {
-  double cpoint[NVC];
-  getPoint(cpoint,shared_state,idx);
   shared_state[idx+TIMES]=shared_state[idx]+ALPHA*DT*centralDifference(shared_state,idx);
 }
 
