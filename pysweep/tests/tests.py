@@ -128,22 +128,43 @@ def testChecker(npx=384,npy=384):
                     input()
 
 def testHeat(npx=384,npy=384):
-    filename = pysweep.equations.heat.createInitialConditions(npx,npy)
+    filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"heat.yaml")
     testSolver = pysweep.Solver(filename,yfile)
+    t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
+    tf = 500*dt
+    testSolver.globals[1] = tf #reset tf for 500 steps
     testSolver()
-
-    # if testSolver.clusterMasterBool:
-    #     with h5py.File(testSolver.output,"r") as f:
-    #         data = f["data"]
-    #         for i in range(1,testSolver.arrayShape[0]+1):
-    #             try:
-    #                 assert numpy.all(data[i-1,0,:,:]==i)
-    #             except Exception as e:
-    #                 print("Simulation failed on index: {}.".format(i))
-    #                 print(data[i-1,0,:,:])
-
+    
+    if testSolver.clusterMasterBool:
+        steps = testSolver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
+    else:
+        stepRange = []
+    stepRange = testSolver.comm.scatter(stepRange)
+    error = []
+    testSolver.comm.Barrier()
+    with h5py.File(testSolver.output,"r") as f:
+        data = f["data"]
+        for i in stepRange:
+            T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
+            error.append(numpy.amax(T[:,:,:]-data[i,:,:,:]))
+            # try:
+            #     assert numpy.all(data[i-1,0,:,:]==i)
+            # except Exception as e:
+            #     print("Simulation failed on index: {}.".format(i))
+            #     print(data[i-1,0,:,:])
+    
+    error = testSolver.comm.allgather(error)
+    if testSolver.clusterMasterBool:
+        finalError = []
+        finalMean = []
+        for eL in error:
+            finalError.append(numpy.amax(eL))
+            finalMean.append(numpy.mean(eL))
+        print(numpy.amax(finalError))
+        print(numpy.mean(finalMean))
 
 if __name__ == "__main__":
     pass

@@ -17,15 +17,15 @@ __device__ double centralDifference(double * shared_state, int idx)
 {
 
   double derivativeSum;
-  derivativeSum = (shared_state[idx+SY]-2*shared_state[idx]+shared_state[idx-SY])/(DX*DX); //X derivative
-  derivativeSum += (shared_state[idx+1]-2*shared_state[idx]+shared_state[idx-1])/(DY*DY); //Y derivative
+  derivativeSum = ALPHA*DT*(shared_state[idx+SY]-2*shared_state[idx]+shared_state[idx-SY])/(DX*DX); //X derivative
+  derivativeSum += ALPHA*DT*(shared_state[idx+1]-2*shared_state[idx]+shared_state[idx-1])/(DY*DY); //Y derivative
   return derivativeSum;
 }
 
 
 __device__ void forwardEuler(double * shared_state, int idx, int globalTimeStep)
 {
-  shared_state[idx+TIMES]=shared_state[idx]+ALPHA*DT*centralDifference(shared_state,idx);
+  shared_state[idx+TIMES]=shared_state[idx]+centralDifference(shared_state,idx);
 }
 
 
