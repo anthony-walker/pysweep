@@ -105,16 +105,10 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
     double value;
     for (int k = 0; k < MPSS; k++)
     {
-        // if (threadIdx.x==1 and threadIdx.y==1)
-        // {
-        //     printf("-------------------------------------------\n");
-        // }
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
-        //   value = (state[gid+1]+state[gid-1]+state[gid+SY]+state[gid-SY])/4;
-        //   printf("YBridge,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY]);
-          step(state,gid,globalTimeStep);
+             step(state,gid,globalTimeStep);
         }
         __syncthreads();
         //Updating global time step
@@ -149,9 +143,7 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
-        //   printf("XBridge,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY]);
-          step(state,gid,globalTimeStep);
-          // state[gid+TIMES]=2;
+           step(state,gid,globalTimeStep);
       }
       __syncthreads();
       //Updating global time step
@@ -163,11 +155,6 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
         ly+=OPS;
         uy-=OPS;
     }
-    // __syncthreads(); //Sync all threads so computation is done before block copy
-    // //add block copy here
-    // printf
-    // printf
-
 }
 
 __global__ void
@@ -190,9 +177,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
       // Solving step function
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
-        //   printf("Octahedron,%f,%f,%f,%f\n",state[gid+1], state[gid-1],state[gid+SY],state[gid-SY]);
           step(state,gid,globalTimeStep);
-          // state[gid+TIMES]=1;
       }
       __syncthreads();
       //Updating global time step
@@ -224,7 +209,6 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             step(state,gid,globalTimeStep);
-            // state[gid+TIMES]=1;
         }
         __syncthreads();
         //Updating global time step
@@ -255,7 +239,6 @@ DownPyramid(double *state, int globalTimeStep, int sweptStep)
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
           step(state,gid,globalTimeStep);
-          // state[gid+TIMES]=1;
       }
       __syncthreads();
       //Updating global time step
