@@ -127,16 +127,26 @@ def testChecker(npx=384,npy=384):
                     print(data[i,0,:,:])
                     input()
 
-def testHeat(npx=384,npy=384):
+def testHeat(npx=24,npy=24):
+    timeSteps = 50
     filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"heat.yaml")
     testSolver = pysweep.Solver(filename,yfile)
     t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
-    tf = 50*dt
+    tf = timeSteps*dt
     testSolver.globals[1] = tf #reset tf for 500 steps
+    # testSolver.output = "heatCPU.hdf5"
     testSolver()
-    
+    # if testSolver.clusterMasterBool:
+    #     with h5py.File(testSolver.output,"r") as f:
+    #         data = f["data"]
+    #         for i in range(timeSteps):
+    #             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
+    #             temp = numpy.abs(T[:,:,:]-data[i,:,:,:])
+    #             print(i,numpy.amax(temp))
+    #             input()
+
     if testSolver.clusterMasterBool:
         steps = testSolver.arrayShape[0]
         stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
@@ -149,7 +159,7 @@ def testHeat(npx=384,npy=384):
         data = f["data"]
         for i in stepRange:
             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
-            error.append(numpy.amax(T[:,:,:]-data[i,:,:,:]))
+            error.append(numpy.amax(numpy.absolute(T[:,:,:]-data[i,:,:,:])))
             # try:
             #     assert numpy.all(data[i-1,0,:,:]==i)
             # except Exception as e:
@@ -164,9 +174,13 @@ def testHeat(npx=384,npy=384):
         for eL in error:
             finalError.append(numpy.amax(eL))
             finalMean.append(numpy.mean(eL))
+    
         print(numpy.amax(finalError))
         print(numpy.mean(finalMean))
+        print(numpy.where(finalError==numpy.amax(finalError)))
 
-if __name__ == "__main__":
-    pass
+
+
+# if __name__ == "__main__":
+    # pass
     # MPI.COMM_SELF.Spawn(sys.executable, args=["from pysweep.tests import testExample; testExample()"], maxprocs=2)
