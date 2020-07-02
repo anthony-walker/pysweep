@@ -92,7 +92,7 @@ def testExample(*args,**kwargs):
         input()
     solver.comm.Barrier()
 
-def testSimpleOne(npx=384,npy=384):
+def testSimpleOne(npx=12,npy=12):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
@@ -102,9 +102,9 @@ def testSimpleOne(npx=384,npy=384):
     if testSolver.clusterMasterBool:
         with h5py.File(testSolver.output,"r") as f:
             data = f["data"]
-            for i in range(1,testSolver.arrayShape[0]+1):
+            for i in range(testSolver.arrayShape[0]):
                 try:
-                    assert numpy.all(data[i-1,0,:,:]==i)
+                    assert numpy.all(data[i,0,:,:]==i)
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
 
@@ -116,18 +116,14 @@ def testSimpleTwo(npx=12,npy=12):
     testSolver.intermediate = 2
     testSolver.globals[-1] = False
     testSolver()
-
     if testSolver.clusterMasterBool:
         with h5py.File(testSolver.output,"r") as f:
             data = f["data"]
-            for i in range(1,testSolver.arrayShape[0]+1):
-                print(data[i,0,:,:])
-                input()
-                # try:
-                #     assert numpy.all(data[i-1,0,:,:]==i)
-                # except Exception as e:
-                #     print("Simulation failed on index: {}.".format(i))
-                #     print(data[i,0,:,:])
+            for i,value in enumerate(range(1,2*testSolver.arrayShape[0]-1,2),start=1):
+                try:
+                    assert numpy.all(data[i,0,:,:]==value)
+                except Exception as e:
+                    print("Simulation failed on index: {}.".format(i))
 
 def testChecker(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)

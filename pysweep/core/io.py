@@ -192,7 +192,7 @@ def standardWrite(cwt,solver):
     """Use this function to write standard data out."""
     solver.nodeComm.Barrier()
     #Write data and copy down a step
-    if (solver.globalTimeStep+1)%solver.intermediate==0 and solver.nodeMasterBool:
+    if (solver.globalTimeStep)%solver.intermediate==0 and solver.nodeMasterBool:
         #Unpacking globalBlock
         iv,ix,iy = solver.globalBlock #Unpack global tuple
         solver.data[cwt,iv,ix,iy] = solver.sharedArray[solver.intermediate,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
@@ -202,11 +202,13 @@ def standardWrite(cwt,solver):
     for block in solver.blocks:
         writeblock,readblock = block
         it,iv,ix,iy = writeblock
-        solver.sharedArray[solver.intermediate-1,iv,ix,iy] = solver.sharedArray[solver.intermediate,iv,ix,iy]
+        for i in range(solver.intermediate):
+            solver.sharedArray[i,iv,ix,iy] = solver.sharedArray[i+1,iv,ix,iy]
     #Update GPU shared data
     if solver.gpuBool:
         it,iv,ix,iy = solver.gpuBlock
-        solver.sharedArray[solver.intermediate-1,iv,ix,iy] = solver.sharedArray[solver.intermediate,iv,ix,iy]
+        for i in range(solver.intermediate):
+            solver.sharedArray[i,iv,ix,iy] = solver.sharedArray[i+1,iv,ix,iy]
     solver.nodeComm.Barrier()
     return cwt
 

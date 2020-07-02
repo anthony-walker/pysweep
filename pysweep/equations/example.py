@@ -21,16 +21,16 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
         for idx,idy in iidx:
             state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex,:,idx,idy]+1
     else: #pseudo RK2
-        addition =  2 if globalTimeStep%2==0 else 1
+        addition,timeChange =  (2,1) if globalTimeStep%2==0 else (1,0)
         for idx,idy in iidx:
-            state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex-1,:,idx,idy]+addition
+            state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex-timeChange,:,idx,idy]+addition
 
 
 def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file."""
     comm = MPI.COMM_WORLD
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
-        hf.create_dataset("data",(nv,nx,ny),data=numpy.ones((nv,nx,ny)))
+        hf.create_dataset("data",(nv,nx,ny),data=numpy.zeros((nv,nx,ny)))
     return filename
 
 def set_globals(*args,source_mod=None):
