@@ -92,7 +92,8 @@ class Solver(object):
             self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
             self.maxOctSize = 2*self.maxPyramidSize
             self.sharedShape = (self.maxOctSize+self.intermediate,)+self.sharedShape
-            self.arrayShape = (self.timeSteps+1,)+self.arrayShape
+            # addition = 0 if self.intermediate%2==0 else 0 #Add one if even else add 0
+            self.arrayShape = (self.timeSteps,)+self.arrayShape
         else:
             self.sharedShape = (self.intermediate+1,)+self.sharedShape
             self.arrayShape = (self.timeSteps+1,)+self.arrayShape

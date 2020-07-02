@@ -28,15 +28,12 @@ def FirstPrism(solver):
     solver.Up.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Yb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
-    
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
         solver.Yb.setSweptStep(solver.maxPyramidSize)
-    #Add to global time step after operations
-    solver.globalTimeStep+=solver.maxPyramidSize
     solver.Yb.start += solver.maxPyramidSize #Change starting location for UpPrism
     solver.nodeComm.Barrier() #Node barrier here before the write
 
@@ -93,6 +90,7 @@ def LastPrism(solver):
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
+    solver.globalTimeStep+=solver.maxPyramidSize #Need this for the write
     solver.nodeComm.Barrier() #Node barrier here before the write
 
 def firstForward(solver):

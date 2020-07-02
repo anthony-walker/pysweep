@@ -139,7 +139,7 @@ def sweptWrite(cwt,solver):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
     iv,ix,iy = solver.globalBlock #Unpack global tuple
-    for si,i in enumerate(range(solver.globalTimeStep+1,solver.globalTimeStep+1+solver.maxPyramidSize,1),start=solver.intermediate):
+    for si,i in enumerate(range(solver.globalTimeStep,solver.globalTimeStep+solver.maxPyramidSize,1),start=solver.intermediate):
         if i%solver.intermediate==0:
             solver.data[cwt,iv,ix,iy] = solver.sharedArray[si,:,:,:]
             cwt+=1
@@ -219,11 +219,11 @@ def systemOutDebug(solver,array=None):
         for row in arr:
             sys.stdout.write("[")
             for item in row:
-                # if item == 1 or item == 0:
-                #     sys.stdout.write("\033[1;36m")
-                # else:
-                #     sys.stdout.write("\033[1;31m")
-                sys.stdout.write("%.5f, "%item)
+                if item == 0:
+                    sys.stdout.write("\033[1;36m")
+                else:
+                    sys.stdout.write("\033[1;31m")
+                sys.stdout.write("%.1f, "%item)
             sys.stdout.write("]\n")
     
     if solver.clusterMasterBool: 
