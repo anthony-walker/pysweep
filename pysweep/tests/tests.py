@@ -139,8 +139,8 @@ def testChecker(npx=384,npy=384):
                     print(data[i,0,:,:])
                     input()
 
-def testHeat(inputFile="heat.yaml",npx=12,npy=12):
-    timeSteps = 50
+def testHeatForwardEuler(inputFile="heat.yaml",npx=384,npy=384):
+    timeSteps = 100
     filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,inputFile)
@@ -150,33 +150,47 @@ def testHeat(inputFile="heat.yaml",npx=12,npy=12):
     testSolver.globals[1] = tf #reset tf for 500 steps
     testSolver.share=0
     testSolver()
-    return testSolver
-
-    # if testSolver.clusterMasterBool:
-    #     with h5py.File(testSolver.output,"r") as f:
-    #         data = f["data"]
-    #         T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*timeSteps,alpha=alpha)
-    #         print(numpy.amax(numpy.abs(T[:,:,:]-data[timeSteps,:,:,:])))
-
-    # if testSolver.clusterMasterBool:
-    #     steps = testSolver.arrayShape[0]
-    #     stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
-    # else:
-    #     stepRange = []
-    # stepRange = testSolver.comm.scatter(stepRange)
-    # error = []
-    # testSolver.comm.Barrier()
-    # with h5py.File(testSolver.output,"r",driver="mpio",comm=testSolver.comm) as f:
-    #     data = f["data"]
-    #     for i in stepRange:
-    #         T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
-    #         error.append(numpy.amax(numpy.absolute(T[:,:,:]-data[i,:,:,:])))
-    #         # try:
-    #         #     assert numpy.all(data[i-1,0,:,:]==i)
-    #         # except Exception as e:
-    #         #     print("Simulation failed on index: {}.".format(i))
-    #         #     print(data[i-1,0,:,:])
     
+    if testSolver.clusterMasterBool:
+        steps = testSolver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
+    else:
+        stepRange = []
+    stepRange = testSolver.comm.scatter(stepRange)
+    error = []
+    testSolver.comm.Barrier()
+    with h5py.File(testSolver.output,"r",driver="mpio",comm=testSolver.comm) as f:
+        data = f["data"]
+        for i in stepRange:
+            T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
+            assert numpy.allclose(data[i,0],T[0])
+
+
+def testHeatRungeKutta(inputFile="heat.yaml",npx=384,npy=384):
+    timeSteps = 100
+    filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
+    yfile = os.path.join(path,"inputs")
+    yfile = os.path.join(yfile,inputFile)
+    testSolver = pysweep.Solver(filename,yfile)
+    t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
+    tf = timeSteps*dt
+    testSolver.globals[1] = tf #reset tf for 500 steps
+    testSolver.share=0
+    testSolver()
+    
+    if testSolver.clusterMasterBool:
+        steps = testSolver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
+    else:
+        stepRange = []
+    stepRange = testSolver.comm.scatter(stepRange)
+    error = []
+    testSolver.comm.Barrier()
+    with h5py.File(testSolver.output,"r",driver="mpio",comm=testSolver.comm) as f:
+        data = f["data"]
+        for i in stepRange:
+            T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
+            # assert numpy.allclose(data[i,0],T[0])
     
     # error = testSolver.comm.allgather(error)
     # if testSolver.clusterMasterBool:
@@ -188,29 +202,7 @@ def testHeat(inputFile="heat.yaml",npx=12,npy=12):
     
     #     print(numpy.amax(finalError))
     #     print(numpy.mean(finalMean))
-        # print(numpy.where(finalError==numpy.amax(finalError)))
-
-
-def testOrderOfConvergence(ifile="heat.yaml"):
-    """Use this function to test the order of convergence."""
-    yfilepath = os.path.join(path,"inputs")
-    yfile = os.path.join(yfilepath,ifile)
-    d = 0.25 #Constant
-    alpha = 1
-    error = []
-    sizes = [12,]
-    ss = []
-    ts = []
-    pi = numpy.pi
-    analytical = lambda x,y,t: numpy.sin(2*pi*x)*numpy.sin(2*pi*y)*numpy.exp(-8*pi*pi*alpha*t)    
-    x = numpy.linspace(0,1,size,endpoint=False)
-    dx = float(x[1]-x[0])
-    t0,tf = 0,0.01
-    dt = float(d*dx**2/alpha)
-    filename = pysweep.equations.heat.createInitialConditions(size,size,alpha=0.00016563)
-    testSolver = pysweep.Solver(filename,yfile)
-    testSolver.globals =  [t0,tf,dt,dx,dx,alpha,True]
-    testSolver()
+    #     print(numpy.where(finalError==numpy.amax(finalError)))
 
 
 def testCompareSolvers():
@@ -220,12 +212,11 @@ def testCompareSolvers():
     #Adjustment of global variables
     d = 0.1 #Constant
     alpha = 1
-    npx = npy = 48
+    npx = npy = 384
     T,x,y = pysweep.equations.heat.analytical(npx,npy,0)
     dx = dy = float(x[1]-x[0])
-    t0,tf = 0,0.5
+    t0,tf = 0,0.001
     dt = float(d*dx**2/alpha)
-
     #Input files
     filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=alpha)
     inputPath = os.path.join(path,"inputs")

@@ -54,7 +54,9 @@ def writeOut(arr):
 
 def rungeKutta2(state,iidx,ts,globalTimeStep):
     """Use this function to solve the HDE with RK2."""
-    pass
+    for idx,idy in iidx:
+        state[ts+1,0,idx,idy] = centralDifference(state[ts,0],idx,idy)+state[ts,0,idx,idy]
+
 
 def centralDifference(state,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""

@@ -19,9 +19,6 @@ __device__ __constant__ int OPS; //number of atomic operations
 __device__ __constant__ int ITS; //Number of intermediate time steps
 __device__ __constant__ int SX; //Space in x
 __device__ __constant__ int SY; //Space in y
-//GPU Constants
-__device__ __constant__ const int LB_MIN_BLOCKS = 1;    //Launch bounds min blocks
-__device__ __constant__ const int LB_MAX_THREADS = 1024; //Launch bounds max threads per block
 
 #include PYSWEEP_GPU_SOURCE
 
@@ -55,7 +52,6 @@ __device__ void checkConstants()
     Use this function to create and return the GPU UpPyramid
 */
 __global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 UpPyramid(double *state, int globalTimeStep, int sweptStep)
 {
     
@@ -92,7 +88,6 @@ UpPyramid(double *state, int globalTimeStep, int sweptStep)
     Use this function to create and return the GPU Y-Bridge
 */
 __global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 YBridge(double *state, int globalTimeStep, int sweptStep)
 {
 
@@ -128,7 +123,6 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
     Use this function to create and return the GPU Y-Bridge
 */
 __global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 XBridge(double *state, int globalTimeStep, int sweptStep)
 {
     int gid = get_idx(sweptStep);//+blockDim.x/2; //global index
@@ -158,7 +152,6 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
 }
 
 __global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 Octahedron(double *state, int globalTimeStep, int sweptStep)
 {
     int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
@@ -219,7 +212,6 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
 }
 
 __global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
      int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
@@ -268,7 +260,6 @@ __device__ int get_gid()
 }
 
 __global__ void
-__launch_bounds__(LB_MAX_THREADS, LB_MIN_BLOCKS)    //Launch bounds greatly reduce register usage
 Standard(double *state, int globalTimeStep)
 {
 
