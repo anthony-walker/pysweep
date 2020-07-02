@@ -217,11 +217,11 @@ def systemOutDebug(solver,array=None):
         for row in arr:
             sys.stdout.write("[")
             for item in row:
-                if item == 1 or item == 0:
-                    sys.stdout.write("\033[1;36m")
-                else:
-                    sys.stdout.write("\033[1;31m")
-                sys.stdout.write("%.0f, "%item)
+                # if item == 1 or item == 0:
+                #     sys.stdout.write("\033[1;36m")
+                # else:
+                #     sys.stdout.write("\033[1;31m")
+                sys.stdout.write("%.5f, "%item)
             sys.stdout.write("]\n")
     
     if solver.clusterMasterBool: 

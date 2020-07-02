@@ -18,8 +18,7 @@ def step(state,iidx,ts,globalTimeStep):
     globalTimeStep - a step counter that allows implementation of the scheme
     """
     if scheme:
-        state = forwardEuler(state,iidx,ts,globalTimeStep)
-        return state
+        forwardEuler(state,iidx,ts,globalTimeStep)
     else:
         return rungeKutta2(state,iidx,ts,globalTimeStep)
 
@@ -41,13 +40,8 @@ def set_globals(*args,source_mod=None):
 
 def forwardEuler(state,iidx,ts,globalTimeStep):
     """Use this function to solver the HDE with forward Euler."""
-    d2dx = numpy.zeros(state.shape[2:])
-    d2dy = numpy.zeros(state.shape[2:])
-    source = numpy.zeros(state.shape[2:])
     for idx,idy in iidx:
-        d2dx[idx,idy],d2dy[idx,idy] = centralDifference(state[0,0],idx,idy)
-    state[ts+1,0,:,:] = d2dx[:,:]+d2dy[:,:]+state[ts,0,:,:]
-    return state
+        state[ts+1,0,idx,idy] = centralDifference(state[ts,0],idx,idy)+state[ts,0,idx,idy]
 
 def writeOut(arr):
         for row in arr:
@@ -65,9 +59,9 @@ def rungeKutta2(state,iidx,ts,globalTimeStep):
 def centralDifference(state,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""
     nx,ny = state.shape
-    secondDerivativeX = alpha*dt*(state[(idx+1)%nx,idy]-2*state[idx,idy]+state[(idx-1)%nx,idy])/(dx*dx)
-    secondDerivativeY = alpha*dt*(state[idx,(idy+1)%ny]-2*state[idx,idy]+state[idx,(idy-1)%ny])/(dy*dy)
-    return secondDerivativeX,secondDerivativeY
+    secondDerivativeX = alpha*dt*(state[idx+1,idy]-2*state[idx,idy]+state[idx-1,idy])/(dx*dx)
+    secondDerivativeY = alpha*dt*(state[idx,idy+1]-2*state[idx,idy]+state[idx,idy-1])/(dy*dy)
+    return secondDerivativeX+secondDerivativeY
 
 def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file.

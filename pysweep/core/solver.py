@@ -1,4 +1,4 @@
-import sys, os, yaml, numpy, warnings, subprocess, traceback, time,  mpi4py.MPI as MPI, h5py
+import sys, os, yaml, numpy, warnings, subprocess, traceback, time, h5py
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
 import pysweep.core.process as process
@@ -91,7 +91,7 @@ class Solver(object):
             self.maxGlobalSweptStep = int(self.intermediate*(self.timeSteps-self.maxPyramidSize)/(self.maxPyramidSize)+1)  #Global swept step  #THIS ASSUMES THAT timeSteps > MOSS
             self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
             self.maxOctSize = 2*self.maxPyramidSize
-            self.sharedShape = (self.maxOctSize+self.intermediate+1,)+self.sharedShape
+            self.sharedShape = (self.maxOctSize+self.intermediate,)+self.sharedShape
             self.arrayShape = (self.timeSteps,)+self.arrayShape
         else:
             self.sharedShape = (self.intermediate+1,)+self.sharedShape

@@ -55,12 +55,13 @@ def setupCPUSwept(solver):
     down_sets = createDownPyramidSets(solver.blocksize,solver.operating)
     oct_sets = down_sets+up_sets
     y_sets,x_sets = createBridgeSets(solver.blocksize,solver.operating,solver.maxPyramidSize)
+    cshape = solver.sharedArray[solver.blocks[0]].shape
     #Initializing CPU portion of Geometry
-    solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate-1) 
-    solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate-1)
-    solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate-1)
-    solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate-1)
-    solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate-1)
+    solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate-1,cshape) 
+    solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate-1,cshape)
+    solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate-1,cshape)
+    solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate-1,cshape)
+    solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate-1,cshape)
     #Setting starting swept step
     solver.Up.setSweptStep(solver.intermediate-1)
     solver.Down.setSweptStep(solver.intermediate-1)
@@ -180,7 +181,8 @@ def setupCPUStandard(solver):
     #Creating sets for cpu calculation
     standardSet = [(x+solver.operating,y+solver.operating) for x,y in numpy.ndindex(solver.blocksize[:-1])]
     #Initializing CPU on standard
-    solver.standard.initializeCPU(solver.cpu,standardSet,solver.intermediate-1) 
+    cshape = solver.sharedArray[solver.blocks[0][1]].shape
+    solver.standard.initializeCPU(solver.cpu,standardSet,solver.intermediate-1,cshape) 
 
 
 def makeReadBlocksStandard(solver, adjustment):

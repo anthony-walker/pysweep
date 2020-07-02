@@ -26,8 +26,10 @@ def FirstPrism(solver):
         solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
     #Do CPU Operations
     solver.Up.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
+    # io.systemOutDebug(solver)
     solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Yb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
@@ -144,6 +146,7 @@ def StandardFunction(solver):
         solver.standard.callStandardGPU(solver.GPUArray,solver.globalTimeStep)      
     #Calling standard CPU 
     solver.standard.callStandardCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
+    # io.systemOutDebug(solver,array=solver.sharedArray[:,:,1:-1,1:-1])
     #Clean up GPU processes
     if solver.gpuBool:
         cuda.Context.synchronize()
