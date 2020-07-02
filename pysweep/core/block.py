@@ -55,7 +55,7 @@ def setupCPUSwept(solver):
     down_sets = createDownPyramidSets(solver.blocksize,solver.operating)
     oct_sets = down_sets+up_sets
     y_sets,x_sets = createBridgeSets(solver.blocksize,solver.operating,solver.maxPyramidSize)
-    cshape = solver.sharedArray[solver.blocks[0]].shape
+    cshape = solver.sharedArray[solver.blocks[0]].shape  if solver.blocks else (0,)
     #Initializing CPU portion of Geometry
     solver.Up.initializeCPU(solver.cpu,up_sets,solver.intermediate-1,cshape) 
     solver.Down.initializeCPU(solver.cpu,down_sets,solver.intermediate-1,cshape)
@@ -181,7 +181,7 @@ def setupCPUStandard(solver):
     #Creating sets for cpu calculation
     standardSet = [(x+solver.operating,y+solver.operating) for x,y in numpy.ndindex(solver.blocksize[:-1])]
     #Initializing CPU on standard
-    cshape = solver.sharedArray[solver.blocks[0][1]].shape
+    cshape = solver.sharedArray[solver.blocks[0][1]].shape if solver.blocks else (0,)
     solver.standard.initializeCPU(solver.cpu,standardSet,solver.intermediate-1,cshape) 
 
 

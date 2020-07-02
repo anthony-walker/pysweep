@@ -213,14 +213,14 @@ def testOrderOfConvergence(ifile="heat.yaml"):
     testSolver()
 
 
-def testCompareCPUs():
+def testCompareSolvers():
     """Use this function to compare cpu portion of solvers based on output hdf5 and error.
     This function is meant for only 1 process
     """
     #Adjustment of global variables
     d = 0.1 #Constant
     alpha = 1
-    npx = npy = 8
+    npx = npy = 48
     T,x,y = pysweep.equations.heat.analytical(npx,npy,0)
     dx = dy = float(x[1]-x[0])
     t0,tf = 0,0.5
@@ -234,7 +234,6 @@ def testCompareCPUs():
     standardSolver = pysweep.Solver(filename, os.path.join(inputPath,"heatStandard.yaml"))
 
     #Set same globals
-    print([t0,tf,dt,dx,dx,alpha,True])
     standardSolver.globals =  [t0,tf,dt,dx,dx,alpha,True]
     sweptSolver.globals =  [t0,tf,dt,dx,dx,alpha,True]
     
@@ -243,21 +242,17 @@ def testCompareCPUs():
     sweptSolver()
     
     #hdf5
-    sweptHdf5 = h5py.File(sweptSolver.output,"r")
-    standardHdf5 = h5py.File(standardSolver.output,"r")
-    
-    sweptData = sweptHdf5['data']
-    standardData = standardHdf5['data']
+    if standardSolver.clusterMasterBool:
+        sweptHdf5 = h5py.File(sweptSolver.output,"r")
+        standardHdf5 = h5py.File(standardSolver.output,"r")
+        
+        sweptData = sweptHdf5['data']
+        standardData = standardHdf5['data']
 
-    for i in range(standardSolver.timeSteps):
-        print("Time {}".format(dt*i))
-        T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
-        writeOut(sweptData[i,0]-standardData[i,0])
-        print("-----------------------------------")
-        # writeOut(T[0,:,:]-sweptData[i,0,:,:])
-        # print("-----------------------------------")
-        # writeOut(T[0,:,:]-standardData[i,0,:,:])
-        input()
+        for i in range(standardSolver.timeSteps):
+            T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
+            assert numpy.allclose(sweptData[i,0],standardData[i,0])
+        
 
 def testOrderOfConvergence(ifile="heat.yaml"):
     """Use this function to test the order of convergence."""

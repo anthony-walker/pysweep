@@ -1,5 +1,4 @@
 import numpy
-import pysweep.tests as tests
 
 class Geometry(object):
     """Use this class to represent different phases in the swept process."""
@@ -14,7 +13,6 @@ class Geometry(object):
     def initializeGPU(self,*args):
         """Use this function to initialize GPU arguments."""
         self.gfunction,self.blocksize,self.grid = args
-
 
     def setSweptStep(self,value):
         """Use this function to set the swept step."""
@@ -32,13 +30,8 @@ class Geometry(object):
             self.CPUArray[:,:,:,:] = sharedArray[block]
             for ts,blockset in enumerate(self.sets,start=self.start):
                 #Calculating Step
-                # tests.writeOut(self.CPUArray[ts,0])
-                # print("---------------------------")
                 self.cpu.step(self.CPUArray,blockset,ts,ct)
-                # tests.writeOut(self.CPUArray[ts+1,0])
-                # print("---------------------------")
-                # input()
-                # ct+=1
+                ct+=1
             sharedArray[block] = self.CPUArray[:,:,:,:]
 
     def callGPU(self,GPUArray,globalTimeStep):
