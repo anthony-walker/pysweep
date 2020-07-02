@@ -92,7 +92,7 @@ def testExample(*args,**kwargs):
         input()
     solver.comm.Barrier()
 
-def testSimpleOne(npx=12,npy=12):
+def testSimpleOne(npx=120,npy=120):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
@@ -106,9 +106,10 @@ def testSimpleOne(npx=12,npy=12):
                 try:
                     assert numpy.all(data[i,0,:,:]==i)
                 except Exception as e:
-                    print("Simulation failed on index: {}.".format(i))
+                    failed = True
+                    # print("Simulation failed on index: {}.".format(i))
 
-def testSimpleTwo(npx=12,npy=12):
+def testSimpleTwo(npx=120,npy=120):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
@@ -123,7 +124,9 @@ def testSimpleTwo(npx=12,npy=12):
                 try:
                     assert numpy.all(data[i,0,:,:]==value)
                 except Exception as e:
-                    print("Simulation failed on index: {}.".format(i))
+                    failed = True
+                    # print("Simulation failed on index: {}.".format(i))
+            print("{}".format("Failed" if failed else "Success"))
 
 def testChecker(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)

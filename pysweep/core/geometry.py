@@ -7,17 +7,18 @@ class Geometry(object):
 
     def initializeCPU(self,*args):
         """Use this function to initialize CPU arguments."""
-        self.cpu,self.sets,self.start,cshape = args
+        self.cpu,self.sets,start,cshape = args
+        self.start = numpy.intc(start)
         self.CPUArray = numpy.zeros(cshape)
 
     def initializeGPU(self,*args):
         """Use this function to initialize GPU arguments."""
         self.gfunction,self.blocksize,self.grid = args
 
-    def setSweptStep(self,value):
-        """Use this function to set the swept step."""
-        self.sweptStep = numpy.int32(value)
-
+    def startAdd(self,value):
+        """Use this to add to the existing start parameter."""
+        self.start += numpy.intc(value)
+        
     def setAdjustment(self,value):
         """Use this to set the adjustment for standard"""
         self.adj = value
@@ -37,7 +38,7 @@ class Geometry(object):
     def callGPU(self,GPUArray,globalTimeStep):
         """Use this function to build the Up Pyramid."""
         #UpPyramid of Swept Step
-        self.gfunction(GPUArray,numpy.int32(globalTimeStep),self.sweptStep,grid=self.grid, block=self.blocksize)
+        self.gfunction(GPUArray,numpy.int32(globalTimeStep),self.start,grid=self.grid, block=self.blocksize)
 
     def callStandardGPU(self,GPUArray,globalTimeStep):
         """Use this function to build the Up Pyramid."""

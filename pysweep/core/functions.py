@@ -33,8 +33,7 @@ def FirstPrism(solver):
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
-        solver.Yb.setSweptStep(solver.maxPyramidSize)
-    solver.Yb.start += solver.maxPyramidSize #Change starting location for UpPrism
+    solver.Yb.startAdd(solver.maxPyramidSize) #Change starting location for UpPrism
     solver.nodeComm.Barrier() #Node barrier here before the write
 
 def UpPrism(solver):
@@ -66,8 +65,6 @@ def UpPrism(solver):
     solver.globalTimeStep+=solver.maxPyramidSize
     solver.nodeComm.Barrier() #Node barrier here before the write
 
-
-
 def LastPrism(solver):
     """
     This is the starting pyramid for the 2D heterogeneous swept rule cpu portion.
@@ -90,7 +87,7 @@ def LastPrism(solver):
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
-    solver.globalTimeStep+=solver.maxPyramidSize #Need this for the write
+    solver.globalTimeStep+=solver.maxPyramidSize #Need this for the write of intermediate steps
     solver.nodeComm.Barrier() #Node barrier here before the write
 
 def firstForward(solver):

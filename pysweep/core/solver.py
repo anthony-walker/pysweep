@@ -26,7 +26,7 @@ class Solver(object):
         """Use this function to spawn processes."""
         #Grabbing start of call time
         self.moments.append(time.time())
-
+        io.verbosePrint(self,"-----------------------------PySweep-------------------------\n")
         #set up MPI
         io.verbosePrint(self,"Setting up processes...\n")
         process.setupProcesses(self)
@@ -65,7 +65,8 @@ class Solver(object):
         io.verbosePrint(self,'Cleaning up processes...\n')
         process.cleanupProcesses(self,self.moments[start],self.moments[stop])
         io.verbosePrint(self,'Done in {} seconds...\n'.format(self.moments[-1]-self.moments[0]))
-
+        io.verbosePrint(self,"---------------------------------------------------------------\n")
+        
     def __str__(self):
         """Use this function to print the object."""
         return io.getSolverPrint(self)

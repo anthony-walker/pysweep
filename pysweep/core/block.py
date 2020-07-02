@@ -62,12 +62,6 @@ def setupCPUSwept(solver):
     solver.Xb.initializeCPU(solver.cpu,x_sets,solver.intermediate-1,cshape)
     solver.Yb.initializeCPU(solver.cpu,y_sets,solver.intermediate-1,cshape)
     solver.Oct.initializeCPU(solver.cpu,oct_sets,solver.intermediate-1,cshape)
-    #Setting starting swept step
-    solver.Up.setSweptStep(solver.intermediate-1)
-    solver.Down.setSweptStep(solver.intermediate-1)
-    solver.Xb.setSweptStep(solver.intermediate-1)
-    solver.Yb.setSweptStep(solver.intermediate-1)
-    solver.Oct.setSweptStep(solver.intermediate-1)
 
 def getGPUReadBlockSwept(solver):
     """Use this function to create the GPU read block."""
