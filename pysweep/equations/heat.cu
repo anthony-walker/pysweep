@@ -24,31 +24,12 @@ __device__ void forwardEuler(double * shared_state, int idx, int globalTimeStep)
 }
 
 
-__device__ void rungeKutta2(double * shared_state, int idx, int globalTimeStep)
+__device__ void rungeKuttaTwo(double * shared_state, int idx, int globalTimeStep)
 {
-//     bool cond = ((globalTimeStep+1)%ITS==0);
-//   int coeff = cond ? 1 : 0;
-
-//   double cpoint[NVC];
-//   getPoint(cpoint,shared_state,idx-TIMES*coeff);
-
-//   double tval[NVC]={0,0,0,0};
-//    __syncthreads();
-
-
-//    for (int i = 0; i < NVC; i++)
-//    {
-
-//        tval[i] = cpoint[i]+1;
-//    }
-
-//   __syncthreads();
-
-//   for (int i = 0; i < NVC; i++)
-//   {
-//       shared_state[idx+TIMES+i*VARS]=tval[i];
-//   }
-
+bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
+int timeChange = cond ? 1 : 0; //If true rolls back a time step
+int coeff = cond ? 1 : 0.5; //If true uses 1 instead of 0.5 for intermediate step
+shared_state[idx+TIMES]=shared_state[idx-TIMES*timeChange]+coeff*centralDifference(shared_state,idx);
 }
 
 __device__
@@ -60,7 +41,7 @@ void step(double * shared_state, int idx, int globalTimeStep)
  }
  else
  {
-     rungeKutta2(shared_state,idx,globalTimeStep);
+     rungeKuttaTwo(shared_state,idx,globalTimeStep);
  }
  
 

@@ -16,9 +16,9 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     globalTimeStep - a step counter that allows implementation of the scheme
     """
     if scheme:
-        return checkerOneStep(state,iidx,arrayTimeIndex,globalTimeStep)
+        checkerOneStep(state,iidx,arrayTimeIndex,globalTimeStep)
     else:
-        return checkerTwoStep(state,iidx,arrayTimeIndex,globalTimeStep)
+        checkerTwoStep(state,iidx,arrayTimeIndex,globalTimeStep)
 
 def checkerOneStep(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function as the one step checker pattern"""
@@ -30,14 +30,13 @@ def checkerOneStep(state,iidx,arrayTimeIndex,globalTimeStep):
         state[ntidx] += state[arrayTimeIndex,vs,idx,idy+1]
         state[ntidx] += state[arrayTimeIndex,vs,idx,idy-1]
         state[ntidx] /= 4
-    return state
 
 def checkerTwoStep(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function as the two step checker pattern"""
     vs = slice(0,state.shape[1],1)
     for idx,idy in iidx:
         ntidx = (arrayTimeIndex+1,vs,idx,idy)  #next step index
-        if (globalTimeStep+1)%2==0:
+        if (globalTimeStep)%2==0:
             state[ntidx] = state[arrayTimeIndex,vs,idx+1,idy]
             state[ntidx] += state[arrayTimeIndex,vs,idx-1,idy]
             state[ntidx] += state[arrayTimeIndex,vs,idx,idy+1]
@@ -45,7 +44,6 @@ def checkerTwoStep(state,iidx,arrayTimeIndex,globalTimeStep):
             state[ntidx] /= 4
         else:
             state[ntidx] = state[arrayTimeIndex,vs,idx,idy]
-    return state
 
 def createInitialConditions(nv,nx,ny,filename="checkerConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file."""

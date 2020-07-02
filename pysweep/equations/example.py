@@ -8,6 +8,8 @@ try:
 except Exception as e:
     pass
 
+scheme = True
+
 def step(state,iidx,arrayTimeIndex,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
@@ -15,12 +17,14 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     arrayTimeIndex - the current time step
     globalTimeStep - a step counter that allows implementation of the scheme
     """
-    vSlice = slice(0,state.shape[1],1)
-    for idx,idy in iidx:
-        ntidx = (arrayTimeIndex+1,vSlice,idx,idy)  #next step index
-        cidx = (arrayTimeIndex,vSlice,idx,idy)
-        state[ntidx] = state[cidx]+1
-    return state
+    if scheme: #pseude FE
+        for idx,idy in iidx:
+            state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex,:,idx,idy]+1
+    else: #pseudo RK2
+        addition =  2 if globalTimeStep%2==0 else 1
+        for idx,idy in iidx:
+            state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex-1,:,idx,idy]+addition
+
 
 def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file."""
@@ -32,7 +36,7 @@ def createInitialConditions(nv,nx,ny,filename="exampleConditions.hdf5"):
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
     global dt,dx,dy,scheme #true for one step
-    t0,tf,dt,dx,dy = args
+    t0,tf,dt,dx,dy,scheme = args
     if source_mod is not None:
         keys = "DT","DX","DY"
         nargs = args[2:]
@@ -40,3 +44,5 @@ def set_globals(*args,source_mod=None):
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
             cuda.memcpy_htod(ckey,fc(nargs[i]))
+        ckey,_ = source_mod.get_global("SCHEME")
+        cuda.memcpy_htod(ckey,numpy.intc(scheme))

@@ -97,7 +97,7 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
     int ux = blockDim.x-OPS; //upper x
     int ly = blockDim.y/2-OPS; // Lower y swept bound
     int uy = blockDim.y/2+OPS; //upper y
-    double value;
+    
     for (int k = 0; k < MPSS; k++)
     {
         // Solving step function
@@ -155,7 +155,6 @@ __global__ void
 Octahedron(double *state, int globalTimeStep, int sweptStep)
 {
     int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
-    //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
@@ -215,7 +214,6 @@ __global__ void
 DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
      int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
-    //globalTimeStep-=1; //Subtract 1 so that ITS works
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------

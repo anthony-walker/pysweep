@@ -92,7 +92,7 @@ class Solver(object):
             self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
             self.maxOctSize = 2*self.maxPyramidSize
             self.sharedShape = (self.maxOctSize+self.intermediate,)+self.sharedShape
-            self.arrayShape = (self.timeSteps,)+self.arrayShape
+            self.arrayShape = (self.timeSteps+1,)+self.arrayShape
         else:
             self.sharedShape = (self.intermediate+1,)+self.sharedShape
             self.arrayShape = (self.timeSteps+1,)+self.arrayShape
@@ -127,7 +127,7 @@ class Solver(object):
         """Use this function to begin the simulation."""
         # -------------------------------SWEPT RULE---------------------------------------------#
         #setting global time step to zero
-        self.globalTimeStep=0
+        self.globalTimeStep=1
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
         functions.firstForward(self)
@@ -146,7 +146,7 @@ class Solver(object):
     def standardSolve(self):
         # -------------------------------Standard Decomposition---------------------------------------------#
         #setting global time step to zero
-        self.globalTimeStep=0
+        self.globalTimeStep=1
         #Send Boundary points
         functions.sendEdges(self)
         cwt = 1

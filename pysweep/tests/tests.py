@@ -92,7 +92,7 @@ def testExample(*args,**kwargs):
         input()
     solver.comm.Barrier()
 
-def testSimple(npx=384,npy=384):
+def testSimpleOne(npx=384,npy=384):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"example.yaml")
@@ -107,6 +107,27 @@ def testSimple(npx=384,npy=384):
                     assert numpy.all(data[i-1,0,:,:]==i)
                 except Exception as e:
                     print("Simulation failed on index: {}.".format(i))
+
+def testSimpleTwo(npx=12,npy=12):
+    filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
+    yfile = os.path.join(path,"inputs")
+    yfile = os.path.join(yfile,"example.yaml")
+    testSolver = pysweep.Solver(filename,yfile)
+    testSolver.intermediate = 2
+    testSolver.globals[-1] = False
+    testSolver()
+
+    if testSolver.clusterMasterBool:
+        with h5py.File(testSolver.output,"r") as f:
+            data = f["data"]
+            for i in range(1,testSolver.arrayShape[0]+1):
+                print(data[i,0,:,:])
+                input()
+                # try:
+                #     assert numpy.all(data[i-1,0,:,:]==i)
+                # except Exception as e:
+                #     print("Simulation failed on index: {}.".format(i))
+                #     print(data[i,0,:,:])
 
 def testChecker(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)
@@ -148,7 +169,6 @@ def testHeatForwardEuler(inputFile="heat.yaml",npx=384,npy=384):
     t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
     tf = timeSteps*dt
     testSolver.globals[1] = tf #reset tf for 500 steps
-    testSolver.share=0
     testSolver()
     
     if testSolver.clusterMasterBool:
@@ -165,8 +185,7 @@ def testHeatForwardEuler(inputFile="heat.yaml",npx=384,npy=384):
             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
             assert numpy.allclose(data[i,0],T[0])
 
-
-def testHeatRungeKutta(inputFile="heat.yaml",npx=384,npy=384):
+def testHeatRungeKuttaTwo(inputFile="heat.yaml",npx=384,npy=384):
     timeSteps = 100
     filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
     yfile = os.path.join(path,"inputs")
@@ -175,7 +194,7 @@ def testHeatRungeKutta(inputFile="heat.yaml",npx=384,npy=384):
     t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
     tf = timeSteps*dt
     testSolver.globals[1] = tf #reset tf for 500 steps
-    testSolver.share=0
+    testSolver.globals[-1] = False #Set to RK2
     testSolver()
     
     if testSolver.clusterMasterBool:
@@ -190,8 +209,11 @@ def testHeatRungeKutta(inputFile="heat.yaml",npx=384,npy=384):
         data = f["data"]
         for i in stepRange:
             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
-            # assert numpy.allclose(data[i,0],T[0])
-    
+            try:
+                assert numpy.allclose(data[i,0],T[0])
+            except:
+                print("Simulation failed at index {}".format(i))
+
     # error = testSolver.comm.allgather(error)
     # if testSolver.clusterMasterBool:
     #     finalError = []

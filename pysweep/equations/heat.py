@@ -10,18 +10,17 @@ scheme = True
 pi = numpy.pi
 piSq = pi*pi
 
-def step(state,iidx,ts,globalTimeStep):
+def step(state,iidx,arrayTimeIndex,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
-    ts - the current time step
+    arrayTimeIndex - array time index for state
     globalTimeStep - a step counter that allows implementation of the scheme
     """
     if scheme:
-        forwardEuler(state,iidx,ts,globalTimeStep)
+        forwardEuler(state,iidx,arrayTimeIndex,globalTimeStep)
     else:
-        return rungeKutta2(state,iidx,ts,globalTimeStep)
-
+        return rungeKuttaTwo(state,iidx,arrayTimeIndex,globalTimeStep)
 
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
@@ -37,11 +36,10 @@ def set_globals(*args,source_mod=None):
         ckey,_ = source_mod.get_global("SCHEME")
         cuda.memcpy_htod(ckey,numpy.intc(scheme))
     
-
-def forwardEuler(state,iidx,ts,globalTimeStep):
+def forwardEuler(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function to solver the HDE with forward Euler."""
     for idx,idy in iidx:
-        state[ts+1,0,idx,idy] = centralDifference(state[ts,0],idx,idy)+state[ts,0,idx,idy]
+        state[arrayTimeIndex+1,0,idx,idy] = centralDifference(state[arrayTimeIndex,0],idx,idy)+state[arrayTimeIndex,0,idx,idy]
 
 def writeOut(arr):
         for row in arr:
@@ -51,13 +49,12 @@ def writeOut(arr):
             sys.stdout.write("]\n")
         sys.stdout.write("\n")
 
-
-def rungeKutta2(state,iidx,ts,globalTimeStep):
+def rungeKuttaTwo(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function to solve the HDE with RK2."""
+    coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)
     for idx,idy in iidx:
-        state[ts+1,0,idx,idy] = centralDifference(state[ts,0],idx,idy)+state[ts,0,idx,idy]
-
-
+        state[arrayTimeIndex+1,0,idx,idy] = coeff*centralDifference(state[arrayTimeIndex,0],idx,idy)+state[arrayTimeIndex-timechange,0,idx,idy]
+    
 def centralDifference(state,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""
     nx,ny = state.shape
