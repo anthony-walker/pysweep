@@ -140,6 +140,7 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
+            # io.systemOutDebug(self)
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         functions.LastPrism(self)
