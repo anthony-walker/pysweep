@@ -89,8 +89,14 @@ class Solver(object):
             self.splitx = self.blocksize[0]//2
             self.splity = self.blocksize[1]//2
             self.maxPyramidSize = self.blocksize[0]//(2*self.operating)-1 #This will need to be adjusted for differing x and y block lengths
-            self.maxGlobalSweptStep = int(self.intermediate*(self.timeSteps-self.maxPyramidSize)/(self.maxPyramidSize)+1)  #Global swept step  #THIS ASSUMES THAT timeSteps > MOSS
-            self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Number of time
+            self.maxGlobalSweptStep = numpy.ceil(self.intermediate*self.timeSteps/self.maxPyramidSize)-1 #minus 1 because the last pyramid will be outside this loop
+            # print(self.maxGlobalSweptStep)
+            # self.maxGlobalSweptStep = int(self.intermediate*(self.timeSteps-self.maxPyramidSize)/(self.maxPyramidSize)+1)  #Global swept step  #THIS ASSUMES THAT timeSteps > MOSS
+            # print(self.maxGlobalSweptStep)
+            # self.timeSteps = self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1 #Number of time
+            # print(self.timeSteps)
+            self.timeSteps = self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1 #Plus 1 for initial conditions
+            # print(self.timeSteps)
             self.maxOctSize = 2*self.maxPyramidSize
             self.sharedShape = (self.maxOctSize+self.intermediate,)+self.sharedShape
             # addition = 0 if self.intermediate%2==0 else 0 #Add one if even else add 0
