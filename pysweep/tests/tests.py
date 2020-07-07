@@ -108,7 +108,9 @@ def testSimpleOne(npx=384,npy=384):
                     assert numpy.all(data[i,0,:,:]==i)
                 except Exception as e:
                     failed = True
-                    # print("Simulation failed on index: {}.".format(i))
+                    print("Simulation failed on index: {}.".format(i))
+                    print(data[i,0])
+                    input()
         print("{}".format("Failed: testSimpleOne\n" if failed else "Success: testSimpleOne\n"))
 
 def testSimpleTwo(npx=384,npy=384):

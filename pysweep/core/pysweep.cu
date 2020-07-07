@@ -154,7 +154,7 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
 __global__ void
 Octahedron(double *state, int globalTimeStep, int sweptStep)
 {
-    int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
+    int gid = get_idx(sweptStep)+blockDim.x/2-OPS-OPS*SY; //global index
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
@@ -170,6 +170,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
           step(state,gid,globalTimeStep);
+        //   state[gid+TIMES] = 5;
       }
       __syncthreads();
       //Updating global time step
@@ -213,7 +214,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
 __global__ void
 DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
-     int gid = get_idx(sweptStep)+blockDim.x/2-OPS-SY; //global index
+     int gid = get_idx(sweptStep)+blockDim.x/2-OPS-OPS*SY; //global index
     int TOPS = 2*OPS;
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------

@@ -92,7 +92,7 @@ class Solver(object):
             self.maxGlobalSweptStep = int(numpy.ceil(self.intermediate*self.timeSteps/self.maxPyramidSize)-1) #minus 1 because the last pyramid will be outside this loop
             self.timeSteps = int(numpy.ceil(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1)) #Plus 1 for initial conditions
             self.maxOctSize = 2*self.maxPyramidSize
-            self.subtraction = 1 if self.maxPyramidSize%2==0 else 0
+            self.subtraction = 1 if self.maxPyramidSize%2==0 and self.intermediate%2==0 else 0 
             self.sharedShape = (self.maxOctSize+self.intermediate,)+self.sharedShape
             self.arrayShape = (self.timeSteps,)+self.arrayShape
         else:
@@ -140,7 +140,6 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
-            # io.systemOutDebug(self)
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         functions.LastPrism(self)
