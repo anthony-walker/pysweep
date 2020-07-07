@@ -24,10 +24,10 @@ def testing(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 384
+        arraysize = 240
         shares = [0,0.625,1] #Shares for GPU
         sims = [True,False] #different simulations
-        blocksizes = [8, 12, 16] #blocksizes with most options
+        blocksizes = [8, 12, 16, 20] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -153,52 +153,80 @@ def testCheckerOne(solver,arraysize):
         print("{}".format("Failed: testCheckerOne\n" if failed else "Success: testCheckerOne\n"))
     solver.comm.Barrier()
 
-def testHeatForwardEuler(inputFile="heat.yaml",npx=384,npy=384):
-    timeSteps = 100
-    filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
-    yfile = os.path.join(path,"inputs")
-    yfile = os.path.join(yfile,inputFile)
-    testSolver = pysweep.Solver(filename,yfile)
-    t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
-    tf = timeSteps*dt
-    testSolver.globals[1] = tf #reset tf for 500 steps
-    testSolver()
-    
-    if testSolver.clusterMasterBool:
-        steps = testSolver.arrayShape[0]
-        stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
+@testing
+def testHeatForwardEuler(solver,arraysize,printError=True):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "heatConditions.hdf5"
+    alpha=0.00016563
+    if not os.path.exists(filename):
+        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=alpha)
+    solver.assignInitialConditions(filename)
+    solver.operating = 1
+    solver.intermediate = 1
+    solver.setCPU(getEqnPath("heat.py"))
+    solver.setGPU(getEqnPath("heat.cu"))
+    solver.globals = [0,0.5,0.00001,0.0026041666666666665,0.0026041666666666665,alpha,True]
+    changeSolverTimeSteps(solver,50)
+    solver.exid = []
+    solver.output = "testing.hdf5"
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        steps = solver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
     else:
         stepRange = []
-    stepRange = testSolver.comm.scatter(stepRange)
+    stepRange = solver.comm.scatter(stepRange)
     error = []
-    testSolver.comm.Barrier()
-    with h5py.File(testSolver.output,"r",driver="mpio",comm=testSolver.comm) as f:
+    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
         data = f["data"]
+        failed = False
         for i in stepRange:
-            T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
-            assert numpy.allclose(data[i,0],T[0])
+            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
+            error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
+            try:
+                assert numpy.allclose(data[i,0],T[0])
+            except Exception as e:
+                failed = True
+
+    failed = solver.comm.allgather(failed)
+    if solver.clusterMasterBool:
+        solver.compactPrint()
+        masterFail = numpy.all(failed)
+        print("{}".format("Failed: testHeatForwardEuler" if masterFail else "Success: testHeatForwardEuler"))
+
+    if printError:
+        error = solver.comm.allgather(error)
+        if solver.clusterMasterBool:
+            finalError = []
+            for eL in error:
+                finalError.append(numpy.amax(eL))
+            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
+    if solver.clusterMasterBool:
+        print("\n") #Final end line
+    solver.comm.Barrier()
 
 def testHeatRungeKuttaTwo(inputFile="heat.yaml",npx=384,npy=384):
     timeSteps = 50
     filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,inputFile)
-    testSolver = pysweep.Solver(filename,yfile)
-    t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
+    solver = pysweep.Solver(filename,yfile)
+    t0,tf,dt,dx,dy,alpha,scheme = solver.globals
     tf = timeSteps*dt
-    testSolver.globals[1] = tf #reset tf for specified number of time steps
-    testSolver.globals[-1] = False #Set to RK2
-    testSolver()
+    solver.globals[1] = tf #reset tf for specified number of time steps
+    solver.globals[-1] = False #Set to RK2
+    solver()
     
-    if testSolver.clusterMasterBool:
-        steps = testSolver.arrayShape[0]
-        stepRange = numpy.array_split(numpy.arange(0,steps),testSolver.comm.Get_size())
+    if solver.clusterMasterBool:
+        steps = solver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
     else:
         stepRange = []
-    stepRange = testSolver.comm.scatter(stepRange)
+    stepRange = solver.comm.scatter(stepRange)
     error = []
-    testSolver.comm.Barrier()
-    with h5py.File(testSolver.output,"r",driver="mpio",comm=testSolver.comm) as f:
+    solver.comm.Barrier()
+    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
         data = f["data"]
         for i in stepRange:
             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
@@ -207,17 +235,7 @@ def testHeatRungeKuttaTwo(inputFile="heat.yaml",npx=384,npy=384):
                 assert numpy.allclose(data[i,0],T[0])
             except:
                 print("Simulation failed at index {}".format(i))
-    error = testSolver.comm.allgather(error)
-    if testSolver.clusterMasterBool:
-        finalError = []
-        finalMean = []
-        for eL in error:
-            finalError.append(numpy.amax(eL))
-            finalMean.append(numpy.mean(eL))
     
-        print(numpy.amax(finalError))
-        print(numpy.mean(finalMean))
-        print(numpy.where(finalError==numpy.amax(finalError)))
 
 
 def testCompareSolvers():
@@ -279,10 +297,10 @@ def testOrderOfConvergence(ifile="heat.yaml"):
         t0,tf = 0,0.01
         dt = float(d*dx**2/alpha)
         filename = pysweep.equations.heat.createInitialConditions(size,size,alpha=0.00016563)
-        testSolver = pysweep.Solver(filename,yfile)
-        testSolver.globals =  [t0,tf,dt,dx,dx,alpha,True]
-        testSolver()
-        hdf5 = h5py.File(testSolver.output,"r")
+        solver = pysweep.Solver(filename,yfile)
+        solver.globals =  [t0,tf,dt,dx,dx,alpha,True]
+        solver()
+        hdf5 = h5py.File(solver.output,"r")
         data = hdf5['data']
         num = data[int(tf//dt),0,int(size//2),int(size//2)]
         an = analytical(tf,int(size//2)*dx,int(size//2)*dx)
@@ -291,7 +309,7 @@ def testOrderOfConvergence(ifile="heat.yaml"):
         ss.append(float(dx))
         hdf5.close()
     
-    if testSolver.clusterMasterBool:
+    if solver.clusterMasterBool:
         with open('convergence.yaml',"w") as f:
             outdata  = {"error":error,"sizes":sizes,"dx":ss,"dt":ts}
             yaml.dump(outdata,f)
