@@ -108,9 +108,6 @@ def testSimpleOne(npx=384,npy=384):
                     assert numpy.all(data[i,0,:,:]==i)
                 except Exception as e:
                     failed = True
-                    print("Simulation failed on index: {}.".format(i))
-                    print(data[i,0])
-                    input()
         print("{}".format("Failed: testSimpleOne\n" if failed else "Success: testSimpleOne\n"))
 
 def testSimpleTwo(npx=384,npy=384):
@@ -130,18 +127,16 @@ def testSimpleTwo(npx=384,npy=384):
                     assert numpy.all(data[i,0,:,:]==2*i)
                 except Exception as e:
                     failed = True
-                    print("Simulation failed on index: {}.".format(i))
-                    print(2*i,data[i,0])
-                    input()
         print("{}".format("Failed: testSimpleTwo\n" if failed else "Success: testSimpleTwo\n"))
 
-def testChecker(npx=384,npy=384):
+def testCheckerOne(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,"checker.yaml")
     testSolver = pysweep.Solver(filename,yfile)
     testSolver()
     if testSolver.clusterMasterBool:
+        failed = False
         with h5py.File(testSolver.output,"r") as f:
             data = f["data"]
             nt,nv,nx,ny = numpy.shape(data)
@@ -162,9 +157,9 @@ def testChecker(npx=384,npy=384):
                     else:
                         assert numpy.all(data[i,0,:,:]==pattern2)
                 except Exception as e:
-                    print("Simulation failed on index: {}.".format(i))
-                    print(data[i,0,:,:])
-                    input()
+                    failed = True
+        print("{}".format("Failed: testCheckerOne\n" if failed else "Success: testCheckerOne\n"))
+
 
 def testHeatForwardEuler(inputFile="heat.yaml",npx=384,npy=384):
     timeSteps = 100
@@ -192,14 +187,14 @@ def testHeatForwardEuler(inputFile="heat.yaml",npx=384,npy=384):
             assert numpy.allclose(data[i,0],T[0])
 
 def testHeatRungeKuttaTwo(inputFile="heat.yaml",npx=384,npy=384):
-    timeSteps = 100
+    timeSteps = 50
     filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=0.00016563)
     yfile = os.path.join(path,"inputs")
     yfile = os.path.join(yfile,inputFile)
     testSolver = pysweep.Solver(filename,yfile)
     t0,tf,dt,dx,dy,alpha,scheme = testSolver.globals
     tf = timeSteps*dt
-    testSolver.globals[1] = tf #reset tf for 500 steps
+    testSolver.globals[1] = tf #reset tf for specified number of time steps
     testSolver.globals[-1] = False #Set to RK2
     testSolver()
     
@@ -216,21 +211,21 @@ def testHeatRungeKuttaTwo(inputFile="heat.yaml",npx=384,npy=384):
         for i in stepRange:
             T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
             try:
+                error.append(numpy.absolute(data[i,0]-T[0]))
                 assert numpy.allclose(data[i,0],T[0])
             except:
                 print("Simulation failed at index {}".format(i))
-
-    # error = testSolver.comm.allgather(error)
-    # if testSolver.clusterMasterBool:
-    #     finalError = []
-    #     finalMean = []
-    #     for eL in error:
-    #         finalError.append(numpy.amax(eL))
-    #         finalMean.append(numpy.mean(eL))
+    error = testSolver.comm.allgather(error)
+    if testSolver.clusterMasterBool:
+        finalError = []
+        finalMean = []
+        for eL in error:
+            finalError.append(numpy.amax(eL))
+            finalMean.append(numpy.mean(eL))
     
-    #     print(numpy.amax(finalError))
-    #     print(numpy.mean(finalMean))
-    #     print(numpy.where(finalError==numpy.amax(finalError)))
+        print(numpy.amax(finalError))
+        print(numpy.mean(finalMean))
+        print(numpy.where(finalError==numpy.amax(finalError)))
 
 
 def testCompareSolvers():
