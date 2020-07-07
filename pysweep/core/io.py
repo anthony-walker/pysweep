@@ -1,4 +1,4 @@
-import sys, os, h5py, time, yaml, numpy, importlib.util
+import sys, os, h5py, time, yaml, numpy
 from datetime import datetime
 from collections import Iterable
 from pycuda.compiler import SourceModule
@@ -24,8 +24,7 @@ def updateLogFile(solver,clocktime):
 def generateYamlEntry(obj,clocktime):
     """Use this function to generate a yaml entry."""
 
-    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":obj.blocksize[0],"filename":obj.output,"verbose":obj.verbose,"share":obj.share,"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"cpu":obj.cpuStr,"gpu":obj.gpuStr,"dtype":obj.dtypeStr,"exid":obj.exid}
-
+    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":int(obj.blocksize[0]),"filename":obj.output,"verbose":obj.verbose,"share":float(obj.share),"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"cpu":obj.cpuStr,"gpu":obj.gpuStr,"dtype":obj.dtypeStr,"exid":obj.exid}
     return {datetime.now().strftime("%m/%d/%Y-%H:%M:%S"):rundata}
 
 def yamlManager(solver):
@@ -67,16 +66,9 @@ def yamlManager(solver):
     #Settings datatype
     solver.dtypeStr=yamlGet('dtype','float64')
     solver.dtype = numpy.dtype(solver.dtypeStr)
-    #Time tuple
-    spec = importlib.util.spec_from_file_location("module.step", solver.cpu)
-    solver.cpu  = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(solver.cpu)
+    #Loading CPU module
+    solver.loadCPUModule()
 
-def loadCPUModule(solver):
-    """Use this function to set the cpu module externally."""
-    spec = importlib.util.spec_from_file_location("module.step", solver.cpu)
-    solver.cpu  = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(solver.cpu)
 
 def createOutputFile(solver):
     """Use this function to create output file which will act as the input file as well."""

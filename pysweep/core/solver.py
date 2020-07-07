@@ -1,4 +1,4 @@
-import sys, os, yaml, numpy, warnings, subprocess, traceback, time, h5py
+import sys, os, yaml, numpy, warnings, time, h5py, importlib.util
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
 import pysweep.core.process as process
@@ -8,11 +8,11 @@ from itertools import cycle
 
 class Solver(object):
     """docstring for Solver."""
-    def __init__(self, initialConditions, yamlFileName=None,sendWarning=True):
+    def __init__(self, initialConditions=None, yamlFileName=None,sendWarning=True):
         super(Solver, self).__init__()
         self.moments = [time.time(),]
         process.setupCommunicators(self) #This function creates necessary variables for MPI to use
-        self.assignInitialConditions(initialConditions)
+        self.assignInitialConditions(initialConditions,sendWarning=sendWarning)
 
         if yamlFileName is not None:
             self.yamlFileName = yamlFileName
@@ -71,16 +71,42 @@ class Solver(object):
         """Use this function to print the object."""
         return io.getSolverPrint(self)
 
-    def assignInitialConditions(self,initialConditions):
-        """Use this function to optionally assign initial conditions as an hdf5 file."""
+    def compactPrint(self):
+        """Use this function to print a compact version of the simulation details."""
+        shortPrint = "swept: " if self.simulation else "standard: "
+        moment = self.moments[-1] - self.moments[0] if self.moments else None
+        shortPrint += "{}, {}, {}, {}, {}".format(self.blocksize[0],self.share,self.intermediate,self.operating, moment)
+        print(shortPrint)
+
+    def loadCPUModule(self):
+        """Use this function to set the cpu module externally."""
+        spec = importlib.util.spec_from_file_location("module.step", self.cpu)
+        self.cpu  = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.cpu)    
+
+    def assignInitialConditions(self,initialConditions,sendWarning=True):
+        """Use this function to optionally assign initial conditions as an hdf5 file, array, or throw warning."""
         if type(initialConditions) == str:
             hf =  h5py.File(initialConditions,"r", driver='mpio', comm=self.comm)
             self.initialConditions = hf.get('data')
             self.arrayShape = hf.get('data').shape
             self.hf = hf
-        else:
+        elif initialConditions is not None:
             self.initialConditions = initialConditions
             self.arrayShape = numpy.shape(initialConditions)
+        else:
+            if sendWarning:
+                warnings.warn('Initial condition not provided, requires manual assignment with assignInitialConditionsFunction.')
+
+    def setGPU(self,gpu):
+        """Use this function to set GPU variable."""
+        self.gpu = gpu
+        self.gpuStr = gpu
+
+    def setCPU(self,cpu):
+        """Use this function to set CPU variable."""
+        self.cpu = cpu
+        self.cpuStr = cpu
 
     def createTimeStepData(self):
         """Use this function to create timestep data."""
@@ -101,12 +127,14 @@ class Solver(object):
 
     def solverCleanUp(self):
         """Use this function to remove unvariables not needed for computation."""
-        # if self.clusterMasterBool:
-        del self.gpuRank
-        del self.initialConditions
-        del self.yamlFile
-        del self.yamlFileName
-        del self.rank
+        #Try to delete unnecessary left over variables
+        try:
+            del self.gpuRank
+            del self.initialConditions
+            del self.yamlFileName
+            del self.yamlFile
+        except Exception as e:
+            pass
         #Close ICS if it is a file.
         try:
             self.hf.close()
