@@ -134,31 +134,17 @@ def getSolverPrint(solver):
         returnString+="]\n"
     return returnString
 
-
 def sweptWrite(cwt,solver):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
     iv,ix,iy = solver.globalBlock #Unpack global tuple
-    for si,i in enumerate(range(solver.globalTimeStep,solver.globalTimeStep+solver.maxPyramidSize,1),start=solver.intermediate):
-        if i%solver.intermediate==0:
-            solver.data[cwt,iv,ix,iy] = solver.sharedArray[si,:,:,:]
-            cwt+=1
-    nte = solver.sharedShape[0]-solver.maxPyramidSize
-    solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
-    solver.sharedArray[nte:,:,:,:] = 0
-    return cwt
-
-def NewsweptWrite(cwt,solver):
-    """Use this function to write to the hdf file and shift the shared array
-        # data after writing."""
-    iv,ix,iy = solver.globalBlock #Unpack global tuple
-    si = solver.intermediate
-    for i in range(solver.globalTimeStep,solver.globalTimeStep+solver.maxPyramidSize,solver.intermediate):
-        solver.data[cwt,iv,ix,iy] = solver.sharedArray[si,:,:,:]
+    for i in range(solver.globalTimeStep%solver.intermediate+solver.intermediate-solver.subtraction,solver.maxPyramidSize+solver.intermediate-solver.subtraction,solver.intermediate):
+        solver.data[cwt,iv,ix,iy] = solver.sharedArray[i,:,:,:]
         cwt+=1
+    
     nte = solver.sharedShape[0]-solver.maxPyramidSize
     solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
-    solver.sharedArray[nte:,:,:,:] = 0
+    solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
     return cwt
 
 def buildGPUSource(sourcefile):

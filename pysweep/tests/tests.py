@@ -100,6 +100,7 @@ def testSimpleOne(npx=384,npy=384):
     testSolver()
 
     if testSolver.clusterMasterBool:
+        failed = False
         with h5py.File(testSolver.output,"r") as f:
             data = f["data"]
             for i in range(testSolver.arrayShape[0]):
@@ -108,6 +109,7 @@ def testSimpleOne(npx=384,npy=384):
                 except Exception as e:
                     failed = True
                     # print("Simulation failed on index: {}.".format(i))
+        print("{}".format("Failed: testSimpleOne\n" if failed else "Success: testSimpleOne\n"))
 
 def testSimpleTwo(npx=384,npy=384):
     filename = pysweep.equations.example.createInitialConditions(1,npx,npy)
@@ -117,19 +119,19 @@ def testSimpleTwo(npx=384,npy=384):
     testSolver.intermediate = 2
     testSolver.globals[-1] = False
     testSolver()
-    # if testSolver.clusterMasterBool:
-    #     failed = False
-    #     with h5py.File(testSolver.output,"r") as f:
-    #         data = f["data"]
-    #         for i,value in enumerate(range(1,2*testSolver.arrayShape[0]-1,2),start=1):
-    #             try:
-    #                 assert numpy.all(data[i,0,:,:]==value)
-    #             except Exception as e:
-    #                 failed = True
-    #                 print("Simulation failed on index: {}.".format(i))
-    #                 print(data[i,0])
-    #                 input()
-    #         print("{}".format("Failed" if failed else "Success"))
+    if testSolver.clusterMasterBool:
+        failed = False
+        with h5py.File(testSolver.output,"r") as f:
+            data = f["data"]
+            for i in range(testSolver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,0,:,:]==2*i)
+                except Exception as e:
+                    failed = True
+                    print("Simulation failed on index: {}.".format(i))
+                    print(2*i,data[i,0])
+                    input()
+        print("{}".format("Failed: testSimpleTwo\n" if failed else "Success: testSimpleTwo\n"))
 
 def testChecker(npx=384,npy=384):
     filename = pysweep.equations.checker.createInitialConditions(1,npx,npy)

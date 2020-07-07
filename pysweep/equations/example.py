@@ -21,7 +21,7 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
         for idx,idy in iidx:
             state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex,:,idx,idy]+1
     else: #pseudo RK2
-        addition,timeChange =  (2,1) if globalTimeStep%2==0 else (1,0)
+        addition,timeChange = (1,0) if globalTimeStep%2==0 else  (2,1)
         for idx,idy in iidx:
             state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex-timeChange,:,idx,idy]+addition
 
