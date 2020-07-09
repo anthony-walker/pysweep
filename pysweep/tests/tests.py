@@ -26,7 +26,7 @@ def testing(func):
     def testConfigurations():
         arraysize = 384 #240
         shares = [0,0.625,1] #Shares for GPU
-        sims = [True,False] #different simulations
+        sims = [False,] #different simulations
         blocksizes = [8, 12, 16, 24] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
@@ -260,7 +260,7 @@ def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
     solver.setCPU(getEqnPath("heat.py"))
     solver.setGPU(getEqnPath("heat.cu"))
     solver.globals = [0,0.5,0.00001,0.0026041666666666665,0.0026041666666666665,alpha,False]
-    changeSolverTimeSteps(solver,10)
+    changeSolverTimeSteps(solver,50)
     solver.exid = []
     solver.output = "testing.hdf5"
     solver.loadCPUModule()
@@ -287,7 +287,7 @@ def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
     if solver.clusterMasterBool:
         solver.compactPrint()
         masterFail = numpy.all(failed)
-        print("{} testRungeKuttaTwo".format("Failed:" if masterFail else "Success:"))
+        print("{} testHeatRungeKuttaTwo".format("Failed:" if masterFail else "Success:"))
 
     if printError:
         error = solver.comm.allgather(error)

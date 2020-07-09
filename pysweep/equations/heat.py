@@ -46,19 +46,9 @@ def writeOut(arr):
             sys.stdout.write("]\n")
         sys.stdout.write("\n")
 
-prevSteps = []
-
 def rungeKuttaTwo(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function to solve the HDE with RK2."""
-    global prevSteps
-    coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)
-    
-    if globalTimeStep%2==0 and globalTimeStep not in prevSteps:
-        prevSteps.append(globalTimeStep)
-        print(globalTimeStep,"complete")
-    elif globalTimeStep not in prevSteps:
-        prevSteps.append(globalTimeStep)
-        print(globalTimeStep,"intermediate")
+    coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)  #True - Final Step, False- Intermediate Step
     for idx,idy in iidx:
         state[arrayTimeIndex+1,0,idx,idy] = coeff*centralDifference(state[arrayTimeIndex,0],idx,idy)+state[arrayTimeIndex-timechange,0,idx,idy]
     

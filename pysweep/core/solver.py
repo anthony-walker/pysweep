@@ -157,10 +157,11 @@ class Solver(object):
         """Use this function to begin the simulation."""
         # -------------------------------SWEPT RULE---------------------------------------------#
         #setting global time step to zero
-        self.globalTimeStep=1
+        self.globalTimeStep=numpy.int32(1) #Has to be int32 for GPU
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
         functions.firstForward(self)
+        # io.systemOutDebug(self)
         #Loop variables
         cwt = 1 #Current write time
         del self.Up #Deleting Up object after FirstPrism
@@ -176,7 +177,7 @@ class Solver(object):
     def standardSolve(self):
         # -------------------------------Standard Decomposition---------------------------------------------#
         #setting global time step to zero
-        self.globalTimeStep=1
+        self.globalTimeStep=numpy.int32(1)
         #Send Boundary points
         functions.sendEdges(self)
         cwt = 0 #Starts at zero compared too swept because of the write algorithm
