@@ -3,12 +3,8 @@
 #------------------------------Decomp Functions----------------------------------
 import numpy
 import pysweep.core.io as io
-#Try to import pycuda
-try:
-    import pycuda.driver as cuda
-except Exception as e:
-    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
-    
+import pycuda.driver as cuda
+
 #------------------------------Swept Functions----------------------------------
 
 def FirstPrism(solver):

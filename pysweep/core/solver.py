@@ -115,10 +115,10 @@ class Solver(object):
             self.splitx = self.blocksize[0]//2
             self.splity = self.blocksize[1]//2
             self.maxPyramidSize = self.blocksize[0]//(2*self.operating)-1 #This will need to be adjusted for differing x and y block lengths
-            self.maxGlobalSweptStep = int(numpy.ceil(self.intermediate*self.timeSteps/self.maxPyramidSize)-1) #minus 1 because the last pyramid will be outside this loop
-            self.timeSteps = int(numpy.ceil(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1)) #Plus 1 for initial conditions
+            self.maxGlobalSweptStep = int(self.intermediate*self.timeSteps/self.maxPyramidSize-1) #minus 1 because the last pyramid will be outside this loop
+            self.timeSteps = int(self.maxPyramidSize*(self.maxGlobalSweptStep+1)/self.intermediate+1) #Plus 1 for initial conditions
             self.maxOctSize = 2*self.maxPyramidSize
-            self.subtraction = 1 if self.maxPyramidSize%2==0 and self.intermediate%2==0 else 0 
+            self.subtraction = 1 if self.maxPyramidSize%2!=0 and self.intermediate%2==0 else 0 
             self.sharedShape = (self.maxOctSize+self.intermediate,)+self.sharedShape
             self.arrayShape = (self.timeSteps,)+self.arrayShape
         else:
@@ -179,8 +179,8 @@ class Solver(object):
         self.globalTimeStep=1
         #Send Boundary points
         functions.sendEdges(self)
-        cwt = 1
-        for i in range(self.intermediate*self.timeSteps):
+        cwt = 0 #Starts at zero compared too swept because of the write algorithm
+        for i in range(self.intermediate*(self.timeSteps+1)):
             functions.StandardFunction(self)
             cwt = io.standardWrite(cwt,self)
             #Communicate

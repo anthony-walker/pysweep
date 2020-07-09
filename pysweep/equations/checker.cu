@@ -15,16 +15,7 @@ __device__ void checkerOneStep(double * shared_state, int idx, int globalTimeSte
 
 __device__ void checkerTwoStep(double * shared_state, int idx, int globalTimeStep)
 {
-    bool cond = ((globalTimeStep+1)%ITS==0); //false - intermediate step, true complete step
-    
-    if (cond)
-    {
-      shared_state[idx+TIMES]=(shared_state[idx+1]+shared_state[idx-1]+shared_state[idx+SY]+shared_state[idx-SY])/4;
-    }
-    else
-    {
-      shared_state[idx+TIMES]=shared_state[idx]; //just translate previous data for intermediate step
-    }
+  shared_state[idx+TIMES]=(shared_state[idx+1]+shared_state[idx-1]+shared_state[idx+SY]+shared_state[idx-SY])/4;
 }
 
 __device__

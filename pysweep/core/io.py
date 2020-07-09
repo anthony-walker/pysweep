@@ -2,10 +2,7 @@ import sys, os, h5py, time, yaml, numpy
 from datetime import datetime
 from collections import Iterable
 from pycuda.compiler import SourceModule
-try:
-    import pycuda.driver as cuda
-except Exception as e:
-    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
+import pycuda.driver as cuda
 
 def updateLogFile(solver,clocktime):
     """Use this function to update log.yaml"""
@@ -130,16 +127,12 @@ def sweptWrite(cwt,solver):
     """Use this function to write to the hdf file and shift the shared array
         # data after writing."""
     iv,ix,iy = solver.globalBlock #Unpack global tuple
-    tg = solver.globalTimeStep
-    for i in range(solver.globalTimeStep%solver.intermediate+solver.intermediate-solver.subtraction,solver.maxPyramidSize+solver.intermediate-solver.subtraction,solver.intermediate):
-        print(i,tg,solver.sharedArray[i,0,5,5])
+    for i in range((solver.globalTimeStep+solver.subtraction)%solver.intermediate+solver.intermediate,solver.maxPyramidSize+solver.intermediate,solver.intermediate):
         solver.data[cwt,iv,ix,iy] = solver.sharedArray[i,:,:,:]
         cwt+=1
-        tg+=solver.intermediate
     nte = solver.sharedShape[0]-solver.maxPyramidSize
     solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
     # solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
-    
     return cwt
 
 def buildGPUSource(sourcefile):
@@ -189,7 +182,7 @@ def standardWrite(cwt,solver):
     if (solver.globalTimeStep)%solver.intermediate==0 and solver.nodeMasterBool:
         #Unpacking globalBlock
         iv,ix,iy = solver.globalBlock #Unpack global tuple
-        solver.data[cwt,iv,ix,iy] = solver.sharedArray[solver.intermediate,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
+        solver.data[cwt,iv,ix,iy] = solver.sharedArray[solver.intermediate-1,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
         cwt+=1
     solver.nodeComm.Barrier()
     #Update CPU shared data

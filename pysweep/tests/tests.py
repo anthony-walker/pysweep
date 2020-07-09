@@ -24,10 +24,10 @@ def testing(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 16 #240
-        shares = [0,]#0.625,1] #Shares for GPU
-        sims = [True,]#False] #different simulations
-        blocksizes = [16,]#[8, 12, 16, 20] #blocksizes with most options
+        arraysize = 384 #240
+        shares = [0,0.625,1] #Shares for GPU
+        sims = [True,False] #different simulations
+        blocksizes = [8, 12, 16, 24] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -92,7 +92,7 @@ def testSimpleTwo(solver,arraysize):
     solver.setGPU(getEqnPath("example.cu"))
     solver.output = "testing.hdf5"
     solver.globals = [0,1,0.1,0.1,0.1,False]
-    changeSolverTimeSteps(solver,10)
+    changeSolverTimeSteps(solver,50)
     solver.exid = []
     solver.loadCPUModule()
     solver()
@@ -152,6 +152,47 @@ def testCheckerOne(solver,arraysize):
                     failed = True
         print("{} testCheckerOne\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
+
+
+@testing
+def testCheckerTwo(solver,arraysize):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "checkerConditions.hdf5"
+    if not os.path.exists(filename):
+        filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.operating = 2
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("checker.py"))
+    solver.setGPU(getEqnPath("checker.cu"))
+    solver.output = "testing.hdf5"
+    solver.globals = [0,1,0.1,0.1,0.1,False]
+    changeSolverTimeSteps(solver,50)
+    solver.exid = []
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            nt,nv,nx,ny = numpy.shape(data)
+            pattern1 = numpy.zeros((nx,ny))
+            pattern2 = numpy.zeros((nx,ny))
+            for i in range(0,nx,2):
+                for j in range(0,ny,2):
+                    pattern1[i,j]=1
+            for i in range(1,nx,2):
+                for j in range(1,ny,2):
+                    pattern1[i,j]=1
+            for i in range(0,solver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,0,:,:]==pattern1)
+                except Exception as e:
+                    failed = True
+        print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
+
 
 @testing
 def testHeatForwardEuler(solver,arraysize,printError=True):

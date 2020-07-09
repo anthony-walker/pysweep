@@ -1,11 +1,8 @@
 
 import numpy, h5py, os, sys
 import mpi4py.MPI as MPI
-try:
-    import pycuda.driver as cuda
-except Exception as e:
-    print(str(e)+": Importing pycuda failed, execution will continue but is most likely to fail unless the affinity is 0.")
-    
+import pycuda.driver as cuda
+
 scheme = True
 pi = numpy.pi
 piSq = pi*pi

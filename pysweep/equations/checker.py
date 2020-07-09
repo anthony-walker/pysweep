@@ -36,14 +36,11 @@ def checkerTwoStep(state,iidx,arrayTimeIndex,globalTimeStep):
     vs = slice(0,state.shape[1],1)
     for idx,idy in iidx:
         ntidx = (arrayTimeIndex+1,vs,idx,idy)  #next step index
-        if (globalTimeStep)%2==0:
-            state[ntidx] = state[arrayTimeIndex,vs,idx+1,idy]
-            state[ntidx] += state[arrayTimeIndex,vs,idx-1,idy]
-            state[ntidx] += state[arrayTimeIndex,vs,idx,idy+1]
-            state[ntidx] += state[arrayTimeIndex,vs,idx,idy-1]
-            state[ntidx] /= 4
-        else:
-            state[ntidx] = state[arrayTimeIndex,vs,idx,idy]
+        state[ntidx] = state[arrayTimeIndex,vs,idx+1,idy]
+        state[ntidx] += state[arrayTimeIndex,vs,idx-1,idy]
+        state[ntidx] += state[arrayTimeIndex,vs,idx,idy+1]
+        state[ntidx] += state[arrayTimeIndex,vs,idx,idy-1]
+        state[ntidx] /= 4
 
 def createInitialConditions(nv,nx,ny,filename="checkerConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file."""
