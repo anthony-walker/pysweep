@@ -29,10 +29,10 @@ def testing(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 16
+        arraysize = 240
         shares = [1,]#[0,0.625,1] #Shares for GPU
-        sims = [True,] #different simulations
-        blocksizes = [16,]#[8, 12, 16, 24] #blocksizes with most options
+        sims = [False,] #different simulations
+        blocksizes = [8,]#[8, 12, 16, 24] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'

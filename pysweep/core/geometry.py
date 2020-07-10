@@ -38,12 +38,12 @@ class Geometry(object):
     def callGPU(self,GPUArray,globalTimeStep):
         """Use this function to build the Up Pyramid."""
         #UpPyramid of Swept Step
-        self.gfunction(GPUArray,globalTimeStep,self.start,grid=self.grid, block=self.blocksize)
+        self.gfunction(GPUArray,numpy.int32(globalTimeStep),self.start,grid=self.grid, block=self.blocksize)
 
     def callStandardGPU(self,GPUArray,globalTimeStep):
         """Use this function to build the Up Pyramid."""
         #UpPyramid of Swept Step
-        self.gfunction(GPUArray,globalTimeStep,grid=self.grid, block=self.blocksize)
+        self.gfunction(GPUArray,numpy.int32(globalTimeStep),grid=self.grid, block=self.blocksize)
 
     def callStandardCPU(self,sharedArray,blocks,globalTimeStep):
         """Use this function to build the Up Pyramid."""
