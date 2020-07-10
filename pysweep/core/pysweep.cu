@@ -170,7 +170,6 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
           step(state,gid,globalTimeStep);
-        //   state[gid+TIMES] = 5;
       }
       __syncthreads();
       //Updating global time step

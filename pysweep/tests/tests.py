@@ -3,6 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
+testTimeSteps=10
 
 def writeOut(arr,prec="%.5f"):
         for row in arr:
@@ -18,16 +19,20 @@ def writeOut(arr,prec="%.5f"):
 def changeSolverTimeSteps(solver,numberOfTimeSteps):
     solver.globals[1] = numberOfTimeSteps*solver.globals[2] #reset tf for numberOfTimeSteps
 
+def getEqnPath(eqn):   
+    """Use this function to get equation path."""
+    return os.path.join(eqnPath,eqn)
+
 def testing(func):
     """Use this function as a decorator for other tests.
     It's purpose is to contain a set of test conditions and wrap tests with those conditions.
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 384 #240
-        shares = [0,0.625,1] #Shares for GPU
-        sims = [False,] #different simulations
-        blocksizes = [8, 12, 16, 24] #blocksizes with most options
+        arraysize = 16
+        shares = [1,]#[0,0.625,1] #Shares for GPU
+        sims = [True,] #different simulations
+        blocksizes = [16,]#[8, 12, 16, 24] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -43,171 +48,18 @@ def testing(func):
                     func(solver,arraysize)
     return testConfigurations
 
-
-def getEqnPath(eqn):   
-    """Use this function to get equation path."""
-    return os.path.join(eqnPath,eqn)
-
-@testing
-def testSimpleOne(solver,arraysize):
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "exampleConditions.hdf5"
-    if not os.path.exists(filename):
-        filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
-    solver.assignInitialConditions(filename)
-    solver.operating = 1
-    solver.intermediate = 1
-    solver.setCPU(getEqnPath("example.py"))
-    solver.setGPU(getEqnPath("example.cu"))
-    solver.output = "testing.hdf5"
-    solver.globals = [0,1,0.1,0.1,0.1,True]
-    changeSolverTimeSteps(solver,50)
-    solver.exid = [-1,]
-    solver.loadCPUModule()
-    solver()
-    
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            for i in range(solver.arrayShape[0]):
-                try:
-                    assert numpy.all(data[i,0,:,:]==i)
-                except Exception as e:
-                    failed = True
-        print("{} testSimpleOne\n".format("Failed:" if failed else "Success:"))
-    solver.comm.Barrier()
-
-@testing 
-def testSimpleTwo(solver,arraysize):
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "exampleConditions.hdf5"
-    if not os.path.exists(filename):
-        filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
-    solver.assignInitialConditions(filename)
-    solver.operating = 2
-    solver.intermediate = 2
-    solver.setCPU(getEqnPath("example.py"))
-    solver.setGPU(getEqnPath("example.cu"))
-    solver.output = "testing.hdf5"
-    solver.globals = [0,1,0.1,0.1,0.1,False]
-    changeSolverTimeSteps(solver,50)
-    solver.exid = []
-    solver.loadCPUModule()
-    solver()
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            for i in range(solver.arrayShape[0]):
-                try:
-                    assert numpy.all(data[i,0,:,:]==2*i)
-                except Exception as e:
-                    failed = True
-        print("{} testSimpleTwo\n".format("Failed:" if failed else "Success:"))
-    solver.comm.Barrier()
-
-@testing
-def testCheckerOne(solver,arraysize):
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "checkerConditions.hdf5"
-    if not os.path.exists(filename):
-        filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
-    solver.assignInitialConditions(filename)
-    solver.operating = 1
-    solver.intermediate = 1
-    solver.setCPU(getEqnPath("checker.py"))
-    solver.setGPU(getEqnPath("checker.cu"))
-    solver.output = "testing.hdf5"
-    solver.globals = [0,1,0.1,0.1,0.1,True]
-    changeSolverTimeSteps(solver,50)
-    solver.exid = []
-    solver.loadCPUModule()
-    solver()
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            nt,nv,nx,ny = numpy.shape(data)
-            pattern1 = numpy.zeros((nx,ny))
-            pattern2 = numpy.zeros((nx,ny))
-            for i in range(0,nx,2):
-                for j in range(0,ny,2):
-                    pattern1[i,j]=1
-                    pattern2[i+1,j]=1
-            for i in range(1,nx,2):
-                for j in range(1,ny,2):
-                    pattern1[i,j]=1
-                    pattern2[i-1,j]=1
-            for i in range(0,solver.arrayShape[0]):
-                try:
-                    if i%2==0:
-                        assert numpy.all(data[i,0,:,:]==pattern1)
-                    else:
-                        assert numpy.all(data[i,0,:,:]==pattern2)
-                except Exception as e:
-                    failed = True
-        print("{} testCheckerOne\n".format("Failed:" if failed else "Success:"))
-    solver.comm.Barrier()
-
-
-@testing
-def testCheckerTwo(solver,arraysize):
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "checkerConditions.hdf5"
-    if not os.path.exists(filename):
-        filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
-    solver.assignInitialConditions(filename)
-    solver.operating = 2
-    solver.intermediate = 2
-    solver.setCPU(getEqnPath("checker.py"))
-    solver.setGPU(getEqnPath("checker.cu"))
-    solver.output = "testing.hdf5"
-    solver.globals = [0,1,0.1,0.1,0.1,False]
-    changeSolverTimeSteps(solver,50)
-    solver.exid = []
-    solver.loadCPUModule()
-    solver()
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            nt,nv,nx,ny = numpy.shape(data)
-            pattern1 = numpy.zeros((nx,ny))
-            pattern2 = numpy.zeros((nx,ny))
-            for i in range(0,nx,2):
-                for j in range(0,ny,2):
-                    pattern1[i,j]=1
-            for i in range(1,nx,2):
-                for j in range(1,ny,2):
-                    pattern1[i,j]=1
-            for i in range(0,solver.arrayShape[0]):
-                try:
-                    assert numpy.all(data[i,0,:,:]==pattern1)
-                except Exception as e:
-                    failed = True
-        print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
-    solver.comm.Barrier()
-
-
 @testing
 def testHeatForwardEuler(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
-    alpha=0.00016563
+    adjustHeatGlobals(solver,arraysize,True,timesteps=testTimeSteps)
     if not os.path.exists(filename):
-        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=alpha)
+        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
     solver.assignInitialConditions(filename)
     solver.operating = 1
-    solver.intermediate = 1
+    solver.intermediate = 2
     solver.setCPU(getEqnPath("heat.py"))
     solver.setGPU(getEqnPath("heat.cu"))
-    solver.globals = [0,0.5,0.00001,0.0026041666666666665,0.0026041666666666665,alpha,True]
-    changeSolverTimeSteps(solver,50)
     solver.exid = []
     solver.output = "testing.hdf5"
     solver.loadCPUModule()
@@ -251,16 +103,14 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
 def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
-    alpha=0.00016563
+    adjustHeatGlobals(solver,arraysize,False,timesteps=testTimeSteps)
     if not os.path.exists(filename):
-        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=alpha)
+        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
     solver.assignInitialConditions(filename)
     solver.operating = 1
     solver.intermediate = 2
     solver.setCPU(getEqnPath("heat.py"))
     solver.setGPU(getEqnPath("heat.cu"))
-    solver.globals = [0,0.5,0.00001,0.0026041666666666665,0.0026041666666666665,alpha,False]
-    changeSolverTimeSteps(solver,50)
     solver.exid = []
     solver.output = "testing.hdf5"
     solver.loadCPUModule()
@@ -300,6 +150,13 @@ def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
         print("\n") #Final end line
     solver.comm.Barrier()
 
+def adjustHeatGlobals(solver,arraysize,scheme,timesteps=50):
+    """Use this function to adjust heat equation step size based on arraysize"""
+    d = 0.1
+    alpha = 1
+    dx = 1/arraysize
+    dt = float(d*dx**2/alpha)
+    solver.globals = [0,dt*timesteps,dt,dx,dx,alpha,scheme]
 
 def testCompareSolvers():
     """Use this function to compare cpu portion of solvers based on output hdf5 and error.
@@ -387,7 +244,158 @@ def makeOrderOfConvergencePlot():
         ax.loglog(data['dt'],data['error'])
         ax.set_xlim([10e-6,10e-4])
         plt.show()
-        
+
+
+#-------------------------------------Completed Tests------------------#
+@testing
+def testSimpleOne(solver,arraysize):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "exampleConditions.hdf5"
+    if not os.path.exists(filename):
+        filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.operating = 1
+    solver.intermediate = 1
+    solver.setCPU(getEqnPath("example.py"))
+    solver.setGPU(getEqnPath("example.cu"))
+    solver.output = "testing.hdf5"
+    solver.globals = [0,1,0.1,0.1,0.1,True]
+    changeSolverTimeSteps(solver,testTimeSteps)
+    solver.exid = [-1,]
+    solver.loadCPUModule()
+    solver()
+    
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            for i in range(solver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,0,:,:]==i)
+                except Exception as e:
+                    failed = True
+        print("{} testSimpleOne\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
+
+@testing 
+def testSimpleTwo(solver,arraysize):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "exampleConditions.hdf5"
+    if not os.path.exists(filename):
+        filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.operating = 2
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("example.py"))
+    solver.setGPU(getEqnPath("example.cu"))
+    solver.output = "testing.hdf5"
+    solver.globals = [0,1,0.1,0.1,0.1,False]
+    changeSolverTimeSteps(solver,testTimeSteps)
+    solver.exid = []
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            for i in range(solver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,0,:,:]==2*i)
+                except Exception as e:
+                    failed = True
+                    print(i,data[i,0])
+                    input()
+        print("{} testSimpleTwo\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
+
+@testing
+def testCheckerOne(solver,arraysize):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "checkerConditions.hdf5"
+    if not os.path.exists(filename):
+        filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.operating = 1
+    solver.intermediate = 1
+    solver.setCPU(getEqnPath("checker.py"))
+    solver.setGPU(getEqnPath("checker.cu"))
+    solver.output = "testing.hdf5"
+    solver.globals = [0,1,0.1,0.1,0.1,True]
+    changeSolverTimeSteps(solver,testTimeSteps)
+    solver.exid = []
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            nt,nv,nx,ny = numpy.shape(data)
+            pattern1 = numpy.zeros((nx,ny))
+            pattern2 = numpy.zeros((nx,ny))
+            for i in range(0,nx,2):
+                for j in range(0,ny,2):
+                    pattern1[i,j]=1
+                    pattern2[i+1,j]=1
+            for i in range(1,nx,2):
+                for j in range(1,ny,2):
+                    pattern1[i,j]=1
+                    pattern2[i-1,j]=1
+            for i in range(0,solver.arrayShape[0]):
+                try:
+                    if i%2==0:
+                        assert numpy.all(data[i,0,:,:]==pattern1)
+                    else:
+                        assert numpy.all(data[i,0,:,:]==pattern2)
+                except Exception as e:
+                    failed = True
+        print("{} testCheckerOne\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
+
+
+@testing
+def testCheckerTwo(solver,arraysize):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "checkerConditions.hdf5"
+    if not os.path.exists(filename):
+        filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.operating = 2
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("checker.py"))
+    solver.setGPU(getEqnPath("checker.cu"))
+    solver.output = "testing.hdf5"
+    solver.globals = [0,1,0.1,0.1,0.1,False]
+    changeSolverTimeSteps(solver,testTimeSteps)
+    solver.exid = []
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            nt,nv,nx,ny = numpy.shape(data)
+            pattern1 = numpy.zeros((nx,ny))
+            pattern2 = numpy.zeros((nx,ny))
+            for i in range(0,nx,2):
+                for j in range(0,ny,2):
+                    pattern1[i,j]=1
+            for i in range(1,nx,2):
+                for j in range(1,ny,2):
+                    pattern1[i,j]=1
+            for i in range(0,solver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,0,:,:]==pattern1)
+                except Exception as e:
+                    failed = True
+        print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
+
+
+
 # if __name__ == "__main__":
     # pass
     # MPI.COMM_SELF.Spawn(sys.executable, args=["from pysweep.tests import testExample; testExample()"], maxprocs=2)

@@ -161,7 +161,7 @@ class Solver(object):
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
         functions.firstForward(self)
-        # io.systemOutDebug(self)
+        # io.systemOutDebug(self,self.sharedArray[:,:,:self.blocksize[0],:self.blocksize[0]])
         #Loop variables
         cwt = 1 #Current write time
         del self.Up #Deleting Up object after FirstPrism
@@ -169,6 +169,7 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
+            # io.systemOutDebug(self,self.sharedArray[:,:,:self.blocksize[0],:self.blocksize[0]])
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         functions.LastPrism(self)

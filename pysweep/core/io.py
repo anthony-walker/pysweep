@@ -210,7 +210,7 @@ def systemOutDebug(solver,array=None):
                     sys.stdout.write("\033[1;36m")
                 else:
                     sys.stdout.write("\033[1;31m")
-                sys.stdout.write("%.4f, "%item)
+                sys.stdout.write("%.5e, "%item)
             sys.stdout.write("]\n")
     
     if solver.clusterMasterBool: 
