@@ -2,7 +2,7 @@
 import numpy, h5py, os, sys
 import mpi4py.MPI as MPI
 import pycuda.driver as cuda
-
+import pysweep.core.io as io
 scheme = True
 pi = numpy.pi
 piSq = pi*pi
@@ -92,17 +92,71 @@ def analytical(npx,npy,t,alpha=0.1):
             u[0,i,j] = numpy.sin(m*pi*x)*numpy.sin(n*pi*y)*numpy.exp(-(m*m+n*n)*pi*pi*alpha*t)
     return u,X,Y
 
-def sourceTerm(idx,idy,globalTimeStep):
-    x = idx*dx
-    y = idy*dy
-    t = dt*globalTimeStep
-    expon = numpy.exp(-8*piSq*alpha*t)
-    trig = numpy.sin(2*pi*x)*numpy.sin(2*pi*y)
-    sx = -4*alpha*piSq*expon*trig
-    sy = -4*alpha*piSq*expon*trig
-    st = -8*piSq*alpha*expon*trig
-    sTotal = dt*(sx+sy+st)
-    return sTotal
+
+def numericalHeatComparisonFE():
+    """Use this function to compare a directly implemented forward euler to the analytical."""
+    arraysize = 10
+    d = 0.1
+    alpha = 1
+    dx = 1/arraysize
+    dt = float(d*dx**2/alpha)
+    T,x,y = analytical(arraysize,arraysize,0,alpha=alpha)
+    numerical = numpy.zeros((2,)+T.shape)
+    ns = numerical.shape
+    numerical[0,:,:,:] = T[:,:,:]
+    error = []
+    diff = []
+    hdf5 = h5py.File('/home/anthony-walker/nrg-swept-project/testing.hdf5')
+    data = hdf5['data']
+    courant = alpha*dt/dx/dx
+    for i in range(1,20):
+        T,x,y = analytical(arraysize,arraysize,i*dt,alpha=alpha)
+        for idx,idy in numpy.ndindex(ns[2:]):
+            dxx = numerical[0,0,idx-1,idy]+numerical[0,0,(idx+1)%ns[-2],idy]-2*numerical[0,0,idx,idy]
+            dyy = numerical[0,0,idx,idy-1]+numerical[0,0,idx,(idy+1)%ns[-1]]-2*numerical[0,0,idx,idy]
+            numerical[1,0,idx,idy] = courant*(dxx+dyy)+numerical[0,0,idx,idy]
+        error.append(numpy.amax(numpy.absolute(numerical[1,:,:,:]-T[:,:,:])))
+        # diff.append(numpy.amax(numpy.absolute(numerical[1,:,:,:]-data[i,:,:,:])))
+        numerical[0,:,:,:] = numerical[1,:,:,:]
+    print(numpy.amax(error))
+    # print(numpy.amax(diff))
+    hdf5.close()
+
+def numericalHeatComparisonRK2():
+    """Use this function to compare a directly implemented forward euler to the analytical."""
+    arraysize = 10
+    d = 0.1
+    alpha = 1
+    dx = 1/arraysize
+    dt = float(d*dx**2/alpha)
+    T,x,y = analytical(arraysize,arraysize,0,alpha=alpha)
+    numerical = numpy.zeros((3,)+T.shape)
+    ns = numerical.shape
+    numerical[0,:,:,:] = T[:,:,:]
+    error = []
+    diff = []
+    hdf5 = h5py.File('/home/anthony-walker/nrg-swept-project/testing.hdf5')
+    data = hdf5['data']
+    courant = alpha*dt/dx/dx
+    for i in range(1,20):
+        T,x,y = analytical(arraysize,arraysize,i*dt,alpha=alpha)
+        for idx,idy in numpy.ndindex(ns[2:]):
+            #Intermediate
+            dxx = numerical[0,0,idx-1,idy]+numerical[0,0,(idx+1)%ns[-2],idy]-2*numerical[0,0,idx,idy]
+            dyy = numerical[0,0,idx,idy-1]+numerical[0,0,idx,(idy+1)%ns[-1]]-2*numerical[0,0,idx,idy]
+            numerical[1,0,idx,idy] = 0.5*courant*(dxx+dyy)+numerical[0,0,idx,idy]
+            
+        for idx,idy in numpy.ndindex(ns[2:]):
+            #RK Step
+            dxx = numerical[1,0,idx-1,idy]+numerical[1,0,(idx+1)%ns[-2],idy]-2*numerical[1,0,idx,idy]
+            dyy = numerical[1,0,idx,idy-1]+numerical[1,0,idx,(idy+1)%ns[-1]]-2*numerical[1,0,idx,idy]
+            numerical[2,0,idx,idy] = courant*(dxx+dyy)+numerical[0,0,idx,idy]
+        error.append(numpy.amax(numpy.absolute(numerical[2,:,:,:]-T[:,:,:])))
+        # diff.append(numpy.amax(numpy.absolute(numerical[1,:,:,:]-data[i,:,:,:])))
+        numerical[0,:,:,:] = numerical[2,:,:,:]
+    print(numpy.amax(error))
+    # print(numpy.amax(diff))
+    hdf5.close()
 
 class HeatGIF(object):
     
@@ -142,37 +196,39 @@ class HeatGIF(object):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from matplotlib import cm
-    from mpl_toolkits import mplot3d
-    from matplotlib import animation, rc
-    os.system("rm heat.gif") #Remove old heat gif
-    alpha = 0.1#0.00016563 #Of pure silver
-    dt = 0.0001
-    npx = 11
-    npy = 11
-    t0 = 0
-    tf = 0.5
-    uIC,X,Y = analytical(npx,npy,t0)
-    dx = X[1]-X[0]
-    dy = Y[1]-Y[0]
-    globs = t0,tf,dt,
-    set_globals(False,t0,tf,dt,dx,dy,alpha,True)
-    U = numpy.zeros((2,)+uIC.shape)
-    U[0,:,:,:] = uIC[:,:,:]
-    idxs = list(numpy.ndindex((npx,npy)))
-    X, Y = numpy.meshgrid(X, Y)
-    hgf = HeatGIF()
-    hgf.setXY(X,Y)
-    hgf.appendTemp(U[0,0])
-    error = [numpy.amax(U[0]-uIC),]
-    for i,time in enumerate(numpy.arange(t0,tf+dt,dt)):
-        U = step(U,idxs,0,i)
-        uA,_,__ = analytical(npx,npy,time+dt)
-        # print(numpy.amax(U[0]-U[1]))
-        U[0,:,:,:] = numpy.copy(U[1,:,:,:])
-        U[1,:,:,:] = 0
-        error.append(numpy.amax(U[0]-uA))
-        hgf.appendTemp(U[0,0])
-    print(numpy.amax(error))
+    numericalHeatComparisonFE()
+    numericalHeatComparisonRK2()
+    # import matplotlib.pyplot as plt
+    # from matplotlib import cm
+    # from mpl_toolkits import mplot3d
+    # from matplotlib import animation, rc
+    # os.system("rm heat.gif") #Remove old heat gif
+    # alpha = 0.1#0.00016563 #Of pure silver
+    # dt = 0.0001
+    # npx = 11
+    # npy = 11
+    # t0 = 0
+    # tf = 0.5
+    # uIC,X,Y = analytical(npx,npy,t0)
+    # dx = X[1]-X[0]
+    # dy = Y[1]-Y[0]
+    # globs = t0,tf,dt,
+    # set_globals(False,t0,tf,dt,dx,dy,alpha,True)
+    # U = numpy.zeros((2,)+uIC.shape)
+    # U[0,:,:,:] = uIC[:,:,:]
+    # idxs = list(numpy.ndindex((npx,npy)))
+    # X, Y = numpy.meshgrid(X, Y)
+    # hgf = HeatGIF()
+    # hgf.setXY(X,Y)
+    # hgf.appendTemp(U[0,0])
+    # error = [numpy.amax(U[0]-uIC),]
+    # for i,time in enumerate(numpy.arange(t0,tf+dt,dt)):
+    #     U = step(U,idxs,0,i)
+    #     uA,_,__ = analytical(npx,npy,time+dt)
+    #     # print(numpy.amax(U[0]-U[1]))
+    #     U[0,:,:,:] = numpy.copy(U[1,:,:,:])
+    #     U[1,:,:,:] = 0
+    #     error.append(numpy.amax(U[0]-uA))
+    #     hgf.appendTemp(U[0,0])
+    # print(numpy.amax(error))
     # hgf.makeGif()

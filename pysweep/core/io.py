@@ -132,7 +132,7 @@ def sweptWrite(cwt,solver):
         cwt+=1
     nte = solver.sharedShape[0]-solver.maxPyramidSize
     solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
-    # solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
+    solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
     return cwt
 
 def buildGPUSource(sourcefile):
@@ -199,19 +199,19 @@ def standardWrite(cwt,solver):
     solver.nodeComm.Barrier()
     return cwt
 
-def systemOutDebug(solver,array=None):
-    """Use this function to write data out with standard out for more clear debugging."""
-    
-    def writeOut(arr):
+def writeOut(arr,prec="%.3f, "):
         for row in arr:
             sys.stdout.write("[")
             for item in row:
-                if item == 0:
+                if 1:
                     sys.stdout.write("\033[1;36m")
                 else:
                     sys.stdout.write("\033[1;31m")
-                sys.stdout.write("%.5e, "%item)
+                sys.stdout.write(prec%item)
             sys.stdout.write("]\n")
+
+def systemOutDebug(solver,array=None):
+    """Use this function to write data out with standard out for more clear debugging."""
     
     if solver.clusterMasterBool: 
             ci = 0
