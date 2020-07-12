@@ -45,20 +45,19 @@ def UpPrism(solver):
         cuda.memcpy_htod(solver.GPUArray,solver.localGPUArray)  
         solver.Xb.callGPU(solver.GPUArray,solver.globalTimeStep)
         solver.Oct.callGPU(solver.GPUArray,solver.globalTimeStep)
-        solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep)
+        solver.Yb.callGPU(solver.GPUArray,solver.globalTimeStep+solver.maxPyramidSize)
     #Do CPU  Operations
     solver.Xb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
     solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
     solver.Oct.callCPU(solver.sharedArray,solver.edgeblocks,solver.globalTimeStep)
     solver.nodeComm.Barrier() #need barrier to make sure all data is in place for next step
+    solver.globalTimeStep+=solver.maxPyramidSize #Add pyramid to global time step so ybridge starts at appropriate step for intermediate schemes
     solver.Yb.callCPU(solver.sharedArray,solver.blocks,solver.globalTimeStep)
     #Cleanup GPU Operations
     if solver.gpuBool:
         cuda.Context.synchronize()
         cuda.memcpy_dtoh(solver.localGPUArray,solver.GPUArray)
         solver.sharedArray[solver.gpuBlock]=solver.localGPUArray[:,:,:,solver.blocksize[0]:-solver.blocksize[0]]
-    #Add to global time step after operations
-    solver.globalTimeStep+=solver.maxPyramidSize
     solver.nodeComm.Barrier() #Node barrier here before the write
 
 def LastPrism(solver):

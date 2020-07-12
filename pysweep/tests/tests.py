@@ -55,10 +55,11 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 16
+        blk = 16
+        arraysize = blk
         shares = [0,] #Shares for GPU
         sims = [True,] #different simulations
-        blocksizes = [16,] #blocksizes with most options
+        blocksizes = [blk,] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -74,6 +75,50 @@ def debugging(func):
                     func(solver,arraysize)
     return testConfigurations
 
+@debugging
+def testHalf(solver,arraysize):
+    """Use this function to run the half test."""
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "halfConditions.hdf5"
+    # if not os.path.exists(filename):
+    filename = pysweep.equations.half.createInitialConditions(arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.globals = [0,1,0.1,0.1,0.1]
+    changeSolverTimeSteps(solver,testTimeSteps)
+    solver.operating = 1
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("half.py"))
+    solver.setGPU(getEqnPath("half.cu"))
+    solver.exid = []
+    solver.output = "half.hdf5"
+    solver.loadCPUModule()
+    solver()
+
+    hdf5File = h5py.File(solver.output,"r")
+    data = hdf5File['data']
+    actual = data[:3,:,:,:]
+    
+    actualFile = h5py.File("actual.hdf5","w")
+    actualData = actualFile.create_dataset('data',shape = (int(2*testTimeSteps),1,arraysize,arraysize))
+
+    ct = 0
+    for i in range(1,testTimeSteps):
+        for idx, idy in numpy.ndindex(actual.shape[2:]):
+            actual[1,0,idx,idy] = (actual[0,0,(idx+1)%arraysize,idy]-2*actual[0,0,idx,idy]+actual[0,0,idx-1,idy])+(actual[0,0,idx,(idy+1)%arraysize]-2*actual[0,0,idx,idy]+actual[0,0,idx,idy-1])
+            actual[1,0,idx,idy] *= 0.5/100
+            actual[1,0,idx,idy] += actual[0,0,idx,idy]
+        actualData[ct,:,:,:] = actual[1,:,:,:]
+        ct+=1
+        for idx, idy in numpy.ndindex(actual.shape[2:]):
+            actual[2,0,idx,idy] = (actual[1,0,(idx+1)%arraysize,idy]-2*actual[1,0,idx,idy]+actual[1,0,idx-1,idy])+(actual[1,0,idx,(idy+1)%arraysize]-2*actual[1,0,idx,idy]+actual[1,0,idx,idy-1])
+            actual[2,0,idx,idy] /= 100
+            actual[2,0,idx,idy] += actual[0,0,idx,idy]
+        actualData[ct,:,:,:] = actual[2,:,:,:]
+        ct+=1
+        pysweep.equations.half.writeOut(actual[2,0,:,:]-data[i,0,:,:])
+        input()
+        actual[0,:,:,:] = actual[2,:,:,:]
+        
 @testing
 def testHeatForwardEuler(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
