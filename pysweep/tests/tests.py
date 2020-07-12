@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=50
+testTimeSteps=10#50
 
 def writeOut(arr,prec="%.5f"):
         for row in arr:
@@ -31,8 +31,8 @@ def testing(func):
     def testConfigurations():
         arraysize = 384
         shares = [0,0.625,1] #Shares for GPU
-        sims = [True,] #different simulations
-        blocksizes = [8, 12, 16, 24, 32] #blocksizes with most options
+        sims = [True,False] #different simulations
+        blocksizes = [8, 12, 16, 24] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -49,25 +49,30 @@ def testing(func):
     return testConfigurations
 
 
-def testDebugger():
-    """Use this function to run one case for debugging purposes."""
-    arraysize = 16
-    filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
-    solver = pysweep.Solver(initialConditions=filename, yamlFileName="/home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/tests/inputs/example.yaml")
-    solver()
-    
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            for i in range(solver.arrayShape[0]):
-                try:
-                    assert numpy.all(data[i,0,:,:]==i)
-                except Exception as e:
-                    failed = True
-        print("{} testSimpleOne\n".format("Failed:" if failed else "Success:"))
-    solver.comm.Barrier()
+def debugging(func):
+    """Use this function as a decorator for other tests.
+    It's purpose is to contain a set of test conditions and wrap tests with those conditions.
+    exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
+    """
+    def testConfigurations():
+        arraysize = 16
+        shares = [0,] #Shares for GPU
+        sims = [True,] #different simulations
+        blocksizes = [16,] #blocksizes with most options
+        #Creat solver object
+        solver = pysweep.Solver(sendWarning=False)
+        solver.dtypeStr = 'float64'
+        solver.dtype = numpy.dtype(solver.dtypeStr)
+        solver.verbose=False
+        for sim in sims:
+            for bs in blocksizes:
+                for sh in shares:
+                    solver.moments = [time.time(),]
+                    solver.share = sh
+                    solver.simulation = sim
+                    solver.blocksize = (bs,bs,1)
+                    func(solver,arraysize)
+    return testConfigurations
 
 @testing
 def testHeatForwardEuler(solver,arraysize,printError=True):
@@ -120,7 +125,7 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
         print("\n") #Final end line
     solver.comm.Barrier()
 
-@testing
+@debugging
 def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
@@ -178,6 +183,43 @@ def adjustHeatGlobals(solver,arraysize,scheme,timesteps=50):
     dx = 1/arraysize
     dt = float(d*dx**2/alpha)
     solver.globals = [0,dt*timesteps,dt,dx,dx,alpha,scheme]
+
+def compareGPUToCPU():
+    """Use this function to compare GPU to CPU based on file output."""
+    #Adjustment of global variables
+    d = 0.1 #Constant
+    alpha = 1
+    npx = npy = 8
+    T,x,y = pysweep.equations.heat.analytical(npx,npy,0)
+    dx = dy = float(x[1]-x[0])
+    t0,tf = 0,0.001
+    dt = float(d*dx**2/alpha)
+    timesteps = 10
+    #Input files
+    filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=alpha)
+    inputPath = os.path.join(path,"inputs")
+    solver = pysweep.Solver(filename, os.path.join(inputPath,"heatSwept.yaml"))
+    adjustHeatGlobals(solver,npx,False,timesteps=timesteps)
+    solver.intermediate = 2
+    solver.blocksize = (npx,npx,1)
+    #Solve CPU
+    solver.output = "cpu.hdf5"
+    solver.share = 0
+    solver()
+    cpuFile = h5py.File(solver.output,'r')
+    cdata = cpuFile['data']
+    #Solver GPU
+    solver.assignInitialConditions(filename)
+    solver.output = "gpu.hdf5"
+    solver.share = 1
+    solver()
+    gpuFile = h5py.File(solver.output,'r')
+    gdata = gpuFile['data']
+    #compare
+    for i in range(timesteps):
+        print(gdata[i,0,:,:]-cdata[i,0,:,:])
+        input()
+    
 
 def testCompareSolvers():
     """Use this function to compare cpu portion of solvers based on output hdf5 and error.
