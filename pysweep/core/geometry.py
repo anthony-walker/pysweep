@@ -8,7 +8,7 @@ class Geometry(object):
     def initializeCPU(self,*args):
         """Use this function to initialize CPU arguments."""
         self.cpu,self.sets,start,cshape = args
-        self.start = numpy.intc(start)
+        self.start = numpy.int32(start)
         self.CPUArray = numpy.zeros(cshape)
 
     def initializeGPU(self,*args):
@@ -17,7 +17,7 @@ class Geometry(object):
 
     def startAdd(self,value):
         """Use this to add to the existing start parameter."""
-        self.start += numpy.intc(value)
+        self.start = numpy.int32(value+self.start)
         
     def setAdjustment(self,value):
         """Use this to set the adjustment for standard"""

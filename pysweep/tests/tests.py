@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=10
+testTimeSteps=50
 
 def writeOut(arr,prec="%.5f"):
         for row in arr:
@@ -29,10 +29,10 @@ def testing(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 16
-        shares = [1,]#[0,0.625,1] #Shares for GPU
+        arraysize = 384
+        shares = [0,0.625,1] #Shares for GPU
         sims = [True,] #different simulations
-        blocksizes = [16,]#[8, 12, 16, 24] #blocksizes with most options
+        blocksizes = [8, 12, 16, 24, 32] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -47,6 +47,27 @@ def testing(func):
                     solver.blocksize = (bs,bs,1)
                     func(solver,arraysize)
     return testConfigurations
+
+
+def testDebugger():
+    """Use this function to run one case for debugging purposes."""
+    arraysize = 16
+    filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
+    solver = pysweep.Solver(initialConditions=filename, yamlFileName="/home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/tests/inputs/example.yaml")
+    solver()
+    
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            for i in range(solver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,0,:,:]==i)
+                except Exception as e:
+                    failed = True
+        print("{} testSimpleOne\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
 
 @testing
 def testHeatForwardEuler(solver,arraysize,printError=True):

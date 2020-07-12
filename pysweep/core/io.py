@@ -132,7 +132,7 @@ def sweptWrite(cwt,solver):
         cwt+=1
     nte = solver.sharedShape[0]-solver.maxPyramidSize
     solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
-    solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
+    # solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
     return cwt
 
 def buildGPUSource(sourcefile):
@@ -199,11 +199,11 @@ def standardWrite(cwt,solver):
     solver.nodeComm.Barrier()
     return cwt
 
-def writeOut(arr,prec="%.3f, "):
+def writeOut(arr,prec="%d, "):
         for row in arr:
             sys.stdout.write("[")
             for item in row:
-                if 1:
+                if item==0:
                     sys.stdout.write("\033[1;36m")
                 else:
                     sys.stdout.write("\033[1;31m")

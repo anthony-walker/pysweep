@@ -160,7 +160,6 @@ class Solver(object):
         self.globalTimeStep=1 #Has to be int32 for GPU
         # -------------------------------FIRST PRISM AND COMMUNICATION-------------------------------------------#
         functions.FirstPrism(self)
-        # io.systemOutDebug(self)
         functions.firstForward(self)
         #Loop variables
         cwt = 1 #Current write time
@@ -169,7 +168,6 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
-            # io.systemOutDebug(self)
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         functions.LastPrism(self)
@@ -184,7 +182,6 @@ class Solver(object):
         cwt = 0 #Starts at zero compared too swept because of the write algorithm
         for i in range(self.intermediate*(self.timeSteps+1)):
             functions.StandardFunction(self)
-            io.systemOutDebug(self,self.sharedArray[-1:,:,1:-1,1:-1])
             cwt = io.standardWrite(cwt,self)
             #Communicate
             functions.sendEdges(self)

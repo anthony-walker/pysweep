@@ -40,11 +40,19 @@ __device__ int get_idx(int tmod)
 /*
     Use this function to check the value of global constants
 */
-__device__ void checkConstants()
+__device__ void checkConstants(int gid)
 {
     if (threadIdx.x==1 && threadIdx.y==1)
     {
-        printf("%d,%d,%d,%d,%d,%d,%d,%d,%d\n",NV,SX,SY,VARS,TIMES,ITS,OPS,MPSS,MOSS);
+        printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",gid,NV,SX,SY,VARS,TIMES,ITS,OPS,MPSS,MOSS);
+    }
+}
+
+__device__ void checkBlockParams()
+{
+    if (threadIdx.x==1 && threadIdx.y==1)
+    {
+        printf("%d,%d,%d,%d\n",blockDim.x,blockDim.y,gridDim.x,gridDim.y);
     }
 }
 
@@ -57,7 +65,6 @@ UpPyramid(double *state, int globalTimeStep, int sweptStep)
     
     //Other quantities for indexing
     int gid = get_idx(sweptStep)+blockDim.x/2; //global index
-
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ly = OPS; // Lower y swept bound
@@ -90,8 +97,7 @@ UpPyramid(double *state, int globalTimeStep, int sweptStep)
 __global__ void
 YBridge(double *state, int globalTimeStep, int sweptStep)
 {
-
-    int gid = get_idx(sweptStep);//+blockDim.x/2; //global index
+    int gid = get_idx(sweptStep); //global index
     //Creating swept boundaries
     int lx = OPS; //Lower x swept bound
     int ux = blockDim.x-OPS; //upper x
@@ -124,8 +130,8 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
 */
 __global__ void
 XBridge(double *state, int globalTimeStep, int sweptStep)
-{
-    int gid = get_idx(sweptStep);//+blockDim.x/2; //global index
+{   
+    int gid = get_idx(sweptStep);//global index
     //Creating swept boundaries
     int ly = OPS; //Lower x swept bound
     int uy = blockDim.y-OPS; //upper x
@@ -154,15 +160,14 @@ XBridge(double *state, int globalTimeStep, int sweptStep)
 __global__ void
 Octahedron(double *state, int globalTimeStep, int sweptStep)
 {
-    int gid = get_idx(sweptStep)+blockDim.x/2-OPS-OPS*SY; //global index
-    int TOPS = 2*OPS;
+    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
     //Creating swept boundaries
-    int lx =(blockDim.x+TOPS)/RTWO-OPS; //lower x
-    int ly = (blockDim.y+TOPS)/RTWO-OPS; //lower y
-    int ux =(blockDim.x+TOPS)/RTWO+OPS; //upper x
-    int uy = (blockDim.y+TOPS)/RTWO+OPS; //upper y
+    int lx =blockDim.x/2-OPS; //lower x
+    int ly = blockDim.y/2-OPS; //lower y
+    int ux = blockDim.x/2+OPS; //upper x
+    int uy = blockDim.y/2+OPS; //upper y
     //Calculate Down Pyramid - Down Step
     for (int k = 0; k < MDSS; k++)
     {
@@ -170,6 +175,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
       if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
       {
           step(state,gid,globalTimeStep);
+        //   state[gid+TIMES]=5;
       }
       __syncthreads();
       //Updating global time step
@@ -182,12 +188,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
       ly -= OPS;
     }
 
-    //------------------------UPPYRAMID of OCTAHEDRON-----------------------------
-    //Reassigning swept bounds
-    lx = OPS; //Lower x swept bound
-    ly = OPS; // Lower y swept bound
-    ux = blockDim.x+OPS; //upper x
-    uy = blockDim.y+OPS; //upper y
+    //------------------------UPPYRAMID of OCTAHEDRON-----------------------------//
     //Swept loop
     for (int k = MDSS; k < MOSS; k++)
     {
@@ -201,6 +202,7 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             step(state,gid,globalTimeStep);
+            // state[gid+TIMES]=5;
         }
         __syncthreads();
         //Updating global time step
@@ -213,15 +215,14 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
 __global__ void
 DownPyramid(double *state, int globalTimeStep, int sweptStep)
 {
-     int gid = get_idx(sweptStep)+blockDim.x/2-OPS-OPS*SY; //global index
-    int TOPS = 2*OPS;
+    int gid = get_idx(sweptStep)+blockDim.x/2; //global index
     int MDSS = MOSS-MPSS;
     //------------------------DOWNPYRAMID of OCTAHEDRON-----------------------------
     //Creating swept boundaries
-    int lx =(blockDim.x+TOPS)/RTWO-OPS; //lower x
-    int ly = (blockDim.y+TOPS)/RTWO-OPS; //lower y
-    int ux =(blockDim.x+TOPS)/RTWO+OPS; //upper x
-    int uy = (blockDim.y+TOPS)/RTWO+OPS; //upper y
+    int lx =blockDim.x/2-OPS; //lower x
+    int ly = blockDim.y/2-OPS; //lower y
+    int ux = blockDim.x/2+OPS; //upper x
+    int uy = blockDim.y/2+OPS; //upper y
     //Calculate Down Pyramid - Down Step
     for (int k = 0; k < MDSS; k++)
     {
