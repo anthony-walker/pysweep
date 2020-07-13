@@ -23,6 +23,31 @@ def getEqnPath(eqn):
     """Use this function to get equation path."""
     return os.path.join(eqnPath,eqn)
 
+def performance(func):
+    """Use this function as a decorator for other tests.
+    It's purpose is to contain a set of test conditions and wrap tests with those conditions.
+    exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
+    """
+    def testConfigurations():
+        arraysize = 384
+        shares = [0,0.625,1] #Shares for GPU
+        sims = [True,False] #different simulations
+        blocksizes = [8, 12, 16, 24] #blocksizes with most options
+        #Create solver object
+        solver = pysweep.Solver(sendWarning=False)
+        solver.dtypeStr = 'float64'
+        solver.dtype = numpy.dtype(solver.dtypeStr)
+        solver.verbose=False
+        for sim in sims:
+            for bs in blocksizes:
+                for sh in shares:
+                    solver.moments = [time.time(),]
+                    solver.share = sh
+                    solver.simulation = sim
+                    solver.blocksize = (bs,bs,1)
+                    func(solver,arraysize)
+    return testConfigurations
+
 def testing(func):
     """Use this function as a decorator for other tests.
     It's purpose is to contain a set of test conditions and wrap tests with those conditions.
@@ -57,8 +82,8 @@ def debugging(func):
     def testConfigurations():
         arraysize = 32
         shares = [0,] #Shares for GPU
-        sims = [True,False] #different simulations
-        blocksizes = [16,] #blocksizes with most options
+        sims = [True,] #different simulations
+        blocksizes = [32,] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -79,7 +104,6 @@ def testHalf(solver,arraysize):
     """Use this function to run the half test."""
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "halfConditions.hdf5"
-    # if not os.path.exists(filename):
     filename = pysweep.equations.half.createInitialConditions(arraysize,arraysize)
     solver.assignInitialConditions(filename)
     solver.globals = [0,1,0.1,0.1,0.1]
@@ -96,7 +120,7 @@ def testHalf(solver,arraysize):
     data = hdf5File['data']
     actual = data[:3,:,:,:]
     solver.compactPrint()
-    for i in range(1,testTimeSteps):
+    for i in range(1,numpy.shape(data)[0]):
         for idx, idy in numpy.ndindex(actual.shape[2:]):
             actual[1,0,idx,idy] = (actual[0,0,(idx+1)%arraysize,idy]-2*actual[0,0,idx,idy]+actual[0,0,idx-1,idy])+(actual[0,0,idx,(idy+1)%arraysize]-2*actual[0,0,idx,idy]+actual[0,0,idx,idy-1])
             actual[1,0,idx,idy] *= 0.5/100
@@ -108,115 +132,6 @@ def testHalf(solver,arraysize):
         assert numpy.allclose(actual[2,0,:,:],data[i,0,:,:],rtol=9e-15,atol=9e-15)
         actual[0,:,:,:] = actual[2,:,:,:]
         
-@testing
-def testHeatForwardEuler(solver,arraysize,printError=True):
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "heatConditions.hdf5"
-    adjustHeatGlobals(solver,arraysize,True,timesteps=testTimeSteps)
-    if not os.path.exists(filename):
-        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
-    solver.assignInitialConditions(filename)
-    solver.operating = 1
-    solver.intermediate = 1
-    solver.setCPU(getEqnPath("heat.py"))
-    solver.setGPU(getEqnPath("heat.cu"))
-    solver.exid = []
-    solver.output = "testing.hdf5"
-    solver.loadCPUModule()
-    solver()
-    if solver.clusterMasterBool:
-        steps = solver.arrayShape[0]
-        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
-    else:
-        stepRange = []
-    stepRange = solver.comm.scatter(stepRange)
-    error = []
-    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
-        data = f["data"]
-        failed = False
-        for i in stepRange:
-            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
-            error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
-            try:
-                assert numpy.allclose(data[i,0],T[0])
-            except Exception as e:
-                failed = True
-
-    failed = solver.comm.allgather(failed)
-    if solver.clusterMasterBool:
-        solver.compactPrint()
-        masterFail = numpy.all(failed)
-        print("{} testHeatForwardEuler".format("Failed:" if masterFail else "Success:"))
-
-    if printError:
-        error = solver.comm.allgather(error)
-        if solver.clusterMasterBool:
-            finalError = []
-            for eL in error:
-                finalError.append(numpy.amax(eL))
-            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
-    if solver.clusterMasterBool:
-        print("\n") #Final end line
-    solver.comm.Barrier()
-
-@debugging
-def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "heatConditions.hdf5"
-    adjustHeatGlobals(solver,arraysize,False,timesteps=testTimeSteps)
-    if not os.path.exists(filename):
-        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
-    solver.assignInitialConditions(filename)
-    solver.operating = 1
-    solver.intermediate = 2
-    solver.setCPU(getEqnPath("heat.py"))
-    solver.setGPU(getEqnPath("heat.cu"))
-    solver.exid = []
-    solver.output = "testing.hdf5"
-    solver.loadCPUModule()
-    solver()
-    if solver.clusterMasterBool:
-        steps = solver.arrayShape[0]
-        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
-    else:
-        stepRange = []
-    stepRange = solver.comm.scatter(stepRange)
-    error = []
-    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
-        data = f["data"]
-        failed = False
-        for i in stepRange:
-            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
-            error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
-            try:
-                assert numpy.allclose(data[i,0],T[0])
-            except Exception as e:
-                failed = True
-
-    failed = solver.comm.allgather(failed)
-    if solver.clusterMasterBool:
-        solver.compactPrint()
-        masterFail = numpy.all(failed)
-        print("{} testHeatRungeKuttaTwo".format("Failed:" if masterFail else "Success:"))
-
-    if printError:
-        error = solver.comm.allgather(error)
-        if solver.clusterMasterBool:
-            finalError = []
-            for eL in error:
-                finalError.append(numpy.amax(eL))
-            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
-    if solver.clusterMasterBool:
-        print("\n") #Final end line
-    solver.comm.Barrier()
-
-def adjustHeatGlobals(solver,arraysize,scheme,timesteps=50):
-    """Use this function to adjust heat equation step size based on arraysize"""
-    d = 0.1
-    alpha = 1
-    dx = 1/arraysize
-    dt = float(d*dx**2/alpha)
-    solver.globals = [0,dt*timesteps,dt,dx,dx,alpha,scheme]
 
 def compareGPUToCPU():
     """Use this function to compare GPU to CPU based on file output."""
@@ -491,7 +406,115 @@ def testCheckerTwo(solver,arraysize):
         print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
 
+@testing
+def testHeatForwardEuler(solver,arraysize,printError=True):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "heatConditions.hdf5"
+    adjustHeatGlobals(solver,arraysize,True,timesteps=testTimeSteps)
+    if not os.path.exists(filename):
+        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
+    solver.assignInitialConditions(filename)
+    solver.operating = 1
+    solver.intermediate = 1
+    solver.setCPU(getEqnPath("heat.py"))
+    solver.setGPU(getEqnPath("heat.cu"))
+    solver.exid = []
+    solver.output = "testing.hdf5"
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        steps = solver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
+    else:
+        stepRange = []
+    stepRange = solver.comm.scatter(stepRange)
+    error = []
+    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
+        data = f["data"]
+        failed = False
+        for i in stepRange:
+            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
+            error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
+            try:
+                assert numpy.allclose(data[i,0],T[0])
+            except Exception as e:
+                failed = True
 
+    failed = solver.comm.allgather(failed)
+    if solver.clusterMasterBool:
+        solver.compactPrint()
+        masterFail = numpy.all(failed)
+        print("{} testHeatForwardEuler".format("Failed:" if masterFail else "Success:"))
+
+    if printError:
+        error = solver.comm.allgather(error)
+        if solver.clusterMasterBool:
+            finalError = []
+            for eL in error:
+                finalError.append(numpy.amax(eL))
+            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
+    if solver.clusterMasterBool:
+        print("\n") #Final end line
+    solver.comm.Barrier()
+
+@testing
+def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "heatConditions.hdf5"
+    adjustHeatGlobals(solver,arraysize,False,timesteps=testTimeSteps)
+    if not os.path.exists(filename):
+        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
+    solver.assignInitialConditions(filename)
+    solver.operating = 1
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("heat.py"))
+    solver.setGPU(getEqnPath("heat.cu"))
+    solver.exid = []
+    solver.output = "testing.hdf5"
+    solver.loadCPUModule()
+    solver()
+    if solver.clusterMasterBool:
+        steps = solver.arrayShape[0]
+        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
+    else:
+        stepRange = []
+    stepRange = solver.comm.scatter(stepRange)
+    error = []
+    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
+        data = f["data"]
+        failed = False
+        for i in stepRange:
+            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
+            error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
+            try:
+                assert numpy.allclose(data[i,0],T[0])
+            except Exception as e:
+                failed = True
+
+    failed = solver.comm.allgather(failed)
+    if solver.clusterMasterBool:
+        solver.compactPrint()
+        masterFail = numpy.all(failed)
+        print("{} testHeatRungeKuttaTwo".format("Failed:" if masterFail else "Success:"))
+
+    if printError:
+        error = solver.comm.allgather(error)
+        if solver.clusterMasterBool:
+            finalError = []
+            for eL in error:
+                finalError.append(numpy.amax(eL))
+            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
+    if solver.clusterMasterBool:
+        print("\n") #Final end line
+    solver.comm.Barrier()
+
+def adjustHeatGlobals(solver,arraysize,scheme,timesteps=50):
+    """Use this function to adjust heat equation step size based on arraysize"""
+    d = 0.1
+    alpha = 1
+    dx = 1/arraysize
+    dt = float(d*dx**2/alpha)
+    solver.globals = [0,dt*timesteps,dt,dx,dx,alpha,scheme]
 
 # if __name__ == "__main__":
     # pass
