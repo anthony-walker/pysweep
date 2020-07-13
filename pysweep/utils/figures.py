@@ -1,7 +1,6 @@
 #Programmer: Anthony Walker
 #Use this file to generate figures for the 2D swept paper
 import sys, os
-sys.path.insert(0, '/home/walkanth/swept-project/')
 import numpy as np
 from itertools import cycle
 import matplotlib as mpl
@@ -227,7 +226,6 @@ def staxf(elev=40,azim=35):
           bbox_transform=ax.transData)
     return fig, ax
 
-
 def Up1():
     fig,ax = staxf()
     plot_uppyramid(ax,0)
@@ -290,9 +288,8 @@ def DWP1():
     plot_dwp(ax)
     plt.savefig("DownPyramid1.png",bbox_inches='tight')
 
-
-
-if __name__ == "__main__":
+def createAllFigures():
+    """Use this function to generate all paper figures."""
     Up1()
     Y1()
     Comm1()

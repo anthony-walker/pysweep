@@ -14,8 +14,8 @@ __device__ __constant__  double DY;
 __device__ __constant__  double DT;
 __device__ __constant__ double DTDX;
 __device__ __constant__ double DTDY;
-__device__ __constant__ double GAMMA=1.4; //Gamma
-__device__ __constant__ double GAM_M1=0.4;
+__device__ __constant__ double GAMMA; //Gamma
+__device__ __constant__ double GAM_M1;
 __device__ __constant__ const int NVC=4; //Number of variables
 /*
   Use this function to get point data
@@ -240,42 +240,12 @@ void step(double *state, int idx, int globalTimeStep)
   get_dfdx(dfdx,state,idx,(SY)); //Need plus 2 ops in actual setting
   get_dfdy(dfdy,state,idx,(1));
   //These variables determine predictor or corrector
-  bool cond = ((globalTimeStep+1)%ITS==0);
-  int sidx =  cond ? 1 : 0;
-  double coeff = cond ? 1.0 : 0.5; //Corrector step
+  bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
+  int timeChange = cond ? 1 : 0; //If true rolls back a time step
+  double coeff = cond ? 1 : 0.5; //If true uses 1 instead of 0.5 for intermediate step
   // printf("%f\n", coeff);
   for (int i = 0; i < NVC; i++)
   {
-      state[idx+i*VARS+TIMES]=state[idx+i*VARS-TIMES*sidx]+coeff*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+      state[idx+i*VARS+TIMES]=state[idx+i*VARS-TIMES*timeChange]+coeff*(DTDX*dfdx[i]+DTDY*dfdy[i]);
   }
 }
-
-/*
-    These functions are for testing purposes
-*/
-
-// __device__
-// int test_idxs(){
-//     int M = gridDim.y*blockDim.y+2*OPS;
-//     return M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
-//   }
-//
-// __global__
-// void test_step(double *shared_state, int idx, int globalTimeStep)
-// {
-//     double dfdx[NVC]={0,0,0,0};
-//     double dfdy[NVC]={0,0,0,0};
-//     idx = test_idxs()+STS*globalTimeStep;
-//     get_dfdx(dfdx,shared_state,idx,(blockDim.y*gridDim.x+2*OPS)); //Need plus 2 ops in actual setting
-//     get_dfdy(dfdy,shared_state,idx,(1));
-//     // printf("%0.3f,%0.3f,%0.3f,%0.3f\n",dfdx[0],dfdx[1],dfdx[2],dfdx[3]);
-//     //These variables determine predictor or corrector
-//     bool cond = ((globalTimeStep+1)%ITS==0);
-//     int sidx =  cond ? 1 : 0;
-//     double coeff = cond ? 1.0 : 0.5; //Corrector step
-//     __syncthreads();
-//     for (int i = 0; i < NVC; i++)
-//     {
-//         shared_state[idx+STS+i*SGIDS]=shared_state[idx+i*SGIDS-STS*sidx]+coeff*(DTDX*dfdx[i]+DTDX*dfdy[i]);
-//     }
-// }

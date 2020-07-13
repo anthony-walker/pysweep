@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
 testTimeSteps=50
+globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
         for row in arr:
@@ -29,10 +30,11 @@ def performance(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 384
+        numSizes = 5
         shares = [0,0.625,1] #Shares for GPU
         sims = [True,False] #different simulations
-        blocksizes = [8, 12, 16, 24] #blocksizes with most options
+        blocksizes = [8, 12, 16, 24, 32] #blocksizes with most options
+        arraysizes = [int(768*i) for i in range(1,6,1)] #Performance array sizes
         #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -99,6 +101,102 @@ def debugging(func):
                     func(solver,arraysize)
     return testConfigurations
 
+#----------------------------------End Decorator Functions-------------------------------------------
+@debugging
+def testValidateVortex(solver,arraysize):
+    """Use this funciton to validate the swept solver with a 2D euler vortex"""
+
+    #--------------------------------_Swept Vortex-------------------------------------#
+    swept_file = "\""+os.path.join(dpath,"dist_swept_vortex")+"\""
+    sfn = os.path.join(dpath,"dist_swept_vortex.hdf5")
+    sfp = "\""+sfn+"\""
+    t0,tf,dt,npx,X,blks,aff,nps = args
+    npy=npx
+    Y=X
+    gamma = 1.4
+    times = np.arange(t0,tf+dt,dt)
+    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
+    pts = " -nx "+str(npx)+ " -ny "+str(npx)+ " "
+
+    if not os.path.isfile(sfn):
+    #Create data using solver
+        print("Executing Swept Unsteady Vortex")
+        estr = "mpiexec -n "+str(nps)+" "+hoststr+" "+" python "+os.path.join(path[:-5],"pst.py")+" unsteady_swept_vortex "
+        estr += "-b "+str(blks)+" -a "+str(aff)+ " "
+        estr += " --hdf5 " + swept_file + pts +time_str
+        os.system(estr)
+
+
+    decomp_file = "\""+os.path.join(dpath,"dist_decomp_vortex")+"\""
+    dfn = os.path.join(dpath,"dist_decomp_vortex.hdf5")
+    dfp = "\""+dfn+"\""
+
+    if not os.path.isfile(dfn):
+    #Create data using solver
+        print("Executing Standard Unsteady Vortex")
+        estr = "mpiexec -n "+str(nps)+" "+hoststr+" "+" python "+os.path.join(path[:-5],"pst.py")+" unsteady_standard_vortex "
+        estr += "-b "+str(blks)+" -a "+str(aff)+ " "
+        estr += " --hdf5 " + decomp_file + pts +time_str
+        os.system(estr)
+
+    vfn = os.path.join(dpath,'vortex0.hdf5')
+    if not os.path.isfile(vfn):
+        print("Making AnalyticalVortex")
+        cvics = vortex.vics()
+        cvics.STC(gamma)
+        vortex.create_steady_data(cvics,npx,npy,times=times, filepath = dpath,filename = "/vortex",fdb=True)
+
+    pfn = os.path.join(dpath,"clawres.hdf5")
+
+
+
+    shdf5_file = h5py.File(sfn, 'r')
+    swept = shdf5_file['data'][:,:,:,:]
+    dhdf5_file = h5py.File(dfn, 'r')
+    decomp = dhdf5_file['data'][:,:,:,:]
+    vhdf5_file = h5py.File(vfn, 'r')
+    avortex = vhdf5_file['data'][:,:,:,:]
+    pack_file = h5py.File(pfn,'r')
+    cpack = pack_file['data'][:,:,:,:]
+
+    sfs = "%0.2e"
+    # err1 = [np.amax(abs(swept[i]-decomp[i])) for i in range(len(swept))]
+    err2 = [np.amax(abs(swept[i]-avortex[i])) for i in range(len(swept))]
+    err3 = [np.amax(abs(decomp[i]-avortex[i])) for i in range(len(decomp))]
+    err4 = [np.amax(abs(cpack[i]-avortex[i])) for i in range(len(decomp))]
+    # tarr = cpack[0]-avortex[1]
+    # print(err3)
+    print(max(err2))
+    print(max(err3))
+    print(max(err4))
+    xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
+    ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
+    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+
+    xptsn = np.linspace(-0.5,0.5,npx,dtype=np.float64)
+    yptsn = np.linspace(-0.5,0.5,npy,dtype=np.float64)
+    xgridn,ygridn = np.meshgrid(xptsn,yptsn,sparse=False,indexing='ij')
+
+    pidx = -1
+    fig,axes = plt.subplots(2,2)
+    axes1,axes2 = axes
+    ax1,ax2 = axes1
+    ax3,ax4 = axes2
+
+    ax1.contourf(xgrid,ygrid,avortex[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    ax2.contourf(xgridn,ygridn,cpack[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    ax3.contourf(xgrid,ygrid,decomp[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    ax4.contourf(xgrid,ygrid,swept[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    plt.show()
+
+    vhdf5_file.close()
+    dhdf5_file.close()
+    # pack_file.close()
+    if remove_file:
+        os.system("rm "+sfp)
+        os.system("rm "+dfp)
+        os.system("rm "+vfn)
+
 @debugging
 def testHalf(solver,arraysize):
     """Use this function to run the half test."""
@@ -131,84 +229,6 @@ def testHalf(solver,arraysize):
             actual[2,0,idx,idy] += actual[0,0,idx,idy]
         assert numpy.allclose(actual[2,0,:,:],data[i,0,:,:],rtol=9e-15,atol=9e-15)
         actual[0,:,:,:] = actual[2,:,:,:]
-        
-
-def compareGPUToCPU():
-    """Use this function to compare GPU to CPU based on file output."""
-    #Adjustment of global variables
-    d = 0.1 #Constant
-    alpha = 1
-    npx = npy = 8
-    T,x,y = pysweep.equations.heat.analytical(npx,npy,0)
-    dx = dy = float(x[1]-x[0])
-    t0,tf = 0,0.001
-    dt = float(d*dx**2/alpha)
-    timesteps = 10
-    #Input files
-    filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=alpha)
-    inputPath = os.path.join(path,"inputs")
-    solver = pysweep.Solver(filename, os.path.join(inputPath,"heatSwept.yaml"))
-    adjustHeatGlobals(solver,npx,False,timesteps=timesteps)
-    solver.intermediate = 2
-    solver.blocksize = (npx,npx,1)
-    #Solve CPU
-    solver.output = "cpu.hdf5"
-    solver.share = 0
-    solver()
-    cpuFile = h5py.File(solver.output,'r')
-    cdata = cpuFile['data']
-    #Solver GPU
-    solver.assignInitialConditions(filename)
-    solver.output = "gpu.hdf5"
-    solver.share = 1
-    solver()
-    gpuFile = h5py.File(solver.output,'r')
-    gdata = gpuFile['data']
-    #compare
-    for i in range(timesteps):
-        print(gdata[i,0,:,:]-cdata[i,0,:,:])
-        input()
-    
-
-def testCompareSolvers():
-    """Use this function to compare cpu portion of solvers based on output hdf5 and error.
-    This function is meant for only 1 process
-    """
-    #Adjustment of global variables
-    d = 0.1 #Constant
-    alpha = 1
-    npx = npy = 384
-    T,x,y = pysweep.equations.heat.analytical(npx,npy,0)
-    dx = dy = float(x[1]-x[0])
-    t0,tf = 0,0.001
-    dt = float(d*dx**2/alpha)
-    #Input files
-    filename = pysweep.equations.heat.createInitialConditions(npx,npy,alpha=alpha)
-    inputPath = os.path.join(path,"inputs")
-
-    sweptSolver = pysweep.Solver(filename, os.path.join(inputPath,"heatSwept.yaml"))
-    standardSolver = pysweep.Solver(filename, os.path.join(inputPath,"heatStandard.yaml"))
-
-    #Set same globals
-    standardSolver.globals =  [t0,tf,dt,dx,dx,alpha,True]
-    sweptSolver.globals =  [t0,tf,dt,dx,dx,alpha,True]
-    
-    #execute solvers
-    standardSolver()
-    sweptSolver()
-    
-    #hdf5
-    if standardSolver.clusterMasterBool:
-        sweptHdf5 = h5py.File(sweptSolver.output,"r")
-        standardHdf5 = h5py.File(standardSolver.output,"r")
-        
-        sweptData = sweptHdf5['data']
-        standardData = standardHdf5['data']
-
-        for i in range(standardSolver.timeSteps):
-            T,x,y = pysweep.equations.heat.analytical(npx,npy,t=dt*i,alpha=alpha)
-            assert numpy.allclose(sweptData[i,0],standardData[i,0])
-        
 
 def testOrderOfConvergence(ifile="heat.yaml"):
     """Use this function to test the order of convergence."""
@@ -259,6 +279,42 @@ def makeOrderOfConvergencePlot():
 
 
 #-------------------------------------Completed Tests------------------#
+
+@debugging
+def testHalf(solver,arraysize):
+    """Use this function to run the half test."""
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "halfConditions.hdf5"
+    filename = pysweep.equations.half.createInitialConditions(arraysize,arraysize)
+    solver.assignInitialConditions(filename)
+    solver.globals = [0,1,0.1,0.1,0.1]
+    changeSolverTimeSteps(solver,testTimeSteps)
+    solver.operating = 1
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("half.py"))
+    solver.setGPU(getEqnPath("half.cu"))
+    solver.exid = []
+    solver.output = "half.hdf5"
+    solver.loadCPUModule()
+    solver()
+    hdf5File = h5py.File(solver.output,"r")
+    data = hdf5File['data']
+    actual = data[:3,:,:,:]
+    solver.compactPrint()
+    for i in range(1,numpy.shape(data)[0]):
+        for idx, idy in numpy.ndindex(actual.shape[2:]):
+            actual[1,0,idx,idy] = (actual[0,0,(idx+1)%arraysize,idy]-2*actual[0,0,idx,idy]+actual[0,0,idx-1,idy])+(actual[0,0,idx,(idy+1)%arraysize]-2*actual[0,0,idx,idy]+actual[0,0,idx,idy-1])
+            actual[1,0,idx,idy] *= 0.5/100
+            actual[1,0,idx,idy] += actual[0,0,idx,idy]
+        for idx, idy in numpy.ndindex(actual.shape[2:]):
+            actual[2,0,idx,idy] = (actual[1,0,(idx+1)%arraysize,idy]-2*actual[1,0,idx,idy]+actual[1,0,idx-1,idy])+(actual[1,0,idx,(idy+1)%arraysize]-2*actual[1,0,idx,idy]+actual[1,0,idx,idy-1])
+            actual[2,0,idx,idy] /= 100
+            actual[2,0,idx,idy] += actual[0,0,idx,idy]
+        assert numpy.allclose(actual[2,0,:,:],data[i,0,:,:],rtol=9e-15,atol=9e-15)
+        actual[0,:,:,:] = actual[2,:,:,:]
+        
+
+
 @testing
 def testSimpleOne(solver,arraysize):
     warnings.filterwarnings('ignore') #Ignore warnings for processes

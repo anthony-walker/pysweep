@@ -6,21 +6,8 @@
 
 import numpy as np
 import sympy,sys,itertools
-try:
-    import pycuda.driver as cuda
-    from pycuda.compiler import SourceModule
-except Exception as e:
-    pass
-#Testing imports
-if __name__ == "__main__":
-    import pycuda.autoinit
-    import test_euler as e1d
-    import warnings, os
-    fp = os.path.abspath(__file__)
-    path = os.path.dirname(fp)
-    sys.path.insert(0, path[:-len('equations')])
-    import distributed.sweep.ccore.source as source
-    # warnings.filterwarnings('error')
+import pycuda.driver as cuda
+
 sfs = "%0.2e"
 #Testing
 def print_line(line):
@@ -35,18 +22,17 @@ dtdy = 0
 gM1 = 0
 #----------------------------------End Globals-------------------------------------#
 
-def step(state,iidx,ts,globalTimeStep):
+def step(state,iidx,arrayTimeIndex,globalTimeStep):
     """This is the method that will be called by the swept solver.
     state - 4D numpy array(t,v,x,y (v is variables length))
     iidx -  an iterable of indexs
-    ts - the current time step
+    arrayTimeIndex - the current time step
     globalTimeStep - a step counter that allows implementation of the scheme
     """
     half = 0.5
     ops=2
     vs = slice(0,state.shape[1],1)
-    sidx = ts-1 if (globalTimeStep+1)%2==0 else ts #scheme index
-    coef = 1 if (globalTimeStep+1)%2==0 else 0.5 #scheme index
+    coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)  #True - Final Step, False- Intermediate Step
     #Making pressure vector
     l1,l2 = tuple(zip(*iidx))
     l1 = range(min(l1)-ops,max(l1)+ops+1,1)
@@ -54,32 +40,38 @@ def step(state,iidx,ts,globalTimeStep):
     P = np.zeros(state[0,0,:,:].shape)
 
     for idx,idy in itertools.product(l1,l2):
-        P[idx,idy] = pressure(state[ts,vs,idx,idy])
+        P[idx,idy] = pressure(state[arrayTimeIndex,vs,idx,idy])
 
     for idx,idy in iidx:
-        dfdx,dfdy = dfdxy(state,(ts,vs,idx,idy),P)
-        state[ts+1,vs,idx,idy] = state[sidx,vs,idx,idy]+coef*(dtdx*dfdx+dtdy*dfdy)
+        dfdx,dfdy = dfdxy(state,(arrayTimeIndex,vs,idx,idy),P)
+        state[arrayTimeIndex+1,vs,idx,idy] = state[arrayTimeIndex-timechange,vs,idx,idy]+coeff*(dtdx*dfdx+dtdy*dfdy)
     return state
 
 def set_globals(gpu,*args,source_mod=None):
     """Use this function to set cpu global variables"""
-    t0,tf,dt,dx,dy,gam = args
+    global dtdx,dtdy,gamma,gM1
+    t0,tf,dt,dx,dy,gamma = args
+    dtdx = dtdy = dt/dx
     if gpu:
         keys = "DT","DX","DY","GAMMA","GAM_M1","DTDX","DTDY"
-        nargs = args[2:]+(gam-1,dt/dx,dt/dy)
+        nargs = args[2:]+(gamma-1,dt/dx,dt/dy)
         fc = lambda x:np.float64(x)
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
             cuda.memcpy_htod(ckey,fc(nargs[i]))
-    else:
-        global dtdx
-        dtdx = dt/dx
-        global dtdy
-        dtdy = dt/dy
-        global gamma
-        gamma = gam
-        global gM1
-        gM1 = gam-1.0
+
+def createInitialConditions(npx,npy,gamma=1.4,t=0,filename="eulerConditions.hdf5"):
+    """Use this function to create a set of initial conditions in an hdf5 file.
+    args:
+    npx: number of points in x
+    npy: number of points in y
+    t: time of initial conditions
+    """
+    # comm = MPI.COMM_WORLD
+    # u,X,Y = analytical(npx,npy,t,alpha=alpha)
+    # with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
+    #     hf.create_dataset("data",u.shape,data=u)
+    # return filename
 
 #---------------------------------------------Solving functions
 def dfdxy(state,idx,P):
@@ -181,316 +173,3 @@ def espectral(left_state,right_state,xy):
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
-if __name__ == "__main__":
-    #Debugging functions
-    #Boundary copy
-    def bcpy(idx,state,ops):
-        state[idx,:,:ops,:] = state[idx,:,-2*ops:-ops,:]
-        state[idx,:,-ops:,:] = state[idx,:,ops:2*ops,:]
-        state[idx,:,:,:ops] = state[idx,:,:,-2*ops:-ops]
-        state[idx,:,:,-ops:] = state[idx,:,:,ops:2*ops]
-
-    def bcpy1D(idx,state,ops):
-        state[idx,:,:ops] = state[idx,:,-2*ops:-ops]
-        state[idx,:,-ops:] = state[idx,:,ops:2*ops]
-
-    #Printer function
-    def pm(arr,i,iv=0,ps="%d"):
-        for item in arr[i,iv,:,:]:
-            sys.stdout.write("[ ")
-            for si in item:
-                sys.stdout.write(ps%si+", ")
-            sys.stdout.write("]\n")
-
-
-    def test_euler_shock():
-        """This function tests the implemented manufactured solution."""
-        #Space arguments
-        X = Y = 5
-        nx = ny = 10
-        halfx = int(nx/2)
-        halfy = int(ny/2)
-        dx = X/(nx-1)
-        dy = Y/(ny-1)
-        xVec = np.linspace(0,X,nx)
-        yVec = np.linspace(0,Y,ny)
-        ops = 2
-        tso = 2
-        #Time arguments
-        t0 = 0
-        tf = 10
-        dt = 0.01
-        times = np.arange(t0,tf+dt,dt)
-        nt = len(times)
-        #properties
-        gamma = 1.4
-        leftBC = (1,0,0,2.5)
-        lbc1 = np.asarray(leftBC[:2]+(leftBC[-1],))
-        rightBC = (0.125,0,0,.25)
-        rbc1 = np.asarray(rightBC[:2]+(rightBC[-1],))
-        #globals for each funciton
-        set_globals(False,None,tf,t0,dt,dx,dy,gamma)
-        e1d.set_globals(gamma,dt,dx)
-        #------------------------------TESTING X DIRECTION----------------------#
-        #Make analytical solution
-        shock2D = np.zeros((2*nt,4,nx+2*ops,ny+2*ops))
-        shock1D = np.zeros((2*nt,3,nx+2*ops))
-
-        for x in range(halfx):
-            shock1D[0,:,x+ops] = lbc1
-            shock1D[0,:,x+halfx+ops] = rbc1
-        bcpy1D(0,shock1D,ops)
-
-        for y in range(ny+2*ops):
-            shock2D[0,0,:,y]=shock1D[0,0,:]
-            shock2D[0,1,:,y]=shock1D[0,1,:]
-            shock2D[0,2,:,y]=shock1D[0,1,:]
-            shock2D[0,3,:,y]=shock1D[0,2,:]
-        #Creating array
-        iidx = [(x+ops,y+ops)for x,y in np.ndindex(shock2D.shape[2]-2*ops,shock2D.shape[3]-2*ops)]
-        #First step
-        ps = "%0.3f"
-        shock1D[1,:,ops:-ops] = e1d.step(shock1D[0],shock1D[0],0)[:,ops:-ops]
-        bcpy1D(1,shock1D,ops)
-        step(shock2D,iidx,0,0)
-        bcpy(1,shock2D,ops)
-        # Iteration
-        err = []
-        for i in range(1,2*nt-1):
-            #1D
-            id1 = i-1 if (i+1)%2==0 else i
-            shock1D[i+1,:,ops:-ops] = e1d.step(shock1D[id1],shock1D[i],i)[:,ops:-ops]
-            bcpy1D(i+1,shock1D,ops)
-            #2D
-            step(shock2D,iidx,i,i)
-            bcpy(i+1,shock2D,ops)
-            err.append(shock2D[i,(0,1,3),:,halfy]-shock1D[i,:,:])
-            assert np.allclose(shock2D[i,(0,1,3),:,halfy],shock1D[i,:,:])
-        # pm(shock2D,0,0,"%0.3f")
-        print("CPU Max X Error: ",np.amax(err))
-
-        #------------------------------TESTING Y DIRECTION----------------------#
-        #Make analytical solution
-        shock2D = np.zeros((2*nt,4,nx+2*ops,ny+2*ops))
-        shock1D = np.zeros((2*nt,3,nx+2*ops))
-
-        for x in range(halfx):
-            shock1D[0,:,x+ops] = lbc1
-            shock1D[0,:,x+halfx+ops] = rbc1
-        bcpy1D(0,shock1D,ops)
-
-        for x in range(nx+2*ops):
-            shock2D[0,0,x,:]=shock1D[0,0,:]
-            shock2D[0,1,x,:]=shock1D[0,1,:]
-            shock2D[0,2,x,:]=shock1D[0,1,:]
-            shock2D[0,3,x,:]=shock1D[0,2,:]
-        #Creating array
-        iidx = [(x+ops,y+ops)for x,y in np.ndindex(shock2D.shape[2]-2*ops,shock2D.shape[3]-2*ops)]
-        #First step
-        ps = "%0.3f"
-        shock1D[1,:,ops:-ops] = e1d.step(shock1D[0],shock1D[0],0)[:,ops:-ops]
-        bcpy1D(1,shock1D,ops)
-        step(shock2D,iidx,0,0)
-        bcpy(1,shock2D,ops)
-        # Iteration
-        err = []
-        for i in range(1,2*nt-1):
-            #1D
-            id1 = i-1 if (i+1)%2==0 else i
-            shock1D[i+1,:,ops:-ops] = e1d.step(shock1D[id1],shock1D[i],i)[:,ops:-ops]
-            bcpy1D(i+1,shock1D,ops)
-            #2D
-            step(shock2D,iidx,i,i)
-            bcpy(i+1,shock2D,ops)
-            err.append(shock2D[i,(0,2,3),halfx,:]-shock1D[i,:,:])
-            assert np.allclose(shock2D[i,(0,2,3),halfx,:],shock1D[i,:,:])
-        # pm(shock2D,0,0,"%0.3f")
-        print("CPU Max Y Error: ",np.amax(err))
-
-    def test_euler_shock_gpu_X():
-            #Space arguments
-            X = Y = 5
-            nx = ny = 10
-            BS = 10
-            halfx = int(nx/2)
-            halfy = int(ny/2)
-            dx = X/(nx-1)
-            dy = Y/(ny-1)
-            xVec = np.linspace(0,X,nx)
-            yVec = np.linspace(0,Y,ny)
-            ops = 2
-            tso = 2
-            #Time arguments
-            t0 = 0
-            tf = 10
-            dt = 0.1
-            times = np.arange(t0,tf+dt,dt)
-            nt = len(times)
-            #properties
-            gamma = 1.4
-            leftBC = (1,0,0,2.5)
-            lbc1 = np.asarray(leftBC[:2]+(leftBC[-1],))
-            rightBC = (0.125,0,0,.25)
-            rbc1 = np.asarray(rightBC[:2]+(rightBC[-1],))
-            #globals for each funciton
-            set_globals(False,None,tf,t0,dt,dx,dy,gamma)
-            e1d.set_globals(gamma,dt,dx)
-            #------------------------------TESTING X DIRECTION----------------------#
-            #Make analytical solution
-            shock2D = np.zeros((2*nt,4,nx+2*ops,ny+2*ops))
-            shock1D = np.zeros((2*nt,3,nx+2*ops))
-
-            for x in range(halfx):
-                shock1D[0,:,x+ops] = lbc1
-                shock1D[0,:,x+halfx+ops] = rbc1
-            bcpy1D(0,shock1D,ops)
-
-            for y in range(ny+2*ops):
-                shock2D[0,0,:,y]=shock1D[0,0,:]
-                shock2D[0,1,:,y]=shock1D[0,1,:]
-                shock2D[0,2,:,y]=shock1D[0,1,:]
-                shock2D[0,3,:,y]=shock1D[0,2,:]
-            #Creating array
-            iidx = [(x+ops,y+ops)for x,y in np.ndindex(shock2D.shape[2]-2*ops,shock2D.shape[3]-2*ops)]
-            #-----------------------------GPU STUFF----------------------------#
-            block_shape = (BS,BS,1)
-            GRD = (int(nx/BS),int(ny/BS))   #Grid size
-            #Creating constants
-            NV = shock2D.shape[1]
-            SGIDS = (nx+2*ops)*(ny+2*ops)
-            STS = SGIDS*NV #Shared time shift
-            VARS =  (nx*+2*ops)*(ny*+2*ops)
-            TIMES = VARS*NV
-            MPSS = 2
-            MOSS = 4
-            OPS = ops
-            ITS = 2
-            const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"ITS":ITS,"STS":STS})
-
-            #Source Modules
-            SM = source.build_gpu_source(os.path.join(path,'euler.h'))
-            source.swept_constant_copy(SM,const_dict)
-            arr_gpu = cuda.mem_alloc(shock2D.nbytes)
-            set_globals(True,SM,tf,t0,dt,dx,dy,gamma)
-            #First step
-            ps = "%0.3f"
-            shock1D[1,:,ops:-ops] = e1d.step(shock1D[0],shock1D[0],0)[:,ops:-ops]
-            bcpy1D(1,shock1D,ops)
-            #GPU 1st step
-            cuda.memcpy_htod(arr_gpu,shock2D)
-            SM.get_function('test_step')(arr_gpu,np.int32(0),np.int32(0),grid=GRD,block=(BS,BS,1))
-            cuda.Context.synchronize()
-            cuda.memcpy_dtoh(shock2D,arr_gpu)
-            bcpy(1,shock2D,ops)
-            #Iteration
-            err=[shock2D[1,(0,1,3),:,halfy]-shock1D[1,:,:],]
-            for i in range(1,2*nt-1):
-                #1D
-                id1 = i-1 if (i+1)%2==0 else i
-                shock1D[i+1,:,ops:-ops] = e1d.step(shock1D[id1],shock1D[i],i)[:,ops:-ops]
-                bcpy1D(i+1,shock1D,ops)
-                #2D GPU
-                cuda.memcpy_htod(arr_gpu,shock2D)
-                SM.get_function('test_step')(arr_gpu,np.int32(0),np.int32(i),grid=GRD,block=(BS,BS,1))
-                cuda.Context.synchronize()
-                cuda.memcpy_dtoh(shock2D,arr_gpu)
-                bcpy(i+1,shock2D,ops)
-                assert np.allclose(shock2D[i,(0,1,3),:,halfy],shock1D[i,:,:])
-                err.append(shock2D[i+1,(0,1,3),:,halfy]-shock1D[i+1,:,:])
-            print("GPU Max X Error: ",np.amax(err))
-
-    def test_euler_shock_gpu_Y():
-            #Space arguments
-            X = Y = 5
-            nx = ny = 10
-            BS = 10
-            halfx = int(nx/2)
-            halfy = int(ny/2)
-            dx = X/(nx-1)
-            dy = Y/(ny-1)
-            xVec = np.linspace(0,X,nx)
-            yVec = np.linspace(0,Y,ny)
-            ops = 2
-            tso = 2
-            #Time arguments
-            t0 = 0
-            tf = 10
-            dt = 0.01
-            times = np.arange(t0,tf+dt,dt)
-            nt = len(times)
-            #properties
-            gamma = 1.4
-            leftBC = (1,0,0,2.5)
-            lbc1 = np.asarray(leftBC[:2]+(leftBC[-1],))
-            rightBC = (0.125,0,0,.25)
-            rbc1 = np.asarray(rightBC[:2]+(rightBC[-1],))
-            #globals for each funciton
-            set_globals(False,None,tf,t0,dt,dx,dy,gamma)
-            e1d.set_globals(gamma,dt,dx)
-            #------------------------------TESTING X DIRECTION----------------------#
-            #Make analytical solution
-            shock2D = np.zeros((2*nt,4,nx+2*ops,ny+2*ops))
-            shock1D = np.zeros((2*nt,3,nx+2*ops))
-
-            for x in range(halfx):
-                shock1D[0,:,x+ops] = lbc1
-                shock1D[0,:,x+halfx+ops] = rbc1
-            bcpy1D(0,shock1D,ops)
-
-            for x in range(nx+2*ops):
-                shock2D[0,0,x,:]=shock1D[0,0,:]
-                shock2D[0,1,x,:]=shock1D[0,1,:]
-                shock2D[0,2,x,:]=shock1D[0,1,:]
-                shock2D[0,3,x,:]=shock1D[0,2,:]
-            #Creating array
-            iidx = [(x+ops,y+ops)for x,y in np.ndindex(shock2D.shape[2]-2*ops,shock2D.shape[3]-2*ops)]
-            #-----------------------------GPU STUFF----------------------------#
-            block_shape = (BS,BS,1)
-            GRD = (int(nx/BS),int(ny/BS))   #Grid size
-            #Creating constants
-            NV = shock2D.shape[1]
-            SGIDS = (nx+2*ops)*(ny+2*ops)
-            STS = SGIDS*NV #Shared time shift
-            VARS =  (nx*+2*ops)*(ny*+2*ops)
-            TIMES = VARS*NV
-            MPSS = 2
-            MOSS = 4
-            OPS = ops
-            ITS = 2
-            const_dict = ({"NV":NV,"SGIDS":SGIDS,"VARS":VARS,"TIMES":TIMES,"MPSS":MPSS,"MOSS":MOSS,"OPS":OPS,"ITS":ITS,"STS":STS})
-
-            #Source Modules
-            SM = source.build_gpu_source(os.path.join(path,'euler.h'))
-            source.swept_constant_copy(SM,const_dict)
-            arr_gpu = cuda.mem_alloc(shock2D.nbytes)
-            set_globals(True,SM,tf,t0,dt,dx,dy,gamma)
-            #First step
-            ps = "%0.3f"
-            shock1D[1,:,ops:-ops] = e1d.step(shock1D[0],shock1D[0],0)[:,ops:-ops]
-            bcpy1D(1,shock1D,ops)
-            #GPU 1st step
-            cuda.memcpy_htod(arr_gpu,shock2D)
-            SM.get_function('test_step')(arr_gpu,np.int32(0),np.int32(0),grid=GRD,block=(BS,BS,1))
-            cuda.Context.synchronize()
-            cuda.memcpy_dtoh(shock2D,arr_gpu)
-            bcpy(1,shock2D,ops)
-            #Iteration
-            err=[shock2D[1,(0,2,3),halfx,:]-shock1D[1,:,:],]
-            for i in range(1,2*nt-1):
-                #1D
-                id1 = i-1 if (i+1)%2==0 else i
-                shock1D[i+1,:,ops:-ops] = e1d.step(shock1D[id1],shock1D[i],i)[:,ops:-ops]
-                bcpy1D(i+1,shock1D,ops)
-                #2D GPU
-                cuda.memcpy_htod(arr_gpu,shock2D)
-                SM.get_function('test_step')(arr_gpu,np.int32(0),np.int32(i),grid=GRD,block=(BS,BS,1))
-                cuda.Context.synchronize()
-                cuda.memcpy_dtoh(shock2D,arr_gpu)
-                bcpy(i+1,shock2D,ops)
-                assert np.allclose(shock2D[i,(0,2,3),halfx,:],shock1D[i,:,:])
-                err.append(shock2D[i+1,(0,2,3),halfx,:]-shock1D[i+1,:,:])
-            print("GPU Max Y Error: ",np.amax(err))
-
-    test_euler_shock()
-    test_euler_shock_gpu_X()
-    test_euler_shock_gpu_Y()
