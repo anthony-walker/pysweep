@@ -11,8 +11,8 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function to solve the HDE with RK2."""
     coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)  #True - Final Step, False- Intermediate Step
     for idx,idy in iidx:
-        state[arrayTimeIndex+1,0,idx,idy] = coeff*centralDifference(state[arrayTimeIndex,0],idx,idy)+state[arrayTimeIndex-timechange,0,idx,idy]
-    
+        state[arrayTimeIndex+1,0,idx,idy] = state[arrayTimeIndex-timechange,0,idx,idy]+coeff*centralDifference(state[arrayTimeIndex,0],idx,idy)
+
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
     global dt,dx,dy #true for FE
@@ -40,7 +40,6 @@ def writeOut(arr):
 
 def centralDifference(state,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""
-    nx,ny = state.shape
     secondDerivativeX = (state[idx+1,idy]-2*state[idx,idy]+state[idx-1,idy])/100
     secondDerivativeY = (state[idx,idy+1]-2*state[idx,idy]+state[idx,idy-1])/100
     return secondDerivativeX+secondDerivativeY

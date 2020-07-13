@@ -62,7 +62,6 @@ __device__ void checkBlockParams()
 __global__ void
 UpPyramid(double *state, int globalTimeStep, int sweptStep)
 {
-    
     //Other quantities for indexing
     int gid = get_idx(sweptStep)+blockDim.x/2; //global index
     //Creating swept boundaries
@@ -108,8 +107,8 @@ YBridge(double *state, int globalTimeStep, int sweptStep)
     {
         // Solving step function
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
-        {
-             step(state,gid,globalTimeStep);
+        {    
+            step(state,gid,globalTimeStep);
         }
         __syncthreads();
         //Updating global time step
@@ -202,7 +201,6 @@ Octahedron(double *state, int globalTimeStep, int sweptStep)
         if (threadIdx.x<ux && threadIdx.x>=lx && threadIdx.y<uy && threadIdx.y>=ly)
         {
             step(state,gid,globalTimeStep);
-            // state[gid+TIMES]=5;
         }
         __syncthreads();
         //Updating global time step
@@ -253,7 +251,6 @@ DownPyramid(double *state, int globalTimeStep, int sweptStep)
 */
 __device__ int get_gid()
 {
-    // int bid = blockIdx.x + blockIdx.y * gridDim.x;
     int M = gridDim.y*blockDim.y+2*OPS;
     return M*(OPS+threadIdx.x)+OPS+threadIdx.y+blockDim.y*blockIdx.y+blockDim.x*blockIdx.x*M;
 }

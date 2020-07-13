@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=10#50
+testTimeSteps=50
 
 def writeOut(arr,prec="%.5f"):
         for row in arr:
@@ -55,11 +55,10 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        blk = 16
-        arraysize = blk
+        arraysize = 32
         shares = [0,] #Shares for GPU
-        sims = [True,] #different simulations
-        blocksizes = [blk,] #blocksizes with most options
+        sims = [True,False] #different simulations
+        blocksizes = [16,] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -93,30 +92,20 @@ def testHalf(solver,arraysize):
     solver.output = "half.hdf5"
     solver.loadCPUModule()
     solver()
-
     hdf5File = h5py.File(solver.output,"r")
     data = hdf5File['data']
     actual = data[:3,:,:,:]
-    
-    actualFile = h5py.File("actual.hdf5","w")
-    actualData = actualFile.create_dataset('data',shape = (int(2*testTimeSteps),1,arraysize,arraysize))
-
-    ct = 0
+    solver.compactPrint()
     for i in range(1,testTimeSteps):
         for idx, idy in numpy.ndindex(actual.shape[2:]):
             actual[1,0,idx,idy] = (actual[0,0,(idx+1)%arraysize,idy]-2*actual[0,0,idx,idy]+actual[0,0,idx-1,idy])+(actual[0,0,idx,(idy+1)%arraysize]-2*actual[0,0,idx,idy]+actual[0,0,idx,idy-1])
             actual[1,0,idx,idy] *= 0.5/100
             actual[1,0,idx,idy] += actual[0,0,idx,idy]
-        actualData[ct,:,:,:] = actual[1,:,:,:]
-        ct+=1
         for idx, idy in numpy.ndindex(actual.shape[2:]):
             actual[2,0,idx,idy] = (actual[1,0,(idx+1)%arraysize,idy]-2*actual[1,0,idx,idy]+actual[1,0,idx-1,idy])+(actual[1,0,idx,(idy+1)%arraysize]-2*actual[1,0,idx,idy]+actual[1,0,idx,idy-1])
             actual[2,0,idx,idy] /= 100
             actual[2,0,idx,idy] += actual[0,0,idx,idy]
-        actualData[ct,:,:,:] = actual[2,:,:,:]
-        ct+=1
-        pysweep.equations.half.writeOut(actual[2,0,:,:]-data[i,0,:,:])
-        input()
+        assert numpy.allclose(actual[2,0,:,:],data[i,0,:,:],rtol=9e-15,atol=9e-15)
         actual[0,:,:,:] = actual[2,:,:,:]
         
 @testing

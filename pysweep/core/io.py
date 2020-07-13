@@ -132,7 +132,7 @@ def sweptWrite(cwt,solver):
         cwt+=1
     nte = solver.sharedShape[0]-solver.maxPyramidSize
     solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
-    solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
+    # solver.sharedArray[nte:,:,:,:] = 0 #This shouldn't be necessary - debugging
     return cwt
 
 def buildGPUSource(sourcefile):

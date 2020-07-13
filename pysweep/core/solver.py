@@ -168,7 +168,6 @@ class Solver(object):
         step = cycle([functions.sendBackward,functions.sendForward])
         for i in range(self.maxGlobalSweptStep):
             functions.UpPrism(self)
-            # io.systemOutDebug(self,self.sharedArray[2:,:,:,:])
             cwt = next(step)(cwt,self)
         #Do LastPrism Here then Write all of the remaining data
         functions.LastPrism(self)
@@ -183,7 +182,6 @@ class Solver(object):
         cwt = 0 #Starts at zero compared too swept because of the write algorithm
         for i in range(self.intermediate*(self.timeSteps+1)):
             functions.StandardFunction(self)
-            io.systemOutDebug(self,self.sharedArray[2:,:,1:-1,1:-1])
             cwt = io.standardWrite(cwt,self)
             #Communicate
             functions.sendEdges(self)
