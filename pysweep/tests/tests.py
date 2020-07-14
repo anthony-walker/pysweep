@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=100
+testTimeSteps=10
 globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
@@ -82,10 +82,10 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 24
-        shares = [0,1] #Shares for GPU
-        sims = [True,False] #different simulations
-        blocksizes = [8,] #blocksizes with most options
+        arraysize = 12
+        shares = [0,] #Shares for GPU
+        sims = [True] #different simulations
+        blocksizes = [12,] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -107,7 +107,7 @@ def adjustEulerGlobals(solver,arraysize,timesteps=50):
     """Use this function to adjust heat equation step size based on arraysize"""
     d = 0.1
     gamma = 1.4
-    dx = 1/arraysize
+    dx = 10/arraysize
     dt = d*dx
     solver.globals = [0,dt*timesteps,dt,dx,dx,gamma]
 
@@ -118,9 +118,10 @@ def testEulerVortex(solver,arraysize,printError=True):
     filename = "eulerConditions.hdf5"
     adjustEulerGlobals(solver,arraysize,timesteps=testTimeSteps)
     global globalArraySize
-    if not arraysize == globalArraySize:
-        filename = pysweep.equations.euler.createInitialConditions(arraysize,arraysize)
-        globalArraySize = arraysize
+    # if not arraysize == globalArraySize:
+    filename = pysweep.equations.euler.createInitialConditions(arraysize,arraysize)
+    globalArraySize = arraysize
+    #End if
     solver.assignInitialConditions(filename)
     solver.operating = 2
     solver.intermediate = 2

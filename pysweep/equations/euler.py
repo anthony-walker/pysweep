@@ -29,7 +29,6 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
 
     for idx,idy in itertools.product(l1,l2):
         P[idx,idy] = pressure(state[arrayTimeIndex,vs,idx,idy])
-
     for idx,idy in iidx:
         dfdx,dfdy = dfdxy(state,(arrayTimeIndex,vs,idx,idy),P)
         state[arrayTimeIndex+1,vs,idx,idy] = state[arrayTimeIndex-timechange,vs,idx,idy]+coeff*(dtdx*dfdx+dtdy*dfdy)
@@ -88,8 +87,8 @@ def analytical(x,y,t,dx,dy,gamma=1.4):
 
     Shu, C.-W., “Essentially Non-oscillatory and Weighted Essentially Non-oscillatory Schemes for Hyperbolic ConservationLaws,” Advanced Numerical Approximation of Nonlinear Hyperbolic Equations , edited by A. Quarteroni, Vol. 1697 of Lecture Notes in Mathematics, Springer Berlin Heidelberg, 1998, pp. 325–432.
     """
-    infinityMach = numpy.sqrt(2/gamma)
-    alpha = 45 #Angle of attack 45 degrees
+    infinityMach = 0.3#numpy.sqrt(2/gamma)
+    alpha = 0 #Angle of attack 45 degrees
     infinityRho = 1
     infinityP = 1
     infinityT = 1
@@ -104,8 +103,8 @@ def analytical(x,y,t,dx,dy,gamma=1.4):
     u_bar = V_inf*numpy.cos(alpha)
     v_bar = V_inf*numpy.sin(alpha)
     #differences from origin
-    dx0 = 0 #X offset from origin
-    dy0 = 0 #Y offset from origin
+    dx0 = x-0 #X offset from origin
+    dy0 = y-0 #Y offset from origin
     uterm = (dx0-u_bar*t)
     vterm = (dy0-v_bar*t)
     pterm = beta*beta*(gamma-1)*infinityMach*infinityMach/(8*PI*PI)
