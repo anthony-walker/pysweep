@@ -17,8 +17,7 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     arrayTimeIndex - the current time step
     globalTimeStep - a step counter that allows implementation of the scheme
     """
-    half = 0.5
-    ops=2
+    ops = 2
     vs = slice(0,state.shape[1],1)
     coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)  #True - Final Step, False- Intermediate Step
     #Making pressure vector

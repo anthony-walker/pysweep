@@ -34,20 +34,21 @@ def performance(func):
         shares = [0,0.625,1] #Shares for GPU
         sims = [True,False] #different simulations
         blocksizes = [8, 12, 16, 24, 32] #blocksizes with most options
-        arraysizes = [int(768*i) for i in range(1,6,1)] #Performance array sizes
+        sizes = [int(768*i) for i in range(1,6,1)] #Performance array sizes
         #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
         solver.dtype = numpy.dtype(solver.dtypeStr)
         solver.verbose=False
-        for sim in sims:
-            for bs in blocksizes:
-                for sh in shares:
-                    solver.moments = [time.time(),]
-                    solver.share = sh
-                    solver.simulation = sim
-                    solver.blocksize = (bs,bs,1)
-                    func(solver,arraysize)
+        for arraysize in sizes:
+            for sim in sims:
+                for bs in blocksizes:
+                    for sh in shares:
+                        solver.moments = [time.time(),]
+                        solver.share = sh
+                        solver.simulation = sim
+                        solver.blocksize = (bs,bs,1)
+                        func(solver,arraysize)
     return testConfigurations
 
 def testing(func):
