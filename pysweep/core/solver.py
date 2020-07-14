@@ -31,17 +31,17 @@ class Solver(object):
         io.verbosePrint(self,"Setting up processes...\n")
         process.setupProcesses(self)
         self.moments.append(time.time())
-
+        
         #Creating time step data
         io.verbosePrint(self,'Creating time step data...\n')
         self.createTimeStepData()
         self.moments.append(time.time())
-        
+
         #Creating simulatneous input and output file
         io.verbosePrint(self,'Creating output file...\n')
         io.createOutputFile(self)
         self.moments.append(time.time())
-
+        
         # Creating shared array
         io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
         if self.simulation:
@@ -49,10 +49,12 @@ class Solver(object):
         else:
             block.standardBlock(self)
         self.moments.append(time.time())
+        
         #Cleaning up unneeded variables
         io.verbosePrint(self,'Cleaning up solver...\n')
         self.solverCleanUp()
         self.moments.append(time.time())
+
         #Running simulation
         io.verbosePrint(self,'Running simulation...')
         io.verbosePrint(self,io.getSolverPrint(self))

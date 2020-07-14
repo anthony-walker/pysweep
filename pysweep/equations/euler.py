@@ -2,24 +2,12 @@
 #This file contains functions to solve the eulers equations in 2 dimensions with
 #the swept rule or in a standard way
 
-
-
-import numpy as np
-import sympy,sys,itertools
-import pycuda.driver as cuda
-
-sfs = "%0.2e"
-#Testing
-def print_line(line):
-    sys.stdout.write('[')
-    for item in line:
-        sys.stdout.write(sfs%item+", ")
-    sys.stdout.write(']\n')
+import sys,itertools,numpy,h5py,mpi4py.MPI as MPI,pycuda.driver as cuda
 #----------------------------------Globals-------------------------------------#
-gamma = 0
+gamma = 1.4
 dtdx = 0
 dtdy = 0
-gM1 = 0
+gM1 = 0.4
 #----------------------------------End Globals-------------------------------------#
 
 def step(state,iidx,arrayTimeIndex,globalTimeStep):
@@ -37,7 +25,7 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     l1,l2 = tuple(zip(*iidx))
     l1 = range(min(l1)-ops,max(l1)+ops+1,1)
     l2 = range(min(l2)-ops,max(l2)+ops+1,1)
-    P = np.zeros(state[0,0,:,:].shape)
+    P = numpy.zeros(state[0,0,:,:].shape)
 
     for idx,idy in itertools.product(l1,l2):
         P[idx,idy] = pressure(state[arrayTimeIndex,vs,idx,idy])
@@ -47,31 +35,97 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
         state[arrayTimeIndex+1,vs,idx,idy] = state[arrayTimeIndex-timechange,vs,idx,idy]+coeff*(dtdx*dfdx+dtdy*dfdy)
     return state
 
-def set_globals(gpu,*args,source_mod=None):
+def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
     global dtdx,dtdy,gamma,gM1
     t0,tf,dt,dx,dy,gamma = args
     dtdx = dtdy = dt/dx
-    if gpu:
+    gM1 = gamma-1
+    if source_mod is not None:
         keys = "DT","DX","DY","GAMMA","GAM_M1","DTDX","DTDY"
         nargs = args[2:]+(gamma-1,dt/dx,dt/dy)
-        fc = lambda x:np.float64(x)
+        fc = lambda x:numpy.float64(x)
         for i,key in enumerate(keys):
             ckey,_ = source_mod.get_global(key)
             cuda.memcpy_htod(ckey,fc(nargs[i]))
 
-def createInitialConditions(npx,npy,gamma=1.4,t=0,filename="eulerConditions.hdf5"):
+def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5"):
     """Use this function to create a set of initial conditions in an hdf5 file.
     args:
     npx: number of points in x
     npy: number of points in y
     t: time of initial conditions
     """
-    # comm = MPI.COMM_WORLD
+    comm = MPI.COMM_WORLD
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
         initialConditions = hf.create_dataset("data",(4,npx,npy))
-    
+        L = 5 #From shu
+        xRange = numpy.linspace(-L,L,npx,endpoint=False)
+        yRange = numpy.linspace(-L,L,npy,endpoint=False)
+        dx = 1/npx
+        dy = 1/npy
+        for i,x in enumerate(xRange):
+            for j,y in enumerate(yRange):
+                initialConditions[:,i,j] = analytical(x,y,0,dx,dy,gamma=gamma)
     return filename
+
+def getAnalyticalArray(npx,npy,t):
+    """Use this function to get an analytical array for testing."""
+    state =numpy.zeros((4,npx,npy))
+    L = 5 #From shu
+    xRange = numpy.linspace(-L,L,npx,endpoint=False)
+    yRange = numpy.linspace(-L,L,npy,endpoint=False)
+    dx = 1/npx
+    dy = 1/npy
+    for i,x in enumerate(xRange):
+        for j,y in enumerate(yRange):
+            state[:,i,j] = analytical(x,y,0,dx,dy,gamma=gamma)
+    return state
+
+def analytical(x,y,t,dx,dy,gamma=1.4):
+    """
+    This function matches the analytical vortex used in:
+
+    Shu, C.-W., “Essentially Non-oscillatory and Weighted Essentially Non-oscillatory Schemes for Hyperbolic ConservationLaws,” Advanced Numerical Approximation of Nonlinear Hyperbolic Equations , edited by A. Quarteroni, Vol. 1697 of Lecture Notes in Mathematics, Springer Berlin Heidelberg, 1998, pp. 325–432.
+    """
+    infinityMach = numpy.sqrt(2/gamma)
+    alpha = 45 #Angle of attack 45 degrees
+    infinityRho = 1
+    infinityP = 1
+    infinityT = 1
+    Rv = 1 #Vortex radius
+    sigma = 1 #Perturbation constant
+    PI = numpy.pi
+    beta = infinityMach*5*numpy.sqrt(2)/4/numpy.pi*numpy.exp(0.5)
+    #Getting Freestream velocity
+    c = numpy.sqrt(gamma*infinityP/infinityRho)
+    V_inf = infinityMach*c
+    #Getting velocity components
+    u_bar = V_inf*numpy.cos(alpha)
+    v_bar = V_inf*numpy.sin(alpha)
+    #differences from origin
+    dx0 = 0 #X offset from origin
+    dy0 = 0 #Y offset from origin
+    uterm = (dx0-u_bar*t)
+    vterm = (dy0-v_bar*t)
+    pterm = beta*beta*(gamma-1)*infinityMach*infinityMach/(8*PI*PI)
+    #function calculation f(x,y,t)
+    fx = uterm*uterm
+    fy = vterm*vterm
+    f = (1-fx-fy)/(Rv*Rv)
+    #Finding state variables
+    #pressure
+    pressure = infinityP*(1-pterm*numpy.exp(f))**(gamma/(gamma-1)) 
+    #density
+    rho = infinityRho*(1-pterm*numpy.exp(f))**(1/(gamma-1)) 
+    #x flux
+    u = V_inf*(numpy.cos(alpha)-beta*vterm/(2*PI*Rv)*numpy.exp(f/2)) 
+    #y flux
+    v = V_inf*(numpy.sin(alpha)-beta*uterm/(2*PI*Rv)*numpy.exp(f/2)) 
+    #Energy flux
+    rhoe = pressure/(gamma-1)+rho*u*u/2+rho*v*v/2
+    return numpy.asarray((rho,rho*u,rho*v,rhoe))
+    
 
 #---------------------------------------------Solving functions
 def dfdxy(state,idx,P):
@@ -92,7 +146,7 @@ def direction_flux(state,xy,P):
     ONE = 1    #Constant value of 1
     idx = 2     #This is the index of the point in state (stencil data)
     #Initializing Flux
-    flux = np.zeros(len(state[:,idx]))
+    flux = numpy.zeros(len(state[:,idx]))
 
     #Atomic Operation 1
     tsl = flux_limiter(state,idx-1,idx,P[idx]-P[idx-1],P[idx-1]-P[idx-2])
@@ -144,9 +198,9 @@ def eflux(left_state,right_state,xy):
     #Calculating flux
     #X or Y split
     if xy:  #X flux
-        return np.add([left_state[1],left_state[1]*uL+PL,left_state[1]*vL,(left_state[3]+PL)*uL],[right_state[1],right_state[1]*uR+PR,right_state[1]*vR,(right_state[3]+PR)*uR])
+        return numpy.add([left_state[1],left_state[1]*uL+PL,left_state[1]*vL,(left_state[3]+PL)*uL],[right_state[1],right_state[1]*uR+PR,right_state[1]*vR,(right_state[3]+PR)*uR])
     else: #Y flux
-        return np.add([left_state[2],left_state[2]*uL,left_state[2]*vL+PL,(left_state[3]+PL)*vL],[right_state[2],right_state[2]*uR,right_state[2]*vR+PR,(right_state[3]+PR)*vR])
+        return numpy.add([left_state[2],left_state[2]*uL,left_state[2]*vL+PL,(left_state[3]+PL)*vL],[right_state[2],right_state[2]*uR,right_state[2]*vR+PR,(right_state[3]+PR)*vR])
 
 def espectral(left_state,right_state,xy):
     """Use this method to compute the Roe Average.
@@ -157,9 +211,9 @@ def espectral(left_state,right_state,xy):
     q[3] = rho*e
     """
     # print(left_state,right_state)
-    spec_state = np.zeros(len(left_state))
-    rootrhoL = np.sqrt(left_state[0])
-    rootrhoR = np.sqrt(right_state[0])
+    spec_state = numpy.zeros(len(left_state))
+    rootrhoL = numpy.sqrt(left_state[0])
+    rootrhoR = numpy.sqrt(right_state[0])
     tL = left_state/left_state[0] #Temporary variable to access e, u, v, and w - Left
     tR = right_state/right_state[0] #Temporary variable to access e, u, v, and w -  Right
     #Calculations
@@ -171,5 +225,5 @@ def espectral(left_state,right_state,xy):
     spvec = (spec_state[0],spec_state[0]*spec_state[1],spec_state[0]*spec_state[2],spec_state[0]*spec_state[3])
     P = pressure(spvec)
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
-    return (np.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
+    return (numpy.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
