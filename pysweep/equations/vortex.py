@@ -27,7 +27,15 @@ vyid = 2
 eid = 3
 epsilon = 2e-20
 
-def vortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
+
+class vortex(object):
+    """Use this to create vortex data."""
+    def __init__(self):
+        super(vortex,self).__init__()
+        
+
+
+def notVortex(cvics,npx,npy,times=(0,),x0=0,y0=0):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
     properties are obtained from the vics object, cvics.
        The center can be changed with x0 and y0.

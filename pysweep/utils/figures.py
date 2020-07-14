@@ -288,6 +288,43 @@ def DWP1():
     plot_dwp(ax)
     plt.savefig("DownPyramid1.png",bbox_inches='tight')
 
+class HeatGIF(object):
+    
+    def __init__(self):
+        super(HeatGIF,self).__init__()
+        self.cT = []
+
+    def appendTemp(self,T):
+        self.cT.append(T)
+
+    def setXY(self,X,Y):
+        """Use this function to set X and Y."""
+        self.X = X
+        self.Y = Y
+    
+    def animate(self,i):
+        ax.cla() #clear off axis
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0, 1)
+        ax.set_zlim(-1, 1)
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.plot_surface(self.X,self.Y,self.cT[i],cmap=cm.inferno)
+
+    def makeGif(self,name="heat.gif"):
+        global ax
+        fig =  plt.figure()
+        ax = plt.axes(projection='3d')
+        ax.view_init(elev=45, azim=25)
+        
+        # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
+        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=numpy.linspace(-1,1,10))
+        
+        frames = len(self.cT)
+        anim = animation.FuncAnimation(fig,self.animate,frames)
+        anim.save(name,writer="imagemagick")
+
+
 def createAllFigures():
     """Use this function to generate all paper figures."""
     Up1()

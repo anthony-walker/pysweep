@@ -75,7 +75,7 @@ class Solver(object):
         """Use this function to print a compact version of the simulation details."""
         shortPrint = "swept: " if self.simulation else "standard: "
         moment = self.moments[-1] - self.moments[0] if self.moments else None
-        shortPrint += "{}, {}, {}, {}, {}".format(self.blocksize[0],self.share,self.intermediate,self.operating, moment)
+        shortPrint += "{}, {}, {}, {}, {}, {}".format(self.blocksize[0],self.share,self.intermediate,self.operating,self.timeSteps, moment)
         print(shortPrint)
 
     def loadCPUModule(self):

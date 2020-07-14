@@ -68,10 +68,10 @@ def createInitialConditions(npx,npy,gamma=1.4,t=0,filename="eulerConditions.hdf5
     t: time of initial conditions
     """
     # comm = MPI.COMM_WORLD
-    # u,X,Y = analytical(npx,npy,t,alpha=alpha)
-    # with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
-    #     hf.create_dataset("data",u.shape,data=u)
-    # return filename
+    with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
+        initialConditions = hf.create_dataset("data",(4,npx,npy))
+    
+    return filename
 
 #---------------------------------------------Solving functions
 def dfdxy(state,idx,P):

@@ -1,8 +1,13 @@
-
 import numpy, h5py, os, sys
 import mpi4py.MPI as MPI
 import pycuda.driver as cuda
-import pysweep.core.io as io
+#Matplotlib imports
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from mpl_toolkits import mplot3d
+from matplotlib import animation, rc
+
+#globals
 scheme = True
 pi = numpy.pi
 piSq = pi*pi
@@ -21,8 +26,9 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
 
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
-    global dt,dx,dy,alpha,scheme #true for FE
+    global dt,dx,dy,alpha,scheme,courant #true for FE
     t0,tf,dt,dx,dy,alpha,scheme = args
+    courant = alpha*dt/dx/dx #technically not the courant number
     if source_mod is not None:
         keys = "DT","DX","DY","ALPHA"
         nargs = args[2:]
@@ -38,14 +44,6 @@ def forwardEuler(state,iidx,arrayTimeIndex,globalTimeStep):
     for idx,idy in iidx:
         state[arrayTimeIndex+1,0,idx,idy] = centralDifference(state[arrayTimeIndex,0],idx,idy)+state[arrayTimeIndex,0,idx,idy]
 
-def writeOut(arr):
-        for row in arr:
-            sys.stdout.write("[")
-            for item in row:
-                sys.stdout.write("%.3f, "%item)
-            sys.stdout.write("]\n")
-        sys.stdout.write("\n")
-
 def rungeKuttaTwo(state,iidx,arrayTimeIndex,globalTimeStep):
     """Use this function to solve the HDE with RK2."""
     coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)  #True - Final Step, False- Intermediate Step
@@ -55,8 +53,8 @@ def rungeKuttaTwo(state,iidx,arrayTimeIndex,globalTimeStep):
 def centralDifference(state,idx,idy):
     """Use this function to solve the HDE with a 3 point central difference."""
     nx,ny = state.shape
-    secondDerivativeX = alpha*dt*(state[idx+1,idy]-2*state[idx,idy]+state[idx-1,idy])/(dx*dx)
-    secondDerivativeY = alpha*dt*(state[idx,idy+1]-2*state[idx,idy]+state[idx,idy-1])/(dy*dy)
+    secondDerivativeX = courant*(state[(idx+1)%nx,idy]-2*state[idx,idy]+state[idx-1,idy])
+    secondDerivativeY = courant*(state[idx,(idy+1)%ny]-2*state[idx,idy]+state[idx,idy-1])
     return secondDerivativeX+secondDerivativeY
 
 def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"):
@@ -93,142 +91,41 @@ def analytical(npx,npy,t,alpha=0.1):
     return u,X,Y
 
 
-def numericalHeatComparisonFE():
-    """Use this function to compare a directly implemented forward euler to the analytical."""
-    arraysize = 10
+def verifyOrder(schemeBool=True,fname=None):
+    """Use this function to verify the order of Runge-Kutta Second order."""
+    global scheme,dt,dx,dy,alpha,courant
     d = 0.1
-    alpha = 1
-    dx = 1/arraysize
-    dt = float(d*dx**2/alpha)
-    T,x,y = analytical(arraysize,arraysize,0,alpha=alpha)
-    numerical = numpy.zeros((2,)+T.shape)
-    ns = numerical.shape
-    numerical[0,:,:,:] = T[:,:,:]
+    courant = d
+    scheme = schemeBool
+    sizes = [int(i*12) for i in range(1,6)]
     error = []
-    diff = []
-    hdf5 = h5py.File('/home/anthony-walker/nrg-swept-project/testing.hdf5')
-    data = hdf5['data']
-    courant = alpha*dt/dx/dx
-    for i in range(1,20):
-        T,x,y = analytical(arraysize,arraysize,i*dt,alpha=alpha)
-        for idx,idy in numpy.ndindex(ns[2:]):
-            dxx = numerical[0,0,idx-1,idy]+numerical[0,0,(idx+1)%ns[-2],idy]-2*numerical[0,0,idx,idy]
-            dyy = numerical[0,0,idx,idy-1]+numerical[0,0,idx,(idy+1)%ns[-1]]-2*numerical[0,0,idx,idy]
-            numerical[1,0,idx,idy] = courant*(dxx+dyy)+numerical[0,0,idx,idy]
-        error.append(numpy.amax(numpy.absolute(numerical[1,:,:,:]-T[:,:,:])))
-        # diff.append(numpy.amax(numpy.absolute(numerical[1,:,:,:]-data[i,:,:,:])))
-        numerical[0,:,:,:] = numerical[1,:,:,:]
-    print(numpy.amax(error))
-    # print(numpy.amax(diff))
-    hdf5.close()
-
-def numericalHeatComparisonRK2():
-    """Use this function to compare a directly implemented forward euler to the analytical."""
-    arraysize = 10
-    d = 0.1
-    alpha = 1
-    dx = 1/arraysize
-    dt = float(d*dx**2/alpha)
-    T,x,y = analytical(arraysize,arraysize,0,alpha=alpha)
-    numerical = numpy.zeros((3,)+T.shape)
-    ns = numerical.shape
-    numerical[0,:,:,:] = T[:,:,:]
-    error = []
-    diff = []
-    hdf5 = h5py.File('/home/anthony-walker/nrg-swept-project/testing.hdf5')
-    data = hdf5['data']
-    courant = alpha*dt/dx/dx
-    for i in range(1,20):
-        T,x,y = analytical(arraysize,arraysize,i*dt,alpha=alpha)
-        for idx,idy in numpy.ndindex(ns[2:]):
-            #Intermediate
-            dxx = numerical[0,0,idx-1,idy]+numerical[0,0,(idx+1)%ns[-2],idy]-2*numerical[0,0,idx,idy]
-            dyy = numerical[0,0,idx,idy-1]+numerical[0,0,idx,(idy+1)%ns[-1]]-2*numerical[0,0,idx,idy]
-            numerical[1,0,idx,idy] = 0.5*courant*(dxx+dyy)+numerical[0,0,idx,idy]
-            
-        for idx,idy in numpy.ndindex(ns[2:]):
-            #RK Step
-            dxx = numerical[1,0,idx-1,idy]+numerical[1,0,(idx+1)%ns[-2],idy]-2*numerical[1,0,idx,idy]
-            dyy = numerical[1,0,idx,idy-1]+numerical[1,0,idx,(idy+1)%ns[-1]]-2*numerical[1,0,idx,idy]
-            numerical[2,0,idx,idy] = courant*(dxx+dyy)+numerical[0,0,idx,idy]
-        error.append(numpy.amax(numpy.absolute(numerical[2,:,:,:]-T[:,:,:])))
-        # diff.append(numpy.amax(numpy.absolute(numerical[1,:,:,:]-data[i,:,:,:])))
-        numerical[0,:,:,:] = numerical[2,:,:,:]
-    print(numpy.amax(error))
-    # print(numpy.amax(diff))
-    hdf5.close()
-
-class HeatGIF(object):
-    
-    def __init__(self):
-        super(HeatGIF,self).__init__()
-        self.cT = []
-
-    def appendTemp(self,T):
-        self.cT.append(T)
-
-    def setXY(self,X,Y):
-        """Use this function to set X and Y."""
-        self.X = X
-        self.Y = Y
-    
-    def animate(self,i):
-        ax.cla() #clear off axis
-        ax.set_ylim(0, 1)
-        ax.set_xlim(0, 1)
-        ax.set_zlim(-1, 1)
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.plot_surface(self.X,self.Y,self.cT[i],cmap=cm.inferno)
-
-    def makeGif(self,name="heat.gif"):
-        global ax
-        fig =  plt.figure()
-        ax = plt.axes(projection='3d')
-        ax.view_init(elev=45, azim=25)
-        
-        # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=numpy.linspace(-1,1,10))
-        
-        frames = len(self.cT)
-        anim = animation.FuncAnimation(fig,self.animate,frames)
-        anim.save(name,writer="imagemagick")
-
+    dtCases = []
+    tf = 0.1
+    for arraysize in sizes:
+        alpha = 1
+        dx = dy = 1/arraysize
+        dt = float(d*dx*dx/alpha)
+        timesteps = int(tf//dt)
+        print(timesteps)
+        dtCases.append(dt)
+        T,x,y = analytical(arraysize,arraysize,t=0,alpha=alpha)
+        numerical = numpy.zeros((2,)+T.shape) if scheme else numpy.zeros((3,)+T.shape)
+        numerical[0,:,:,:] = T[0,:,:]
+        iidx = list(numpy.ndindex((arraysize,arraysize)))
+        for i in range(timesteps): #current time step
+            for j in range(1,numerical.shape[0]): #current scheme step
+                step(numerical,iidx,j-1,j)
+            numerical[0,:,:,:] = numerical[-1,:,:,:]
+        T,x,y = analytical(arraysize,arraysize,dt*timesteps,alpha=alpha)
+        errArr = numpy.absolute(T[0,:,:]-numerical[-1,0,:,:])
+        error.append(numpy.amax(errArr))   
+    plt.loglog(dtCases,error,marker='o')
+    plt.ylim(10e-10,10e-2)
+    if fname is None:
+        plt.show()
+    else:
+        plt.savefig(fname)
 
 if __name__ == "__main__":
-    numericalHeatComparisonFE()
-    numericalHeatComparisonRK2()
-    # import matplotlib.pyplot as plt
-    # from matplotlib import cm
-    # from mpl_toolkits import mplot3d
-    # from matplotlib import animation, rc
-    # os.system("rm heat.gif") #Remove old heat gif
-    # alpha = 0.1#0.00016563 #Of pure silver
-    # dt = 0.0001
-    # npx = 11
-    # npy = 11
-    # t0 = 0
-    # tf = 0.5
-    # uIC,X,Y = analytical(npx,npy,t0)
-    # dx = X[1]-X[0]
-    # dy = Y[1]-Y[0]
-    # globs = t0,tf,dt,
-    # set_globals(False,t0,tf,dt,dx,dy,alpha,True)
-    # U = numpy.zeros((2,)+uIC.shape)
-    # U[0,:,:,:] = uIC[:,:,:]
-    # idxs = list(numpy.ndindex((npx,npy)))
-    # X, Y = numpy.meshgrid(X, Y)
-    # hgf = HeatGIF()
-    # hgf.setXY(X,Y)
-    # hgf.appendTemp(U[0,0])
-    # error = [numpy.amax(U[0]-uIC),]
-    # for i,time in enumerate(numpy.arange(t0,tf+dt,dt)):
-    #     U = step(U,idxs,0,i)
-    #     uA,_,__ = analytical(npx,npy,time+dt)
-    #     # print(numpy.amax(U[0]-U[1]))
-    #     U[0,:,:,:] = numpy.copy(U[1,:,:,:])
-    #     U[1,:,:,:] = 0
-    #     error.append(numpy.amax(U[0]-uA))
-    #     hgf.appendTemp(U[0,0])
-    # print(numpy.amax(error))
-    # hgf.makeGif()
+    # verifyOrder(True,"forwardEulerHeatOrder.pdf")
+    verifyOrder(False)

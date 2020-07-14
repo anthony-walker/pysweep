@@ -57,7 +57,7 @@ def testing(func):
     """
     def testConfigurations():
         arraysize = 384
-        shares = [0,0.625,1] #Shares for GPU
+        shares = [0,0.5,1] #Shares for GPU
         sims = [True,False] #different simulations
         blocksizes = [8, 12, 16, 24] #blocksizes with most options
         #Creat solver object
@@ -103,99 +103,83 @@ def debugging(func):
 
 #----------------------------------End Decorator Functions-------------------------------------------
 @debugging
-def testValidateVortex(solver,arraysize):
+def testEulerVortex(solver,arraysize):
     """Use this funciton to validate the swept solver with a 2D euler vortex"""
 
-    #--------------------------------_Swept Vortex-------------------------------------#
-    swept_file = "\""+os.path.join(dpath,"dist_swept_vortex")+"\""
-    sfn = os.path.join(dpath,"dist_swept_vortex.hdf5")
-    sfp = "\""+sfn+"\""
-    t0,tf,dt,npx,X,blks,aff,nps = args
-    npy=npx
-    Y=X
-    gamma = 1.4
-    times = np.arange(t0,tf+dt,dt)
-    time_str = " -dt "+str(dt)+" -tf "+str(tf)+ " "
-    pts = " -nx "+str(npx)+ " -ny "+str(npx)+ " "
-
-    if not os.path.isfile(sfn):
-    #Create data using solver
-        print("Executing Swept Unsteady Vortex")
-        estr = "mpiexec -n "+str(nps)+" "+hoststr+" "+" python "+os.path.join(path[:-5],"pst.py")+" unsteady_swept_vortex "
-        estr += "-b "+str(blks)+" -a "+str(aff)+ " "
-        estr += " --hdf5 " + swept_file + pts +time_str
-        os.system(estr)
+    # --------------------------------_Swept Vortex-------------------------------------#
+    
+    #Running the swept euler vortex
 
 
-    decomp_file = "\""+os.path.join(dpath,"dist_decomp_vortex")+"\""
-    dfn = os.path.join(dpath,"dist_decomp_vortex.hdf5")
-    dfp = "\""+dfn+"\""
+    # decomp_file = "\""+os.path.join(dpath,"dist_decomp_vortex")+"\""
+    # dfn = os.path.join(dpath,"dist_decomp_vortex.hdf5")
+    # dfp = "\""+dfn+"\""
 
-    if not os.path.isfile(dfn):
-    #Create data using solver
-        print("Executing Standard Unsteady Vortex")
-        estr = "mpiexec -n "+str(nps)+" "+hoststr+" "+" python "+os.path.join(path[:-5],"pst.py")+" unsteady_standard_vortex "
-        estr += "-b "+str(blks)+" -a "+str(aff)+ " "
-        estr += " --hdf5 " + decomp_file + pts +time_str
-        os.system(estr)
+    # if not os.path.isfile(dfn):
+    # #Create data using solver
+    #     print("Executing Standard Unsteady Vortex")
+    #     estr = "mpiexec -n "+str(nps)+" "+hoststr+" "+" python "+os.path.join(path[:-5],"pst.py")+" unsteady_standard_vortex "
+    #     estr += "-b "+str(blks)+" -a "+str(aff)+ " "
+    #     estr += " --hdf5 " + decomp_file + pts +time_str
+    #     os.system(estr)
 
-    vfn = os.path.join(dpath,'vortex0.hdf5')
-    if not os.path.isfile(vfn):
-        print("Making AnalyticalVortex")
-        cvics = vortex.vics()
-        cvics.STC(gamma)
-        vortex.create_steady_data(cvics,npx,npy,times=times, filepath = dpath,filename = "/vortex",fdb=True)
+    # vfn = os.path.join(dpath,'vortex0.hdf5')
+    # if not os.path.isfile(vfn):
+    #     print("Making AnalyticalVortex")
+    #     cvics = vortex.vics()
+    #     cvics.STC(gamma)
+    #     vortex.create_steady_data(cvics,npx,npy,times=times, filepath = dpath,filename = "/vortex",fdb=True)
 
-    pfn = os.path.join(dpath,"clawres.hdf5")
+    # pfn = os.path.join(dpath,"clawres.hdf5")
 
 
 
-    shdf5_file = h5py.File(sfn, 'r')
-    swept = shdf5_file['data'][:,:,:,:]
-    dhdf5_file = h5py.File(dfn, 'r')
-    decomp = dhdf5_file['data'][:,:,:,:]
-    vhdf5_file = h5py.File(vfn, 'r')
-    avortex = vhdf5_file['data'][:,:,:,:]
-    pack_file = h5py.File(pfn,'r')
-    cpack = pack_file['data'][:,:,:,:]
+    # shdf5_file = h5py.File(sfn, 'r')
+    # swept = shdf5_file['data'][:,:,:,:]
+    # dhdf5_file = h5py.File(dfn, 'r')
+    # decomp = dhdf5_file['data'][:,:,:,:]
+    # vhdf5_file = h5py.File(vfn, 'r')
+    # avortex = vhdf5_file['data'][:,:,:,:]
+    # pack_file = h5py.File(pfn,'r')
+    # cpack = pack_file['data'][:,:,:,:]
 
-    sfs = "%0.2e"
-    # err1 = [np.amax(abs(swept[i]-decomp[i])) for i in range(len(swept))]
-    err2 = [np.amax(abs(swept[i]-avortex[i])) for i in range(len(swept))]
-    err3 = [np.amax(abs(decomp[i]-avortex[i])) for i in range(len(decomp))]
-    err4 = [np.amax(abs(cpack[i]-avortex[i])) for i in range(len(decomp))]
-    # tarr = cpack[0]-avortex[1]
-    # print(err3)
-    print(max(err2))
-    print(max(err3))
-    print(max(err4))
-    xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
-    ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
-    xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
+    # sfs = "%0.2e"
+    # # err1 = [np.amax(abs(swept[i]-decomp[i])) for i in range(len(swept))]
+    # err2 = [np.amax(abs(swept[i]-avortex[i])) for i in range(len(swept))]
+    # err3 = [np.amax(abs(decomp[i]-avortex[i])) for i in range(len(decomp))]
+    # err4 = [np.amax(abs(cpack[i]-avortex[i])) for i in range(len(decomp))]
+    # # tarr = cpack[0]-avortex[1]
+    # # print(err3)
+    # print(max(err2))
+    # print(max(err3))
+    # print(max(err4))
+    # xpts = np.linspace(-X/2,X/2,npx,dtype=np.float64)
+    # ypts = np.linspace(-Y/2,Y/2,npy,dtype=np.float64)
+    # xgrid,ygrid = np.meshgrid(xpts,ypts,sparse=False,indexing='ij')
 
-    xptsn = np.linspace(-0.5,0.5,npx,dtype=np.float64)
-    yptsn = np.linspace(-0.5,0.5,npy,dtype=np.float64)
-    xgridn,ygridn = np.meshgrid(xptsn,yptsn,sparse=False,indexing='ij')
+    # xptsn = np.linspace(-0.5,0.5,npx,dtype=np.float64)
+    # yptsn = np.linspace(-0.5,0.5,npy,dtype=np.float64)
+    # xgridn,ygridn = np.meshgrid(xptsn,yptsn,sparse=False,indexing='ij')
 
-    pidx = -1
-    fig,axes = plt.subplots(2,2)
-    axes1,axes2 = axes
-    ax1,ax2 = axes1
-    ax3,ax4 = axes2
+    # pidx = -1
+    # fig,axes = plt.subplots(2,2)
+    # axes1,axes2 = axes
+    # ax1,ax2 = axes1
+    # ax3,ax4 = axes2
 
-    ax1.contourf(xgrid,ygrid,avortex[pidx,0,:,:],levels=20,cmap=cm.inferno)
-    ax2.contourf(xgridn,ygridn,cpack[pidx,0,:,:],levels=20,cmap=cm.inferno)
-    ax3.contourf(xgrid,ygrid,decomp[pidx,0,:,:],levels=20,cmap=cm.inferno)
-    ax4.contourf(xgrid,ygrid,swept[pidx,0,:,:],levels=20,cmap=cm.inferno)
-    plt.show()
+    # ax1.contourf(xgrid,ygrid,avortex[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    # ax2.contourf(xgridn,ygridn,cpack[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    # ax3.contourf(xgrid,ygrid,decomp[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    # ax4.contourf(xgrid,ygrid,swept[pidx,0,:,:],levels=20,cmap=cm.inferno)
+    # plt.show()
 
-    vhdf5_file.close()
-    dhdf5_file.close()
-    # pack_file.close()
-    if remove_file:
-        os.system("rm "+sfp)
-        os.system("rm "+dfp)
-        os.system("rm "+vfn)
+    # vhdf5_file.close()
+    # dhdf5_file.close()
+    # # pack_file.close()
+    # if remove_file:
+    #     os.system("rm "+sfp)
+    #     os.system("rm "+dfp)
+    #     os.system("rm "+vfn)
 
 @debugging
 def testHalf(solver,arraysize):
@@ -230,53 +214,19 @@ def testHalf(solver,arraysize):
         assert numpy.allclose(actual[2,0,:,:],data[i,0,:,:],rtol=9e-15,atol=9e-15)
         actual[0,:,:,:] = actual[2,:,:,:]
 
-def testOrderOfConvergence(ifile="heat.yaml"):
-    """Use this function to test the order of convergence."""
-    yfilepath = os.path.join(path,"inputs")
-    yfile = os.path.join(yfilepath,ifile)
-    d = 0.25 #Constant
-    alpha = 1
-    error = []
-    # sizes = [120,240,360]
-    sizes = [12,24,36,48, 60,72,84,96]
-    ss = []
-    ts = []
-    pi = numpy.pi
-    analytical = lambda x,y,t: numpy.sin(2*pi*x)*numpy.sin(2*pi*y)*numpy.exp(-8*pi*pi*alpha*t)
-    for size in sizes:
-        x = numpy.linspace(0,1,size,endpoint=False)
-        dx = float(x[1]-x[0])
-        t0,tf = 0,0.01
-        dt = float(d*dx**2/alpha)
-        filename = pysweep.equations.heat.createInitialConditions(size,size,alpha=0.00016563)
-        solver = pysweep.Solver(filename,yfile)
-        solver.globals =  [t0,tf,dt,dx,dx,alpha,True]
-        solver()
-        hdf5 = h5py.File(solver.output,"r")
-        data = hdf5['data']
-        num = data[int(tf//dt),0,int(size//2),int(size//2)]
-        an = analytical(tf,int(size//2)*dx,int(size//2)*dx)
-        error.append(float(abs(an-num)))
-        ts.append(float(dt))
-        ss.append(float(dx))
-        hdf5.close()
-    
-    if solver.clusterMasterBool:
-        with open('convergence.yaml',"w") as f:
-            outdata  = {"error":error,"sizes":sizes,"dx":ss,"dt":ts}
-            yaml.dump(outdata,f)
-        makeOrderOfConvergencePlot()
-
-
-def makeOrderOfConvergencePlot():
-    """Using yaml file make Order of convergence plot."""
-    with open("convergence.yaml","r") as f:
-        data = yaml.load(f,Loader=yaml.FullLoader)
-        fig,ax = plt.subplots()
-        ax.loglog(data['dt'],data['error'])
-        ax.set_xlim([10e-6,10e-4])
-        plt.show()
-
+def setupSolver(solver,filename,cpu,gpu,ops,its):
+    """Use this function to set up solvers for various tests."""
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    solver.assignInitialConditions(filename)
+    solver.operating = ops
+    solver.intermediate = its
+    solver.setCPU(getEqnPath(cpu))
+    solver.setGPU(getEqnPath(gpu))
+    solver.exid = []
+    solver.output = "testing.hdf5"
+    solver.loadCPUModule()
+    return solver
+        
 
 #-------------------------------------Completed Tests------------------#
 
@@ -313,14 +263,14 @@ def testHalf(solver,arraysize):
         assert numpy.allclose(actual[2,0,:,:],data[i,0,:,:],rtol=9e-15,atol=9e-15)
         actual[0,:,:,:] = actual[2,:,:,:]
         
-
-
 @testing
 def testSimpleOne(solver,arraysize):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "exampleConditions.hdf5"
-    if not os.path.exists(filename):
+    global globalArraySize
+    if not arraysize == globalArraySize:
         filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
+        globalArraySize = arraysize
     solver.assignInitialConditions(filename)
     solver.operating = 1
     solver.intermediate = 1
@@ -350,8 +300,10 @@ def testSimpleOne(solver,arraysize):
 def testSimpleTwo(solver,arraysize):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "exampleConditions.hdf5"
-    if not os.path.exists(filename):
+    global globalArraySize
+    if not arraysize == globalArraySize:
         filename = pysweep.equations.example.createInitialConditions(1,arraysize,arraysize)
+        globalArraySize = arraysize
     solver.assignInitialConditions(filename)
     solver.operating = 2
     solver.intermediate = 2
@@ -382,8 +334,10 @@ def testSimpleTwo(solver,arraysize):
 def testCheckerOne(solver,arraysize):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "checkerConditions.hdf5"
-    if not os.path.exists(filename):
+    global globalArraySize
+    if not arraysize == globalArraySize:
         filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
+        globalArraySize = arraysize
     solver.assignInitialConditions(filename)
     solver.operating = 1
     solver.intermediate = 1
@@ -427,8 +381,10 @@ def testCheckerOne(solver,arraysize):
 def testCheckerTwo(solver,arraysize):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "checkerConditions.hdf5"
-    if not os.path.exists(filename):
+    global globalArraySize
+    if not arraysize == globalArraySize:
         filename = pysweep.equations.checker.createInitialConditions(1,arraysize,arraysize)
+        globalArraySize = arraysize
     solver.assignInitialConditions(filename)
     solver.operating = 2
     solver.intermediate = 2
@@ -467,8 +423,10 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
     adjustHeatGlobals(solver,arraysize,True,timesteps=testTimeSteps)
-    if not os.path.exists(filename):
+    global globalArraySize
+    if not arraysize == globalArraySize:
         filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
+        globalArraySize = arraysize
     solver.assignInitialConditions(filename)
     solver.operating = 1
     solver.intermediate = 1
@@ -495,6 +453,8 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
                 assert numpy.allclose(data[i,0],T[0])
             except Exception as e:
                 failed = True
+        T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=testTimeSteps//2*solver.globals[2],alpha=solver.globals[-2])
+        sameStepError = numpy.amax(data[int(testTimeSteps//2),0,:,:]-T[0,:,:])
 
     failed = solver.comm.allgather(failed)
     if solver.clusterMasterBool:
@@ -508,7 +468,7 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
             finalError = []
             for eL in error:
                 finalError.append(numpy.amax(eL))
-            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
+            print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
     if solver.clusterMasterBool:
         print("\n") #Final end line
     solver.comm.Barrier()
@@ -518,8 +478,10 @@ def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
     adjustHeatGlobals(solver,arraysize,False,timesteps=testTimeSteps)
-    if not os.path.exists(filename):
+    global globalArraySize
+    if not arraysize == globalArraySize:
         filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
+        globalArraySize = arraysize
     solver.assignInitialConditions(filename)
     solver.operating = 1
     solver.intermediate = 2
@@ -546,6 +508,8 @@ def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
                 assert numpy.allclose(data[i,0],T[0])
             except Exception as e:
                 failed = True
+        T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=testTimeSteps//2*solver.globals[2],alpha=solver.globals[-2])
+        sameStepError = numpy.amax(data[int(testTimeSteps//2),0,:,:]-T[0,:,:])
 
     failed = solver.comm.allgather(failed)
     if solver.clusterMasterBool:
@@ -559,10 +523,56 @@ def testHeatRungeKuttaTwo(solver,arraysize,printError=True):
             finalError = []
             for eL in error:
                 finalError.append(numpy.amax(eL))
-            print("Max Error: {}, Process Max Average: {}".format(numpy.amax(finalError),numpy.mean(finalError)))
+            print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
     if solver.clusterMasterBool:
         print("\n") #Final end line
     solver.comm.Barrier()
+
+def testVerifyOrderForwardEulerHeat(fname="forwardEuler",printError=True):
+    """Use this function to test the order of convergence."""
+    sizes = [int(32*i) for i in range(1,5,1)]
+    #Create solver object
+    solver = pysweep.Solver(sendWarning=False)
+    solver.simulation=False
+    solver.dtypeStr = 'float64'
+    solver.dtype = numpy.dtype(solver.dtypeStr)
+    solver.verbose=False
+    filename = "heatConditions.hdf5"
+    d = 0.1
+    solver.globals = [0,0.1,None,None,None,1,True]
+    solver.share=0
+    solver.blocksize = (16,16,1)
+    error = []
+    dts = []
+    for arraysize in sizes:
+        dx = dy = 1/arraysize
+        dt = float(d*dx*dx)
+        dts.append(dt)
+        solver.globals[2:5] = dt,dx,dy
+        filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
+        solver = setupSolver(solver,filename,"heat.py","heat.cu",1,1)
+        solver()
+        #Determining error
+        if solver.clusterMasterBool:
+            print(arraysize,solver.timeSteps)
+            with h5py.File(solver.output,"r") as f:
+                data = f["data"]                
+                T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=dt*solver.timeSteps,alpha=solver.globals[-2])
+                error.append(numpy.amax(numpy.absolute(data[-1,0]-T[0])))
+    if solver.clusterMasterBool:
+        pltname = fname+"SweptOrder" if solver.simulation else fname+"StandardOrder"
+        if solver.share == 1:
+            pltname+="G.pdf"
+        elif solver.share == 0:
+            pltname+="C.pdf"
+        else:
+            pltname+="H.pdf"
+        plt.loglog(dts,error,marker='o')
+        plt.title("Forward Euler Order Verification")
+        plt.xlabel("dt")
+        plt.ylabel("error")
+        plt.savefig(pltname)
+    
 
 def adjustHeatGlobals(solver,arraysize,scheme,timesteps=50):
     """Use this function to adjust heat equation step size based on arraysize"""
