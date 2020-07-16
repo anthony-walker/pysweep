@@ -5,12 +5,6 @@ from matplotlib import cm
 from mpl_toolkits import mplot3d
 from matplotlib import animation, rc
 
-def createGIF(filename,index,function):
-    """Use this function to create a gif for validation purposes"""
-    
-    with h5py.File(filename,"r") as f:
-        data = f['data']
-
 def createSurface(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="surface.pdf",gif=False,elev=45,azim=25):
     """Use this as a function for create gif."""
     global fig,ax,X,Y,gifData
@@ -41,7 +35,7 @@ def createSurface(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="surface.pdf",gif
 def animateSurface(i): 
     ax.plot_surface(X,Y,gifData[i],cmap=cm.magma)
 
-def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False):
+def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False,gmod=1):
     """Use this as a function for create gif."""
     global fig,ax,X,Y,gifData
     fig = plt.figure()
@@ -57,8 +51,11 @@ def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gi
     y = numpy.linspace(-Ly,Ly,shape[2])
     X,Y = numpy.meshgrid(x,y)
     if gif:
-        gifData = data
-        frames = len(data)
+        gifDataRange = range(0,len(data),gmod)
+        gifData = numpy.zeros((len(gifDataRange),)+numpy.shape(data)[1:])
+        for i,j in enumerate(gifDataRange):
+            gifData[i,:,:] = data[j,:,:]
+        frames = len(gifData)
         anim = animation.FuncAnimation(fig,animateContour,frames)
         anim.save(filename.split(".")[0]+".gif",writer="imagemagick")
     else:

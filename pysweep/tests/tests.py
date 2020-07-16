@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=10
+testTimeSteps=100
 globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
@@ -61,7 +61,7 @@ def testing(func):
         shares = [0,0.5,1] #Shares for GPU
         sims = [True,False] #different simulations
         blocksizes = [8, 12, 16, 24] #blocksizes with most options
-        #Creat solver object
+        #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
         solver.dtype = numpy.dtype(solver.dtypeStr)
@@ -83,9 +83,9 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 12
+        arraysize = 48
         shares = [0,] #Shares for GPU
-        sims = [True] #different simulations
+        sims = [True,] #different simulations
         blocksizes = [12,] #blocksizes with most options
         #Creat solver object
         solver = pysweep.Solver(sendWarning=False)
@@ -125,7 +125,7 @@ def testEulerVortex(solver,arraysize,printError=True):
     #End if
     solver.assignInitialConditions(filename)
     solver.operating = 2
-    solver.intermediate = 2
+    solver.intermediate = 1
     solver.setCPU(getEqnPath("euler.py"))
     solver.setGPU(getEqnPath("euler.cu"))
     solver.exid = []
