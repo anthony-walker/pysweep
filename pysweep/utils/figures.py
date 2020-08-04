@@ -1,7 +1,7 @@
 #Programmer: Anthony Walker
 #Use this file to generate figures for the 2D swept paper
-import sys, os
-import numpy as np
+import sys, os, numpy, warnings
+import pysweep.core.block as block
 from itertools import cycle
 import matplotlib as mpl
 mpl.use("tkAgg")
@@ -41,9 +41,9 @@ mscal = 20
 lwidth = 1.5
 asty = "->"
 node_alpha = 0.2
-upsets = block.create_dist_up_sets((bsx,bsx,1),ops)
-downsets = block.create_dist_down_sets((bsx,bsx,1),ops)
-yset,xset = block.create_dist_bridge_sets((bsx,bsx,1),ops,MPSS)
+upsets = block.createUpPyramidSets((bsx,bsx,1),ops)
+downsets = block.createDownPyramidSets((bsx,bsx,1),ops)
+yset,xset = block.createBridgeSets((bsx,bsx,1),ops,MPSS)
 ms = 6
 scale = 1.2
 palp = 0.25
@@ -52,15 +52,15 @@ palp = 0.25
 def make_node_surfaces(ax,colors,spacing):
     """Use this method to make node base colors"""
     for i,c in enumerate(colors):
-        xx, yy = np.meshgrid([i*spacing-bsh,(i+1)*spacing-bsh], [-bsh,npy+bsh])
-        zz = np.zeros(np.shape(xx))*-1
+        xx, yy = numpy.meshgrid([i*spacing-bsh,(i+1)*spacing-bsh], [-bsh,npy+bsh])
+        zz = numpy.zeros(numpy.shape(xx))*-1
         ax.plot_surface(xx,yy,zz,color=c,alpha=node_alpha)
 
 def make_node_tri_surfaces(ax,colors):
     """Use this method to make node base colors"""
     spacing=10
-    n1 = ax.plot_trisurf(np.linspace(xlims[0],xlims[1],spacing),np.linspace(ylims[0],ylims[1],spacing),np.zeros(spacing),color=colors[0],alpha=0.2)
-    n2 = ax.plot_trisurf(np.linspace(xlims[0],xlims[1],spacing),np.linspace(ylims[0],ylims[1],spacing),np.zeros(spacing),color=colors[1],alpha=0.2)
+    n1 = ax.plot_trisurf(numpy.linspace(xlims[0],xlims[1],spacing),numpy.linspace(ylims[0],ylims[1],spacing),numpy.zeros(spacing),color=colors[0],alpha=0.2)
+    n2 = ax.plot_trisurf(numpy.linspace(xlims[0],xlims[1],spacing),numpy.linspace(ylims[0],ylims[1],spacing),numpy.zeros(spacing),color=colors[1],alpha=0.2)
 
 
 class Arrow3D(FancyArrowPatch):
@@ -92,24 +92,24 @@ def create_arrow_axes(ax):
 
 def make_block(ax,start,length,width,height,sc="blue",alp=1,edges=True):
     """Use this function to make a block surface"""
-    xx, yy = np.meshgrid([start[0],start[0]+length], [start[1],start[1]+width])
+    xx, yy = numpy.meshgrid([start[0],start[0]+length], [start[1],start[1]+width])
     ec = 'black' if edges else None
-    zz = np.ones(np.shape(xx))*start[2]
+    zz = numpy.ones(numpy.shape(xx))*start[2]
     ax.plot_surface(xx,yy,zz,color=sc,edgecolors=ec,alpha=alp)
-    xx, yy = np.meshgrid([start[0],start[0]+length], [start[1],start[1]+width])
-    zz = np.ones(np.shape(xx))*(start[2]+height)
+    xx, yy = numpy.meshgrid([start[0],start[0]+length], [start[1],start[1]+width])
+    zz = numpy.ones(numpy.shape(xx))*(start[2]+height)
     ax.plot_surface(xx,yy,zz,color=sc,edgecolors=ec,alpha=alp)
-    xx, yy = np.meshgrid([start[2],start[2]+height], [start[1],start[1]+width])
-    zz = np.ones(np.shape(xx))*(start[0])
+    xx, yy = numpy.meshgrid([start[2],start[2]+height], [start[1],start[1]+width])
+    zz = numpy.ones(numpy.shape(xx))*(start[0])
     ax.plot_surface(zz,yy,xx,color=sc,edgecolors=ec,alpha=alp)
-    zz = np.ones(np.shape(xx))*(start[1])
-    xx, yy = np.meshgrid([start[0],start[0]+length], [start[2],start[2]+height])
+    zz = numpy.ones(numpy.shape(xx))*(start[1])
+    xx, yy = numpy.meshgrid([start[0],start[0]+length], [start[2],start[2]+height])
     ax.plot_surface(xx,zz,yy,color=sc,edgecolors=ec,alpha=alp)
-    xx, yy = np.meshgrid([start[2],start[2]+height], [start[1],start[1]+width])
-    zz = np.ones(np.shape(xx))*(start[0]+length)
+    xx, yy = numpy.meshgrid([start[2],start[2]+height], [start[1],start[1]+width])
+    zz = numpy.ones(numpy.shape(xx))*(start[0]+length)
     ax.plot_surface(zz,yy,xx,color=sc,edgecolors=ec,alpha=alp)
-    zz = np.ones(np.shape(xx))*(start[1]+width)
-    xx, yy = np.meshgrid([start[0],start[0]+length], [start[2],start[2]+height])
+    zz = numpy.ones(numpy.shape(xx))*(start[1]+width)
+    xx, yy = numpy.meshgrid([start[0],start[0]+length], [start[2],start[2]+height])
     ax.plot_surface(xx,zz,yy,color=sc,edgecolors=ec,alpha=alp)
 
 def plot_uppyramid(ax,start=0,edges=True,alp=1):
@@ -229,27 +229,27 @@ def staxf(elev=40,azim=35):
 def Up1():
     fig,ax = staxf()
     plot_uppyramid(ax,0)
-    plt.savefig('UpPyramid1.png',bbox_inches='tight')
+    plt.savefig('UpPyramid1.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def Y1():
     fig,ax = staxf()
     plot_uppyramid(ax,edges=False,alp=palp)
     plot_ybridges(ax)
-    plt.savefig('YBridge1.png',bbox_inches='tight')
+    plt.savefig('YBridge1.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def Comm1():
     fig,ax = staxf()
     plot_comm1(ax)
-    plt.savefig('Comm1.png',bbox_inches='tight')
+    plt.savefig('Comm1.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def X1():
     fig,ax = staxf()
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax)
-    plt.savefig('XBridge1.png',bbox_inches='tight')
+    plt.savefig('XBridge1.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def Oct1():
@@ -257,7 +257,7 @@ def Oct1():
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax,edges=False,alp=palp)
     plot_octahedrons(ax)
-    plt.savefig('Octahedron1.png',bbox_inches='tight')
+    plt.savefig('Octahedron1.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def Y2():
@@ -266,19 +266,19 @@ def Y2():
     plot_xbridges(ax,edges=False,alp=palp)
     plot_octahedrons(ax,edges=False,alp=palp)
     plot_ybridges(ax,start=len(upsets))
-    plt.savefig('YBridge2.png',bbox_inches='tight')
+    plt.savefig('YBridge2.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def Comm2():
     fig,ax = staxf(elev=elev2,azim=azim2)
     plot_comm2(ax)
-    plt.savefig('Comm2.png',bbox_inches='tight')
+    plt.savefig('Comm2.pdf',bbox_inches='tight')
 
 def X2():
     fig,ax = staxf(elev=elev2,azim=azim2)
     plot_comm2(ax,edges=False,alp=palp)
     plot_xbridges(ax,start=len(upsets))
-    plt.savefig('XBridge2.png',bbox_inches='tight')
+    plt.savefig('XBridge2.pdf',bbox_inches='tight')
     plt.close(fig)
 
 def DWP1():
@@ -286,54 +286,17 @@ def DWP1():
     plot_comm2(ax,edges=False,alp=palp)
     plot_xbridges(ax,start=len(upsets),edges=False,alp=palp)
     plot_dwp(ax)
-    plt.savefig("DownPyramid1.png",bbox_inches='tight')
+    plt.savefig("DownPyramid1.pdf",bbox_inches='tight')
 
-class HeatGIF(object):
-    
-    def __init__(self):
-        super(HeatGIF,self).__init__()
-        self.cT = []
-
-    def appendTemp(self,T):
-        self.cT.append(T)
-
-    def setXY(self,X,Y):
-        """Use this function to set X and Y."""
-        self.X = X
-        self.Y = Y
-    
-    def animate(self,i):
-        ax.cla() #clear off axis
-        ax.set_ylim(0, 1)
-        ax.set_xlim(0, 1)
-        ax.set_zlim(-1, 1)
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.plot_surface(self.X,self.Y,self.cT[i],cmap=cm.inferno)
-
-    def makeGif(self,name="heat.gif"):
-        global ax
-        fig =  plt.figure()
-        ax = plt.axes(projection='3d')
-        ax.view_init(elev=45, azim=25)
-        
-        # pos = ax1.imshow(Zpos, cmap='Blues', interpolation='none')
-        fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),ax=ax,boundaries=numpy.linspace(-1,1,10))
-        
-        frames = len(self.cT)
-        anim = animation.FuncAnimation(fig,self.animate,frames)
-        anim.save(name,writer="imagemagick")
-
-
-def createAllFigures():
+def createAll():
     """Use this function to generate all paper figures."""
     Up1()
     Y1()
     Comm1()
     X1()
-    palp = 0.1
     Oct1()
     Y2()
     Comm2()
     X2()
     DWP1()
+    

@@ -2,7 +2,7 @@
 #This file contains functions to solve the eulers equations in 2 dimensions with
 #the swept rule or in a standard way
 
-import sys,itertools,numpy,h5py,mpi4py.MPI as MPI,pycuda.driver as cuda
+import sys,itertools,numpy,h5py,mpi4py.MPI as MPI,pycuda.driver as cuda, pysweep.equations.sodShock as sod
 #----------------------------------Globals-------------------------------------#
 gamma = 1.4
 dtdx = 0
@@ -25,13 +25,18 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     l1 = range(min(l1)-ops,max(l1)+ops+1,1)
     l2 = range(min(l2)-ops,max(l2)+ops+1,1)
     P = numpy.zeros(state[0,0,:,:].shape)
-
     for idx,idy in itertools.product(l1,l2):
         P[idx,idy] = pressure(state[arrayTimeIndex,vs,idx,idy])
-    for idx,idy in iidx:
-        dfdx,dfdy = dfdxy(state,(arrayTimeIndex,vs,idx,idy),P)
-        state[arrayTimeIndex+1,vs,idx,idy] = state[arrayTimeIndex-timechange,vs,idx,idy]+coeff*(dtdx*dfdx+dtdy*dfdy)
-    return state
+
+    if globalTimeStep%2==0:
+        for idx,idy in iidx:
+            dfdx,dfdy = dfdxy(state,(arrayTimeIndex,vs,idx,idy),P)
+            state[arrayTimeIndex+1,vs,idx,idy] = 0.5*state[arrayTimeIndex-1,vs,idx,idy]+0.5*state[arrayTimeIndex,vs,idx,idy]+0.5*(dtdx*dfdx+dtdy*dfdy)
+    else:
+        for idx,idy in iidx:
+            dfdx,dfdy = dfdxy(state,(arrayTimeIndex,vs,idx,idy),P)
+            state[arrayTimeIndex+1,vs,idx,idy] = state[arrayTimeIndex,vs,idx,idy]+(dtdx*dfdx+dtdy*dfdy)
+    
 
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
@@ -81,9 +86,9 @@ def analytical(x,y,t,gamma=1.4):
     """
     PI = numpy.pi
     infinityMach = numpy.sqrt(2/gamma)
-    alpha = PI/2 #Angle of attack 90 degrees - straight x
+    # alpha = PI/2 #Angle of attack 90 degrees - straight x
     # alpha = 0 #Angle of attack 0 degrees - straight y
-    # alpha = PI/4 #Angle of attack 45 degrees
+    alpha = PI/4 #Angle of attack 45 degrees
     infinityRho = 1
     infinityP = 1
     infinityT = 1
@@ -123,6 +128,15 @@ def getAnalyticalArray(npx,npy,t):
             state[:,i,j] = analytical(x,y,t,gamma=gamma)
     return state
 
+def getPeriodicShock(npx,t):
+    """Use this function to test against the sod shock tube in 2D.
+    This doesn't solve shock interaction, just orients the data so it can be solved periodically temporarily.
+    """
+    shock = sod.sodShock(t,npx//2,npx,True)
+    return numpy.concatenate((numpy.flip(shock,axis=1),shock),axis=1)
+    
+    
+
 #---------------------------------------------Solving functions
 def dfdxy(state,idx,P):
     """This method is a five point finite volume method in 2D."""
@@ -149,6 +163,7 @@ def direction_flux(state,xy,P):
     tsr = flux_limiter(state,idx,idx-1,P[idx]-P[idx-1],P[idx+1]-P[idx])
     flux += eflux(tsl,tsr,xy)
     flux += espectral(tsl,tsr,xy)
+    
     #Atomic Operation 2
     tsl = flux_limiter(state,idx,idx+1,P[idx+1]-P[idx],P[idx]-P[idx-1])
     tsr = flux_limiter(state,idx+1,idx,P[idx+1]-P[idx],P[idx+2]-P[idx+1])
@@ -223,3 +238,5 @@ def espectral(left_state,right_state,xy):
     dim = 1 if xy else 2    #if true provides u dim else provides v dim
     return (numpy.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
 
+if __name__ == "__main__":
+    getPeriodicShock(12,0)

@@ -1,7 +1,8 @@
 #Programmer: Anthony Walker
 #This is a file for testing decomp and sweep
-import pysweep, argparse
+import pysweep, argparse, warnings
 import mpi4py.MPI as MPI
+import pysweep.utils.figures as figures
 
 def execute(args):
     """Use this function to execute pysweep in parallel by spawning MPI processes."""
@@ -29,13 +30,18 @@ def commandLine():
     parser.add_argument("--hostfile",nargs="?",type=str,help="This is a file containing hosts to run on.")
     parser.add_argument("-y","--yaml",nargs="?",choices=fmap,type=str,help="This generates a yaml file based on the provided equation packages.")
     
+    figuremap = {"up":figures.Up1,'y1':figures.Y1,'c1':figures.Comm1,'x1':figures.X1,'oct':figures.Oct1,'y2':figures.Y2,'c2':figures.Comm2,'x2':figures.X2,'down':figures.DWP1,"all":figures.createAll}
+    keyStr = ", ".join(figuremap.keys())
+    parser.add_argument("-p","--plot",nargs="+",choices=figuremap.keys(),type=str,help="This option runs the specified plotting function and outputs it as a pdf.")
+    
     args = parser.parse_args()
+    #Figure generation
+    for arg in args.plot:
+        try:
+            figuremap[arg]()
+        except Exception as e:
+            warnings.warn('Figure function not found: {}'.format(arg))
     
-    if args.filename is not None and args.processes is not None: #Executing simulation
-        execute(args)
-    
-    if args.yaml is not None: #Generating yaml
-        pysweep.generateInputFile(args.yaml)
     
     #MPIEXEC ENTRY
     # comm = MPI.COMM_SELF.Spawn("/home/anthony-walker/miniconda3/envs/pysweep-dev/bin/pysweep",

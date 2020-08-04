@@ -1,56 +1,16 @@
-"""
-Programmer: Anthony Walker
-Use this file to solve the Euler's equations with 
-fixed stencil conservative finite difference approach (Central 4th order)
-"""
+#Programmer: Anthony Walker
+#This file contains functions to solve the eulers equations in 2 dimensions with
+#the swept rule or in a standard way
 
-import sys,itertools,numpy,h5py,mpi4py.MPI as MPI,pycuda.driver as cuda
+import sys,itertools,numpy,h5py,mpi4py.MPI as MPI,pycuda.driver as cuda, pysweep.equations.sodShock as sod
 #----------------------------------Globals-------------------------------------#
 gamma = 1.4
 dtdx = 0
 dtdy = 0
 gM1 = 0.4
+
 #----------------------------------End Globals-------------------------------------#
-
-def step(state,iidx,arrayTimeIndex,globalTimeStep):
-    """This is the method that will be called by the swept solver.
-    state - 4D numpy array(t,v,x,y (v is variables length))
-    iidx -  an iterable of indexs
-    arrayTimeIndex - the current time step
-    globalTimeStep - a step counter that allows implementation of the scheme
-    """
-    ops = 2
-    coeff,timechange =  (1,1) if globalTimeStep%2==0 else (0.5,0)  #True - Final Step, False- Intermediate 
-    for idx,idy in iidx:
-        fluxx = dtdx*(getFluxX(state[arrayTimeIndex],idx,idy)-getFluxX(state[arrayTimeIndex],idx-1,idy))
-        fluxy = dtdy*(getFluxY(state[arrayTimeIndex],idx,idy)-getFluxY(state[arrayTimeIndex],idx,idy-1))
-        state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex,:,idx,idy]-fluxx-fluxy
-    return state
-
-def getFluxX(state,idx,idy):
-    """This function finds the x derivative."""
-    dfdx = numpy.zeros(4,)
-    dvars = numpy.asarray([getVars(state[:,i,idy],True) for i in [idx-1,idx,idx+1,idx+2]])
-    dfdx[:] = -dvars[0,:]/12+7*dvars[1,:]/12+7*dvars[2,:]/12-dvars[3,:]/12
-    return dfdx
-
-def getFluxY(state,idx,idy):
-    """This function finds the x derivative."""
-    dgdy = numpy.zeros(4,)
-    dvars = numpy.asarray([getVars(state[:,idx,i],False) for i in [idy-1,idy,idy+1,idy+2]])
-    dgdy[:] = -dvars[0,:]/12+7*dvars[1,:]/12+7*dvars[2,:]/12-dvars[3,:]/12
-    return dgdy
-
-def getVars(state,ifx):
-    """Use this function to get derivative variables."""
-    P = gM1*(state[3]-0.5*(state[1]*state[1]+state[2]*state[2])/state[0])
-    u = state[1]/state[0]
-    v = state[2]/state[0]
-    if ifx:
-        derivativeVariables = state[1],state[0]*u*u+P,state[0]*u*v,(state[3]+P)*u 
-    else:
-        derivativeVariables = state[1],state[0]*u*v,state[0]*v*v+P,(state[3]+P)*u 
-    return numpy.asarray(derivativeVariables)
+    
 
 def set_globals(*args,source_mod=None):
     """Use this function to set cpu global variables"""
@@ -100,9 +60,9 @@ def analytical(x,y,t,gamma=1.4):
     """
     PI = numpy.pi
     infinityMach = numpy.sqrt(2/gamma)
-    alpha = PI/2 #Angle of attack 90 degrees - straight x
+    # alpha = PI/2 #Angle of attack 90 degrees - straight x
     # alpha = 0 #Angle of attack 0 degrees - straight y
-    # alpha = PI/4 #Angle of attack 45 degrees
+    alpha = PI/4 #Angle of attack 45 degrees
     infinityRho = 1
     infinityP = 1
     infinityT = 1
@@ -141,3 +101,214 @@ def getAnalyticalArray(npx,npy,t):
         for j,y in enumerate(yRange):
             state[:,i,j] = analytical(x,y,t,gamma=gamma)
     return state
+
+def getPeriodicShock(npx,t):
+    """Use this function to test against the sod shock tube in 2D.
+    This doesn't solve shock interaction, just orients the data so it can be solved periodically temporarily.
+    """
+    shock = sod.sodShock(t,npx//2,npx,True)
+    return numpy.concatenate((numpy.flip(shock,axis=1),shock),axis=1)
+    
+    
+def step(state,iidx,arrayTimeIndex,globalTimeStep):
+    """This is the method that will be called by the swept solver.
+    state - 4D numpy array(t,v,x,y (v is variables length))
+    iidx -  an iterable of indexs
+    arrayTimeIndex - the current time step
+    globalTimeStep - a step counter that allows implementation of the scheme
+    """
+    ops=2 #number of points on each side of a give point
+    #Finding pressure
+    pressure  = getPressureArray(state[arrayTimeIndex],iidx) #For use with swept
+    #Solving fluxes in X direction
+    if globalTimeStep%2==0: #RK2 step
+        fluxx = getFluxInX(state[arrayTimeIndex],pressure,iidx,ops)
+        fluxy = getFluxInY(state[arrayTimeIndex],pressure,iidx,ops)
+        for idx,idy in iidx:
+            state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex-1,:,idx,idy]+fluxx[:,idx,idy]*dtdx
+    else: #intermediate step
+        fluxx = getFluxInX(state[arrayTimeIndex],pressure,iidx,ops)
+        fluxy = getFluxInY(state[arrayTimeIndex],pressure,iidx,ops)
+        print(numpy.amax(fluxy))
+        for idx,idy in iidx:
+            state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex,:,idx,idy]+0.5*fluxx[:,idx,idy]*dtdx
+    
+
+#---------------------------------------------Solving functions
+
+def getXStencil(idx,idy,maxLen):
+    return ((idx-2)%maxLen,idy),((idx-1)%maxLen,idy),(idx,idy),((idx+1)%maxLen,idy),((idx+2)%maxLen,idy)
+
+def getFluxInX(state,P,iidx,ops):
+    """Use this function to get flux in the X direction."""
+    flux = numpy.zeros((state.shape[0],state.shape[1],state.shape[2]))
+    xlen = state.shape[1]
+    vs = slice(0,4,1)
+    #west part of stencil
+    for idx,idy in iidx:
+        ww,w,c,e,ee = getXStencil(idx,idy,xlen)
+        left = fluxLimiter(state,(vs,)+w,(vs,)+c,P[c]-P[w],P[w]-P[ww])
+        right = fluxLimiter(state,(vs,)+c,(vs,)+w,P[c]-P[w],P[e]-P[c])
+        flux[:,idx,idy] += evaluateFluxInX(left,right)
+        flux[:,idx,idy] += evaluateSpectral(left,right,True)
+    #east part of stencil
+    for idx,idy in iidx:
+        ww,w,c,e,ee = getXStencil(idx,idy,xlen)
+        left = fluxLimiter(state,(vs,)+c,(vs,)+e,P[e]-P[c],P[c]-P[w])
+        right = fluxLimiter(state,(vs,)+e,(vs,)+c,P[e]-P[c],P[ee]-P[e])
+        flux[:,idx,idy] -= evaluateFluxInX(left,right)
+        flux[:,idx,idy] -= evaluateSpectral(left,right,True)
+    return flux*0.5
+
+def getYStencil(idx,idy,maxLen):
+    return (idx,(idy-2)%maxLen),(idx,(idy-1)%maxLen),(idx,idy),(idx,(idy+1)%maxLen),(idx,(idy+2)%maxLen)
+
+def getFluxInY(state,P,iidx,ops):
+    """Use this function to get flux in the X direction."""
+    flux = numpy.zeros((state.shape[0],state.shape[1],state.shape[2]))
+    ylen = state.shape[2]
+    vs = slice(0,4,1)
+    #west part of stencil
+    for idx,idy in iidx:
+        ss,s,c,n,nn = getYStencil(idx,idy,ylen)
+        left = fluxLimiter(state,(vs,)+s,(vs,)+c,P[c]-P[s],P[s]-P[ss])
+        right = fluxLimiter(state,(vs,)+c,(vs,)+s,P[c]-P[s],P[n]-P[c])
+        flux[:,idx,idy] += evaluateFluxInY(left,right)
+        flux[:,idx,idy] += evaluateSpectral(left,right,False)
+    #east part of stencil
+    for idx,idy in iidx:
+        ss,s,c,n,nn = getYStencil(idx,idy,ylen)
+        left = fluxLimiter(state,(vs,)+c,(vs,)+n,P[n]-P[c],P[c]-P[s])
+        right = fluxLimiter(state,(vs,)+n,(vs,)+c,P[n]-P[c],P[nn]-P[n])
+        flux[:,idx,idy] -= evaluateFluxInY(left,right)
+        flux[:,idx,idy] -= evaluateSpectral(left,right,False)
+    return flux*0.5
+
+def fluxLimiter(state,idx1,idx2,num,den):
+    """This function computers the minmod flux limiter based on pressure ratio"""
+    dec = 15
+    num = round(num,dec)
+    den = round(den,dec)
+    if (num > 0 and den > 0) or (num < 0 and den < 0):
+        return state[idx1]+min(num/den,1)/2*(state[idx2]-state[idx1])
+    else:
+        return state[idx1]
+
+def evaluateFluxInX(left_state,right_state):
+    """Use this method to calculation the flux.
+    q (state) is set up as:
+    q[0] = rho
+    q[1] = rho*u
+    q[2] = rho*v
+    q[3] = rho*e
+    """
+    #Pressures
+    PL = getPressure(left_state)
+    PR = getPressure(right_state)
+    flux = numpy.zeros(left_state.shape)
+    flux[0] = left_state[1]+right_state[1]
+    flux[1] = left_state[1]**2/left_state[0]+PL+right_state[1]**2/right_state[0]+PR
+    flux[2] = left_state[1]*left_state[2]/left_state[0]+right_state[1]*right_state[2]/right_state[0]
+    flux[3] = (left_state[3]+PL)*left_state[1]/left_state[0]+(right_state[3]+PR)*right_state[1]/right_state[0]
+    return flux
+
+def evaluateFluxInY(left_state,right_state):
+    """Use this method to calculation the flux.
+    q (state) is set up as:
+    q[0] = rho
+    q[1] = rho*u
+    q[2] = rho*v
+    q[3] = rho*e
+    """
+    #Pressures
+    PL = getPressure(left_state)
+    PR = getPressure(right_state)
+    flux = numpy.zeros(left_state.shape)
+    flux[0] = left_state[1]+right_state[1]
+    flux[1] = left_state[1]*left_state[2]/left_state[0]+right_state[1]*right_state[2]/right_state[0]
+    flux[2] = left_state[2]**2/left_state[0]+PL+right_state[2]**2/right_state[0]+PR
+    flux[3] = (left_state[3]+PL)*left_state[2]/left_state[0]+(right_state[3]+PR)*right_state[2]/right_state[0]
+    return flux
+
+def evaluateSpectral(left_state,right_state,xy):
+    """Use this method to compute the Roe Average.
+    q(state)
+    q[0] = rho
+    q[1] = rho*u
+    q[2] = rho*v
+    q[3] = rho*e
+    """
+    # print(left_state,right_state)
+    spec_state = numpy.zeros(left_state.shape)
+    rootrhoL = numpy.sqrt(left_state[0])
+    rootrhoR = numpy.sqrt(right_state[0])
+    tL = left_state/left_state[0] #Temporary variable to access e, u, v, and w - Left
+    tR = right_state/right_state[0] #Temporary variable to access e, u, v, and w -  Right
+    #Calculations
+    denom = 1/(rootrhoL+rootrhoR)
+    spec_state[0] = rootrhoL*rootrhoR
+    spec_state[1] = (rootrhoL*tL[1]+rootrhoR*tR[1])*denom
+    spec_state[2] = (rootrhoL*tL[2]+rootrhoR*tR[2])*denom
+    spec_state[3] = (rootrhoL*tL[3]+rootrhoR*tR[3])*denom
+    spvec = (spec_state[0],spec_state[0]*spec_state[1],spec_state[0]*spec_state[2],spec_state[0]*spec_state[3])
+    P = getPressure(spvec)
+    dim = 1 if xy else 2    #if true provides u dim else provides v dim
+    return (numpy.sqrt(gamma*P/spec_state[0])+abs(spec_state[dim]))*(left_state-right_state) #Returns the spectral radius *(dQ)
+
+def getPressure(q):
+    """Use this function to solve for pressure of the 2D Eulers equations.
+    q is set up as:
+    q[0] = rho
+    q[1] = rho*u
+    q[2] = rho*v
+    q[3] = rho*e
+    P = (GAMMA-1)*(rho*e-(1/2)*(rho*u^2+rho*v^2))
+    """
+    return gM1*(q[3]-(q[1]*q[1]+q[2]*q[2])/(2*q[0]))
+
+def getPressureArray(state,iidx):
+    """Use this function to solve for pressure of the 2D Eulers equations.
+    q is set up as:
+    q[0] = rho
+    q[1] = rho*u
+    q[2] = rho*v
+    q[3] = rho*e
+    P = (GAMMA-1)*(rho*e-(1/2)*(rho*u^2+rho*v^2))
+    """
+    ops = 2
+    pressure = numpy.zeros(state.shape[1:])
+    lB = numpy.amin(iidx) #lower bound
+    uB = numpy.amax(iidx) #upper bound
+    lB = lB-ops if lB>=ops else lB
+    uB = uB+ops if uB<(state.shape[-1]-1) else uB
+    for i in range(lB,uB):
+        for j in range(lB,uB):
+            pressure[i,j] = gM1*(state[3,i,j]-(state[1,i,j]*state[1,i,j]+state[2,i,j]*state[2,i,j])/(2*state[0,i,j]))
+    return pressure
+
+def writeOut(array):
+    for row in array:
+        sys.stdout.write("[")
+        for value in row:
+            sys.stdout.write("{:0.3f},".format(abs(value)))
+        sys.stdout.write("]\n")
+
+if __name__ == "__main__":
+    dt = 0.01
+    set_globals(0,0.1,dt,0.1428571429,0.1428571429,1.4)
+    ops = 2
+    size = 20
+    ic = getPeriodicShock(size,0)
+    state = numpy.zeros((10,)+ic.shape)
+    state[0] = ic[:]
+    iidx = list(numpy.ndindex(state.shape[2:]))
+    step(state,iidx,0,1)
+    
+    
+    # print(numpy.amax(getPeriodicShock(size,0.01)[1]))
+    for gts,i in enumerate(range(3),start=1):
+        step(state,iidx,i,gts)
+        print("-----------------------------------------------------")
+        # writeOut(getPeriodicShock(size,(i+1)*dt)[1])
+        writeOut(state[i+1,1])
+        input()
