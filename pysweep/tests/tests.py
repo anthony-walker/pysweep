@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=50
+testTimeSteps=1000
 globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
@@ -83,10 +83,10 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 24
+        arraysize = 120
         shares = [0,] #Shares for GPU
         sims = [True,] #different simulations
-        blocksizes = [24,] #blocksizes with most options
+        blocksizes = [12,] #blocksizes with most options
         #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -143,50 +143,9 @@ def testEulerShock(solver,arraysize,printError=True):
                     assert numpy.all(data[i,:,:,:]==pysweep.equations.euler.getPeriodicShock(arraysize,solver.globals[2]*i))
                 except Exception as e:
                     failed = True
-                    # print('-----------------------------------')
-                    # print(data[i,0,:,:])
-                    # print('-----------------------------------')
-                    # print(pysweep.equations.euler.getPeriodicShock(arraysize,solver.globals[2]*i)[0])
-                    # input()
         print("{} testEulerShock\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
 
-    # if solver.clusterMasterBool:
-    #     steps = solver.arrayShape[0]
-    #     stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
-    # else:
-    #     stepRange = []
-    # stepRange = solver.comm.scatter(stepRange)
-    # error = []
-    # with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
-    #     data = f["data"]
-    #     failed = False
-    #     for i in stepRange:
-    #         analytical = pysweep.equations.euler.getPeriodicShock(arraysize,t=solver.globals[2]*i)
-    #         error.append(numpy.amax(numpy.absolute(data[i,:]-analytical[:])))
-    #         try:
-    #             assert numpy.allclose(data[i,:],analytical[:])
-    #         except Exception as e:
-    #             failed = True
-    #     analytical = pysweep.equations.euler.getPeriodicShock(arraysize,t=testTimeSteps//2*solver.globals[2])
-    #     sameStepError = numpy.amax(data[int(testTimeSteps//2),:,:,:]-analytical[:,:,:])
-
-    # failed = solver.comm.allgather(failed)
-    # if solver.clusterMasterBool:
-    #     solver.compactPrint()
-    #     masterFail = numpy.all(failed)
-    #     print("{} testEulerShock".format("Failed:" if masterFail else "Success:"))
-
-    # if printError:
-    #     error = solver.comm.allgather(error)
-    #     if solver.clusterMasterBool:
-    #         finalError = []
-    #         for eL in error:
-    #             finalError.append(numpy.amax(eL))
-    #         print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
-    # if solver.clusterMasterBool:
-    #     print("\n") #Final end line
-    # solver.comm.Barrier()
 
 @debugging
 def testEulerVortex(solver,arraysize,printError=True):

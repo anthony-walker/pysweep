@@ -33,7 +33,7 @@ def sodShock(t,npts,npy,xy,lBC = (1.0,1.0,0,2.5),rBC = (0.1,0.125,0,2),g = 1.4):
     pD = np.zeros(numPts)
     rhoD = np.zeros(numPts)
     uD = np.zeros(numPts)
-    arr = np.zeros((4,npts,1))
+    arr = np.zeros((4,npts,1)) if xy else np.zeros((4,1,npts))
     combList = list()
     for i in range(numPts): #State L
         if(xI[i]<xfL):
@@ -59,10 +59,9 @@ def sodShock(t,npts,npy,xy,lBC = (1.0,1.0,0,2.5),rBC = (0.1,0.125,0,2),g = 1.4):
         eTemp = eqnState(pD[i],rhoD[i],uD[i],gamma)
         if xy:
             arr[:,i,0] = [rhoD[i],rhoD[i]*uD[i],0,rhoD[i]*eTemp]
-            
         else:
-            arr[:,i,0] = [rhoD[i],0,rhoD[i]*uD[i],rhoD[i]*eTemp]
-    return np.repeat(arr,npy,2)
+            arr[:,0,i] = [rhoD[i],0,rhoD[i]*uD[i],rhoD[i]*eTemp]
+    return np.repeat(arr,npy,2) if xy else np.repeat(arr,npy,1)
 
 def eqnState(p,rho,u,gamma):
     """Use this method to solve for pressure."""
