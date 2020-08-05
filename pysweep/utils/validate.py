@@ -32,22 +32,25 @@ def createSurface(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="surface.pdf",gif
         anim = animation.FuncAnimation(fig,animateSurface,frames)
         anim.save(filename.split(".")[0]+".gif",writer="imagemagick")
     else:
-        ax.surface(X,Y,data[tid],cmap=cm.magma)
+        ax.surface(X,Y,data[tid])
         plt.savefig(filename)
 
 def animateSurface(i): 
     ax.cla()
-    ax.set_zlim(0,LZ)
+    ax.set_zlim(-LZ,LZ)
     ax.set_xlim(-LX,LX)
     ax.set_ylim(-LY,LY)
-    ax.plot_surface(X,Y,gifData[i],cmap=cm.magma)
+    ax.plot_surface(X,Y,gifData[i],cmap=cm.magma,vmin=-LZ, vmax=LZ)
 
 def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False,gmod=1):
     """Use this as a function for create gif."""
-    global fig,ax,X,Y,gifData
+    global fig,ax,X,Y,gifData,LZ,LX,LY
     fig = plt.figure()
     ax =  plt.subplot()
-    fig.colorbar(cm.ScalarMappable(cmap=cm.magma),ax=ax,boundaries=numpy.linspace(0,Lz,100))
+    fig.colorbar(cm.ScalarMappable(cmap=cm.magma),ax=ax,boundaries=numpy.linspace(-Lz,Lz,100))
+    LX=Lx
+    LY=Ly
+    LZ=Lz
     ax.set_xlabel(xlab)
     ax.set_ylabel(ylab)
     ax.set_xlim(-Lx,Lx)
@@ -70,4 +73,4 @@ def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gi
         plt.savefig(filename)
    
 def animateContour(i): 
-    ax.contourf(X,Y,gifData[i],cmap=cm.magma)
+    ax.contourf(X,Y,gifData[i],cmap=cm.magma,vmin=-LZ, vmax=LZ)

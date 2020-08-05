@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=1000
+testTimeSteps=3000
 globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
@@ -84,7 +84,7 @@ def debugging(func):
     """
     def testConfigurations():
         arraysize = 120
-        shares = [0,] #Shares for GPU
+        shares = [1,] #Shares for GPU
         sims = [True,] #different simulations
         blocksizes = [12,] #blocksizes with most options
         #Create solver object
@@ -129,7 +129,7 @@ def testEulerShock(solver,arraysize,printError=True):
     solver.setCPU(getEqnPath("euler.py"))
     solver.setGPU(getEqnPath("euler.cu"))
     solver.exid = []
-    solver.output = "testing.hdf5"
+    solver.output = "testingShock.hdf5"
     solver.loadCPUModule()
     solver()
 
@@ -164,7 +164,7 @@ def testEulerVortex(solver,arraysize,printError=True):
     solver.setCPU(getEqnPath("euler.py"))
     solver.setGPU(getEqnPath("euler.cu"))
     solver.exid = []
-    solver.output = "testing.hdf5"
+    solver.output = "testingVortex.hdf5"
     solver.loadCPUModule()
     solver()
     if solver.clusterMasterBool:
@@ -407,7 +407,7 @@ def testCheckerTwo(solver,arraysize):
         print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
 
-@testing
+@debugging
 def testHeatForwardEuler(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
@@ -422,7 +422,7 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
     solver.setCPU(getEqnPath("heat.py"))
     solver.setGPU(getEqnPath("heat.cu"))
     solver.exid = []
-    solver.output = "testing.hdf5"
+    solver.output = "testingHeatFE.hdf5"
     solver.loadCPUModule()
     solver()
     if solver.clusterMasterBool:
