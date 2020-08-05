@@ -42,12 +42,13 @@ def animateSurface(i):
     ax.set_ylim(-LY,LY)
     ax.plot_surface(X,Y,gifData[i],cmap=cm.magma,vmin=-LZ, vmax=LZ)
 
-def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False,gmod=1):
+def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False,gmod=1,LZn=None):
     """Use this as a function for create gif."""
-    global fig,ax,X,Y,gifData,LZ,LX,LY
+    global fig,ax,X,Y,gifData,LZ,LX,LY,LZN
     fig = plt.figure()
     ax =  plt.subplot()
-    fig.colorbar(cm.ScalarMappable(cmap=cm.magma),ax=ax,boundaries=numpy.linspace(-Lz,Lz,100))
+    LZN = -Lz if LZn is None else LZn
+    fig.colorbar(cm.ScalarMappable(cmap=cm.magma),ax=ax,boundaries=numpy.linspace(LZN,Lz,100))
     LX=Lx
     LY=Ly
     LZ=Lz
@@ -73,4 +74,4 @@ def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gi
         plt.savefig(filename)
    
 def animateContour(i): 
-    ax.contourf(X,Y,gifData[i],cmap=cm.magma,vmin=-LZ, vmax=LZ)
+    ax.contourf(X,Y,gifData[i],cmap=cm.magma,vmin=LZN, vmax=LZ)

@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=3000
+testTimeSteps=100
 globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
@@ -84,7 +84,7 @@ def debugging(func):
     """
     def testConfigurations():
         arraysize = 120
-        shares = [1,] #Shares for GPU
+        shares = [0,] #Shares for GPU
         sims = [True,] #different simulations
         blocksizes = [12,] #blocksizes with most options
         #Create solver object
@@ -104,50 +104,7 @@ def debugging(func):
 
 #----------------------------------End Decorator Functions-------------------------------------------
 
-def adjustEulerGlobals(solver,arraysize,timesteps=50):
-    """Use this function to adjust heat equation step size based on arraysize"""
-    d = 0.1
-    gamma = 1.4
-    dx = 10/arraysize
-    dt = d*dx
-    solver.globals = [0,dt*timesteps,dt,dx,dx,gamma]
-
-@debugging
-def testEulerShock(solver,arraysize,printError=True):
-    """Use this funciton to validate the swept solver with a 2D euler vortex"""
-    warnings.filterwarnings('ignore') #Ignore warnings for processes
-    filename = "eulerConditions.hdf5"
-    adjustEulerGlobals(solver,arraysize,timesteps=testTimeSteps)
-    global globalArraySize
-    # if not arraysize == globalArraySize:
-    ic = pysweep.equations.euler.getPeriodicShock(arraysize,0)
-    globalArraySize = arraysize
-    #End if
-    solver.assignInitialConditions(ic)
-    solver.operating = 2
-    solver.intermediate = 2
-    solver.setCPU(getEqnPath("euler.py"))
-    solver.setGPU(getEqnPath("euler.cu"))
-    solver.exid = []
-    solver.output = "testingShock.hdf5"
-    solver.loadCPUModule()
-    solver()
-
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            for i in range(solver.arrayShape[0]):
-                try:
-                    assert numpy.all(data[i,:,:,:]==pysweep.equations.euler.getPeriodicShock(arraysize,solver.globals[2]*i))
-                except Exception as e:
-                    failed = True
-        print("{} testEulerShock\n".format("Failed:" if failed else "Success:"))
-    solver.comm.Barrier()
-
-
-@debugging
+@testing
 def testEulerVortex(solver,arraysize,printError=True):
     """Use this funciton to validate the swept solver with a 2D euler vortex"""
     warnings.filterwarnings('ignore') #Ignore warnings for processes
@@ -203,6 +160,8 @@ def testEulerVortex(solver,arraysize,printError=True):
     if solver.clusterMasterBool:
         print("\n") #Final end line
     solver.comm.Barrier()
+        
+#-------------------------------------Completed Tests------------------#
 
 def setupSolver(solver,filename,cpu,gpu,ops,its):
     """Use this function to set up solvers for various tests."""
@@ -216,10 +175,50 @@ def setupSolver(solver,filename,cpu,gpu,ops,its):
     solver.output = "testing.hdf5"
     solver.loadCPUModule()
     return solver
-        
-#-------------------------------------Completed Tests------------------#
+
+def adjustEulerGlobals(solver,arraysize,timesteps=50):
+    """Use this function to adjust heat equation step size based on arraysize"""
+    d = 0.1
+    gamma = 1.4
+    dx = 10/arraysize
+    dt = d*dx
+    solver.globals = [0,dt*timesteps,dt,dx,dx,gamma]
 
 @debugging
+def testEulerShock(solver,arraysize,printError=True):
+    """Use this funciton to validate the swept solver with a 2D euler vortex"""
+    warnings.filterwarnings('ignore') #Ignore warnings for processes
+    filename = "eulerConditions.hdf5"
+    adjustEulerGlobals(solver,arraysize,timesteps=testTimeSteps)
+    global globalArraySize
+    # if not arraysize == globalArraySize:
+    ic = pysweep.equations.euler.getPeriodicShock(arraysize,0)
+    globalArraySize = arraysize
+    #End if
+    solver.assignInitialConditions(ic)
+    solver.operating = 2
+    solver.intermediate = 2
+    solver.setCPU(getEqnPath("euler.py"))
+    solver.setGPU(getEqnPath("euler.cu"))
+    solver.exid = []
+    solver.output = "testingShock.hdf5"
+    solver.loadCPUModule()
+    solver()
+
+    if solver.clusterMasterBool:
+        failed = False
+        solver.compactPrint()
+        with h5py.File(solver.output,"r") as f:
+            data = f["data"]
+            for i in range(solver.arrayShape[0]):
+                try:
+                    assert numpy.all(data[i,:,:,:]==pysweep.equations.euler.getPeriodicShock(arraysize,solver.globals[2]*i))
+                except Exception as e:
+                    failed = True
+        print("{} testEulerShock\n".format("Failed:" if failed else "Success:"))
+    solver.comm.Barrier()
+
+@testing
 def testHalf(solver,arraysize):
     """Use this function to run the half test."""
     warnings.filterwarnings('ignore') #Ignore warnings for processes
@@ -407,7 +406,7 @@ def testCheckerTwo(solver,arraysize):
         print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
 
-@debugging
+@testing
 def testHeatForwardEuler(solver,arraysize,printError=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"

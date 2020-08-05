@@ -48,7 +48,7 @@ def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5
     return filename
 
     
-def analytical(x,y,t,gamma=1.4):
+def analytical(x,y,t,gamma=1.4,alpha=numpy.pi/4):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
     properties are obtained from the vics object, cvics.
        The center can be changed with x0 and y0.
@@ -63,7 +63,7 @@ def analytical(x,y,t,gamma=1.4):
     infinityMach = numpy.sqrt(2/gamma)
     # alpha = PI/2 #Angle of attack 90 degrees - straight x
     # alpha = 0 #Angle of attack 0 degrees - straight y
-    alpha = PI/2 #Angle of attack 45 degrees
+    # alpha = PI/4 #Angle of attack 45 degrees
     infinityRho = 1
     infinityP = 1
     infinityT = 1
