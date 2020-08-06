@@ -3,7 +3,7 @@ import pysweep,numpy,sys,os,h5py,yaml,time,warnings
 import matplotlib.pyplot as plt
 path = os.path.dirname(os.path.abspath(__file__))
 eqnPath = os.path.join(os.path.dirname(path),"equations")
-testTimeSteps=100
+testTimeSteps=2000
 globalArraySize = None #Used to prevent repeated file creation
 
 def writeOut(arr,prec="%.5f"):
@@ -83,10 +83,10 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 120
-        shares = [0,] #Shares for GPU
+        arraysize = 240
+        shares = [1,] #Shares for GPU
         sims = [True,] #different simulations
-        blocksizes = [12,] #blocksizes with most options
+        blocksizes = [24,] #blocksizes with most options
         #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
@@ -104,7 +104,7 @@ def debugging(func):
 
 #----------------------------------End Decorator Functions-------------------------------------------
 
-@testing
+@debugging
 def testEulerVortex(solver,arraysize,printError=True):
     """Use this funciton to validate the swept solver with a 2D euler vortex"""
     warnings.filterwarnings('ignore') #Ignore warnings for processes

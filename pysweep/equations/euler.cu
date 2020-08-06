@@ -6,9 +6,8 @@
 #define ABSOLUTE(x)   abs(x)
 #define MIN(x,y)   min(x,y)
 #define ISNAN(x)   isnan(x)
-__device__ __constant__ const double ZERO=0;
-__device__ __constant__ const double HALF=0.5;
-__device__ __constant__ const double ONE=1;
+#define ISINF(x)   isinf(x)
+
 __device__ __constant__  double DX;
 __device__ __constant__  double DY;
 __device__ __constant__  double DT;
@@ -36,7 +35,7 @@ __device__
 double pressure(double *point)
 {
   double vss = (point[1]*point[1]+point[2]*point[2])/point[0];
-  return GAM_M1*(point[3]-HALF*vss);
+  return GAM_M1*(point[3]-0.5*vss);
 }
 /*
   Use this function to determine the pressure for spectral function
@@ -46,7 +45,7 @@ double spec_press(double *point)
 {
   double rho = point[0];
   double vss = point[1]*point[1]+point[2]*point[2];
-  return GAM_M1*(rho*point[3]-HALF*rho*vss);
+  return GAM_M1*(rho*point[3]-0.5*rho*vss);
 }
 
 /*
@@ -68,8 +67,11 @@ void espectral(double* flux,double *left_state, double *right_state, int dim, in
     spec_state[i] += rootrhoR*right_state[i]/right_state[0];
     spec_state[i] *= denom; //Puts in flux form to find pressure
   }
+  // printf("%f\n",right_state[0]);
+  // printf("%f,%f,%f,%f\n",right_state[0],right_state[1],right_state[2],right_state[3]);
   //Updating flux with spectral value
   double rs = (SQUAREROOT(GAMMA*spec_press(spec_state)/spec_state[0])+ABSOLUTE(spec_state[dim]));
+  rs = ISNAN(rs) ? 0 : rs;
   for (int i = 0; i < NVC; i++)
   {
     flux[i] += dir*rs*(left_state[i]-right_state[i]);
@@ -119,29 +121,21 @@ void  efluxx(double *flux, double *left_state, double *right_state,int dir)
    flux[3] += dir*((left_state[3]+pL)*vL+(right_state[3]+pR)*vR);
   }
 
+
   /*
     This is the minmod flux limiter method for handling discontinuities
   */
   __device__
   void  flimiter(double *temp_state,double *point1,double *point2,double *point3,double num, double den)
   {
-      // double comp_tol = 1e-5;
-      double Pr = num/den;
 
-      if (isnan(Pr) || isinf(Pr) || Pr > 1.0e6 || Pr < 1e-6)
+      double Pr = num/den; //Neeed the extra comparison here for large numbers
+      Pr = (ISNAN(Pr) || ISINF(Pr) || Pr > 1e6 || Pr < 0.0) ? 0.0 : Pr;
+      Pr = MIN(Pr, 1.0);
+      double tPr = Pr;
+      for (int j = 0; j < NVC; j++)
       {
-        for (int i = 0; i < NVC; i++)
-        {
-            temp_state[i] = point1[i];
-        }
-      }
-      else
-      {
-          double coef = HALF*MIN(Pr, ONE);
-          for (int j = 0; j < NVC; j++)
-          {
-              temp_state[j] =  point1[j]+coef*(point2[j] - point3[j]);
-          }
+        temp_state[j] =  point1[j]+0.5*Pr*(point2[j] - point3[j]);
       }
   }
 
@@ -174,13 +168,14 @@ void get_dfdx(double *dfdx, double *shared_state, int idx,int idmod)
     //West
     flimiter(temp_left,wpoint,cpoint,wpoint,Pv[2]-Pv[1],Pv[1]-Pv[0]); //,num,den
     flimiter(temp_right,cpoint,wpoint,cpoint,Pv[2]-Pv[1],Pv[3]-Pv[2]); //,den,num
-    efluxx(dfdx,temp_left,temp_right,ONE);
-    espectral(dfdx,temp_left,temp_right,spi,ONE);
+    efluxx(dfdx,temp_left,temp_right,1.0);
+    espectral(dfdx,temp_left,temp_right,spi,1.0);
+    // printf("%0.8e\n",dfdx[0]);
     // //East
     flimiter(temp_left,cpoint,epoint,cpoint,Pv[3]-Pv[2],Pv[2]-Pv[1]); //,num,den
     flimiter(temp_right,epoint,cpoint,epoint,Pv[3]-Pv[2],Pv[4]-Pv[3]); //,den,num
-    efluxx(dfdx,temp_left,temp_right,-1);
-    espectral(dfdx,temp_left,temp_right,spi,-1);
+    efluxx(dfdx,temp_left,temp_right,-1.0);
+    espectral(dfdx,temp_left,temp_right,spi,-1.0);
     // Divide flux in half
     for (int i = 0; i < NVC; i++) {
       dfdx[i]/=2;
@@ -217,8 +212,8 @@ void get_dfdy(double *dfdy, double *shared_state, int idx,int idmod)
     flimiter(temp_left,wpoint,cpoint,wpoint,Pv[2]-Pv[1],Pv[1]-Pv[0]); //,num,den
     flimiter(temp_right,cpoint,wpoint,cpoint,Pv[2]-Pv[1],Pv[3]-Pv[2]); //,den,num
 
-    efluxy(dfdy,temp_left,temp_right,ONE);
-    espectral(dfdy,temp_left,temp_right,spi,ONE);
+    efluxy(dfdy,temp_left,temp_right,1.0);
+    espectral(dfdy,temp_left,temp_right,spi,1.0);
     //East
     flimiter(temp_left,cpoint,epoint,cpoint,Pv[3]-Pv[2],Pv[2]-Pv[1]); //,num,den
     flimiter(temp_right,epoint,cpoint,epoint,Pv[3]-Pv[2],Pv[4]-Pv[3]); //,den,num
@@ -238,12 +233,31 @@ void step(double *state, int idx, int globalTimeStep)
   double dfdx[NVC]={0,0,0,0};
   double dfdy[NVC]={0,0,0,0};
   get_dfdx(dfdx,state,idx,(SY)); //Need plus 2 ops in actual setting
-  get_dfdy(dfdy,state,idx,(1));
+  // get_dfdy(dfdy,state,idx,(1));
   //These variables determine predictor or corrector
   bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
   int timeChange = cond ? 1 : 0; //If true rolls back a time step
   double coeff = cond ? 1 : 0.5; //If true uses 1 instead of 0.5 for intermediate step
   // printf("%f\n", coeff);
+  for (int i = 0; i < NVC; i++)
+  {
+      state[idx+i*VARS+TIMES]=state[idx+i*VARS-TIMES*timeChange]+coeff*(DTDX*dfdx[i]+DTDY*dfdy[i]);
+  }
+}
+
+__global__
+void stepTestInterface(double *state, int tidx, int globalTimeStep)
+{
+  double dfdx[NVC]={0,0,0,0};
+  double dfdy[NVC]={0,0,0,0};
+  int idx = threadIdx.y+OPS+(threadIdx.x+OPS)*SY+tidx*TIMES; //This is for test function only
+  get_dfdx(dfdx,state,idx,(SY)); //Need plus 2 ops in actual setting
+  // printf("%0.8e,%0.8e\n",dfdx[0],dfdy[0]);
+  get_dfdy(dfdy,state,idx,(1));
+  //These variables determine predictor or corrector
+  bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
+  int timeChange = cond ? 1 : 0; //If true rolls back a time step
+  double coeff = cond ? 1 : 0.5; //If true uses 1 instead of 0.5 for intermediate step
   for (int i = 0; i < NVC; i++)
   {
       state[idx+i*VARS+TIMES]=state[idx+i*VARS-TIMES*timeChange]+coeff*(DTDX*dfdx[i]+DTDY*dfdy[i]);
