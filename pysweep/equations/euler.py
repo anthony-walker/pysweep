@@ -130,22 +130,11 @@ def step(state,iidx,arrayTimeIndex,globalTimeStep):
     if globalTimeStep%2==0: #RK2 step
         fluxx = getFluxInX(state[arrayTimeIndex],pressure,iidx,ops)
         fluxy = getFluxInY(state[arrayTimeIndex],pressure,iidx,ops)
-
-        # for j in range(2,12,1):
-        #     for i in range(2,12,1):
-        #         print("{:0.8e}, {:0.8e}".format(fluxx[0,i,j],fluxy[0,i,j]))
-
         for idx,idy in iidx:
             state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex-1,:,idx,idy]+(fluxx[:,idx,idy]*dtdx+fluxy[:,idx,idy]*dtdy)
     else: #intermediate step
         fluxx = getFluxInX(state[arrayTimeIndex],pressure,iidx,ops)
         fluxy = getFluxInY(state[arrayTimeIndex],pressure,iidx,ops)
-
-        # for j in range(2,12,1):
-        #     for i in range(2,12,1):
-        #         print("{:0.8e}, {:0.8e}".format(fluxx[0,i,j],fluxy[0,i,j]))
-
-
         for idx,idy in iidx:
             state[arrayTimeIndex+1,:,idx,idy] = state[arrayTimeIndex,:,idx,idy]+0.5*(fluxx[:,idx,idy]*dtdx+fluxy[:,idx,idy]*dtdy)
             
@@ -167,7 +156,7 @@ def getFluxInX(state,P,iidx,ops):
         flux[:,idx,idy] += evaluateFluxInX(left,right)
         flux[:,idx,idy] += evaluateSpectral(left,right
         ,True)
-        # print(flux[0,idx,idy])
+
     #east part of stencil
     for idx,idy in iidx:
         ww,w,c,e,ee = getXStencil(idx,idy,xlen)
@@ -250,7 +239,7 @@ def fluxLimiter(state,idx1,idx2,num,den):
     """This function computers the minmod flux limiter based on pressure ratio"""
     #Try to form pressure ratio
     Pr = num/den
-    Pr = 0 if numpy.isnan(Pr) or numpy.isinf(Pr) or Pr < 0 else num/den
+    Pr = 0 if numpy.isnan(Pr) or numpy.isinf(Pr) or Pr > 1e6 or Pr < 0 else num/den
     tempState = state[idx1]+min(Pr,1)/2*(state[idx2]-state[idx1])
     return tempState
 

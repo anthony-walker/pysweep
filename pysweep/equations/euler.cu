@@ -67,8 +67,7 @@ void espectral(double* flux,double *left_state, double *right_state, int dim, in
     spec_state[i] += rootrhoR*right_state[i]/right_state[0];
     spec_state[i] *= denom; //Puts in flux form to find pressure
   }
-  // printf("%f\n",right_state[0]);
-  // printf("%f,%f,%f,%f\n",right_state[0],right_state[1],right_state[2],right_state[3]);
+
   //Updating flux with spectral value
   double rs = (SQUAREROOT(GAMMA*spec_press(spec_state)/spec_state[0])+ABSOLUTE(spec_state[dim]));
   rs = ISNAN(rs) ? 0 : rs;
@@ -132,7 +131,6 @@ void  efluxx(double *flux, double *left_state, double *right_state,int dir)
       double Pr = num/den; //Neeed the extra comparison here for large numbers
       Pr = (ISNAN(Pr) || ISINF(Pr) || Pr > 1e6 || Pr < 0.0) ? 0.0 : Pr;
       Pr = MIN(Pr, 1.0);
-      double tPr = Pr;
       for (int j = 0; j < NVC; j++)
       {
         temp_state[j] =  point1[j]+0.5*Pr*(point2[j] - point3[j]);
@@ -157,25 +155,26 @@ void get_dfdx(double *dfdx, double *shared_state, int idx,int idmod)
     double Pv[5]={0};
     double temp_left[NVC]={0};
     double temp_right[NVC]={0};
-    int spi = 1;  //spectral radius idx
-    // printf("%0.3f,%0.3f,%0.3f,%0.3f\n",cpoint[0],cpoint[1],cpoint[2],cpoint[3]);
+
     // Pressure ratio
     Pv[0] = pressure(wwpoint);
     Pv[1] = pressure(wpoint);
     Pv[2] = pressure(cpoint);
     Pv[3] = pressure(epoint);
     Pv[4] = pressure(eepoint);
+
     //West
     flimiter(temp_left,wpoint,cpoint,wpoint,Pv[2]-Pv[1],Pv[1]-Pv[0]); //,num,den
     flimiter(temp_right,cpoint,wpoint,cpoint,Pv[2]-Pv[1],Pv[3]-Pv[2]); //,den,num
     efluxx(dfdx,temp_left,temp_right,1.0);
-    espectral(dfdx,temp_left,temp_right,spi,1.0);
-    // printf("%0.8e\n",dfdx[0]);
-    // //East
+    espectral(dfdx,temp_left,temp_right,1,1.0);
+
+    //East
     flimiter(temp_left,cpoint,epoint,cpoint,Pv[3]-Pv[2],Pv[2]-Pv[1]); //,num,den
     flimiter(temp_right,epoint,cpoint,epoint,Pv[3]-Pv[2],Pv[4]-Pv[3]); //,den,num
     efluxx(dfdx,temp_left,temp_right,-1.0);
-    espectral(dfdx,temp_left,temp_right,spi,-1.0);
+    espectral(dfdx,temp_left,temp_right,1,-1.0);
+
     // Divide flux in half
     for (int i = 0; i < NVC; i++) {
       dfdx[i]/=2;
@@ -233,12 +232,11 @@ void step(double *state, int idx, int globalTimeStep)
   double dfdx[NVC]={0,0,0,0};
   double dfdy[NVC]={0,0,0,0};
   get_dfdx(dfdx,state,idx,(SY)); //Need plus 2 ops in actual setting
-  // get_dfdy(dfdy,state,idx,(1));
+  get_dfdy(dfdy,state,idx,(1));
   //These variables determine predictor or corrector
   bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
   int timeChange = cond ? 1 : 0; //If true rolls back a time step
   double coeff = cond ? 1 : 0.5; //If true uses 1 instead of 0.5 for intermediate step
-  // printf("%f\n", coeff);
   for (int i = 0; i < NVC; i++)
   {
       state[idx+i*VARS+TIMES]=state[idx+i*VARS-TIMES*timeChange]+coeff*(DTDX*dfdx[i]+DTDY*dfdy[i]);

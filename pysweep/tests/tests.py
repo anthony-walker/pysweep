@@ -83,10 +83,10 @@ def debugging(func):
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
     def testConfigurations():
-        arraysize = 240
-        shares = [1,] #Shares for GPU
-        sims = [True,] #different simulations
-        blocksizes = [24,] #blocksizes with most options
+        arraysize = 120
+        shares = [0.9,] #Shares for GPU
+        sims = [False,] #different simulations
+        blocksizes = [12,] #blocksizes with most options
         #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'

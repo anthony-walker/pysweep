@@ -44,7 +44,7 @@ python setup.py install
 
 # Constraints
 - The grid used is uniform and rectangular.
-- block_size should be 2^n and constrained by your GPU. It is also constrained by the relation mod(b,2*k)==0.
+- block_size should be 2^n and constrained by your GPU. It is also constrained by the relation mod(b,2*k)==0 where k is the number of points on each side of the operating point, e.g., 2 for a 5 point stencil.
 - A total of three functions must be named accordingly and take specific arguments.
 - This code is currently limited to periodic boundary conditions
 
@@ -54,39 +54,36 @@ The first two functions are python functions, a `step` function and a `set_globa
 ```python
 
 #Step function in example.py
-
-def step(state,iidx,arrayTimeIdx,globalTimeStep):
-    """This is the method that will be called by the swept solver.
-    state - 4D numpy array(t,v,x,y (v is variables length))
-    iidx -  an iterable of indexs
-    arrayTimeIdx - index to be used to update the state array appropriately
-    globalTimeStep - a step counter that allows implementation of the scheme
-    """
-    vSlice = slice(0,state.shape[1],1)
-    for idx,idy in iidx:
-        ntidx = (ts+1,vSlice,idx,idy)  #next step index
-        cidx = (ts,vSlice,idx,idy)
-        state[ntidx] = state[cidx]+1
-    return state
-
+def set_globals(*args,source_mod=None):
+    """Use this function to set cpu global variables"""
+    global dt,dx,dy,scheme #true for one step
+    t0,tf,dt,dx,dy,scheme = args
+    if source_mod is not None:
+        keys = "DT","DX","DY"
+        nargs = args[2:]
+        fc = lambda x:numpy.float32(x)
+        for i,key in enumerate(keys):
+            ckey,_ = source_mod.get_global(key)
+            cuda.memcpy_htod(ckey,fc(nargs[i]))
+        ckey,_ = source_mod.get_global("SCHEME")
+        cuda.memcpy_htod(ckey,numpy.intc(scheme))
 ```
 
 ```python
 #set_globals in example.py
-
-def set(state,iidx,arrayTimeIdx,globalTimeStep):
-    """This is the method that will be called by the swept solver.
-    state - 4D numpy array(t,v,x,y (v is variables length))
-    iidx -  an iterable of indexs
-    arrayTimeIdx - index to be used to update the state array appropriately
-    globalTimeStep - a step counter that allows implementation of the scheme
-    """
-    vSlice = slice(0,state.shape[1],1)
-    for idx,idy in iidx:
-        ntidx = (ts+1,vSlice,idx,idy)  #next step index
-        cidx = (ts,vSlice,idx,idy)
-        state[ntidx] = state[cidx]+1
-    return state
+def set_globals(*args,source_mod=None):
+    """Use this function to set cpu global variables"""
+    global dtdx,dtdy,gamma,gM1
+    t0,tf,dt,dx,dy,gamma = args
+    dtdx = dtdy = dt/dx
+    gM1 = gamma-1
+    if source_mod is not None:
+        keys = "DT","DX","DY","GAMMA","GAM_M1","DTDX","DTDY"
+        nargs = args[2:]+(gamma-1,dt/dx,dt/dy)
+        fc = lambda x:numpy.float64(x)
+        for i,key in enumerate(keys):
+            ckey,_ = source_mod.get_global(key)
+            cuda.memcpy_htod(ckey,fc(nargs[i]))
 ```
 
 The final function is a CUDA function for the GPU.
@@ -95,22 +92,23 @@ The final function is a CUDA function for the GPU.
 __device__ __constant__  double DX;
 __device__ __constant__  double DY;
 __device__ __constant__  double DT;
-__device__ __constant__ const int NVC=1; //Number of variables
-
-__device__
-void getPoint(double * curr_point,double *shared_state, int idx)
-{
-    curr_point[0]=shared_state[idx];
-}
+__device__ __constant__ int SCHEME; //Determine which scheme to use
 
 __device__
 void step(double * shared_state, int idx, int globalTimeStep)
 {
-  double cpoint[NVC];
-  getPoint(cpoint,shared_state,idx);
-  shared_state[idx+TIMES]=cpoint[0]+1;
+  if (SCHEME)
+  {
+    shared_state[idx+TIMES]=shared_state[idx]+1;
+  }
+  else
+  {
+    bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
+    int timeChange = cond ? 1 : 0; //If true rolls back a time step
+    int addition = cond ? 2 : 1; //If true uses 2 instead of 1 for intermediate step
+    shared_state[idx+TIMES]=shared_state[idx-TIMES*timeChange]+addition;
+  }
 }
-
 ```
 
 # Usage of the code
@@ -180,6 +178,14 @@ Cleaning up processes...
 
 Done in 7.3623316287994385 seconds...
 ```
+
+### Commandline interface
+This code is setup to run two examples from the command line. Running `pysweep -h` will give the full list of options. To run an example with MPI use something like 
+shell
+```
+mpiexec -n 2 pysweep -f heat -nx 16 -nt 10 -b 8 -s 1 --swept --verbose
+```
+
 
 ### General Approach
 

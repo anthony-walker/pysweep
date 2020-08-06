@@ -28,7 +28,7 @@ if vortex:
 
         with h5py.File("testingVortex.hdf5","r") as f:
             data = f['data']
-            validate.createContourf(data[:,0,:,:],0,5,5,1,gif=True,gmod=10,filename="numericalVortex.pdf",LZn=0.4)
+            validate.createContourf(data[:,0,:,:],0,5,5,1,gif=True,gmod=20,filename="numericalVortex.pdf",LZn=0.4)
 elif shock:
     tests.testEulerShock() #run euler shock test
     if main:

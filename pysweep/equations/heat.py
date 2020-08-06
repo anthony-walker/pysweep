@@ -65,10 +65,19 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
     t: time of initial conditions
     """
     comm = MPI.COMM_WORLD
-    u,X,Y = analytical(npx,npy,t,alpha=alpha)
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
-        hf.create_dataset("data",u.shape,data=u)
+        initialConditions = hf.create_dataset("data",(1,npx,npy))
+        X = numpy.linspace(0,1,npx,endpoint=False)
+        Y = numpy.linspace(0,1,npy,endpoint=False)
+        for i,x in enumerate(X):
+            for j,y in enumerate(Y):
+                initialConditions[0,i,j] = analyticalEquation(x,y,t=t,alpha=alpha)
     return filename
+
+def analyticalEquation(x,y,t,alpha=0.1):
+    """Use this to fill hdf5 IC."""
+    m = n = 2
+    return numpy.sin(m*pi*x)*numpy.sin(n*pi*y)*numpy.exp(-(m*m+n*n)*pi*pi*alpha*t)
 
 def analytical(npx,npy,t,alpha=0.1):
     """Use this function to generate the prescribed analytical solution analytical solution.
