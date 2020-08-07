@@ -21,7 +21,7 @@ def updateLogFile(solver,clocktime):
 def generateYamlEntry(obj,clocktime):
     """Use this function to generate a yaml entry."""
 
-    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":int(obj.blocksize[0]),"filename":obj.output,"verbose":obj.verbose,"share":float(obj.share),"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"cpu":obj.cpuStr,"gpu":obj.gpuStr,"dtype":obj.dtypeStr,"exid":obj.exid}
+    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":int(obj.blocksize[0]),"filename":obj.output,"verbose":obj.verbose,"share":float(obj.share),"globals":obj.globals,"intermediate_steps":obj.intermediate,"operating_points":obj.operating,"cpu":obj.cpuStr,"gpu":obj.gpuStr,"dtype":obj.dtypeStr,"exid":obj.exid,"array_shape":list(obj.arrayShape),"time_per_step":float(clocktime/(obj.arrayShape[0]-1))}
     return {datetime.now().strftime("%m/%d/%Y-%H:%M:%S"):rundata}
 
 def yamlManager(solver):

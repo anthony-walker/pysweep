@@ -72,6 +72,7 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
         for i,x in enumerate(X):
             for j,y in enumerate(Y):
                 initialConditions[0,i,j] = analyticalEquation(x,y,t=t,alpha=alpha)
+    comm.Barrier()
     return filename
 
 def analyticalEquation(x,y,t,alpha=0.1):

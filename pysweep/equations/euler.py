@@ -45,6 +45,7 @@ def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5
         for i,x in enumerate(xRange):
             for j,y in enumerate(yRange):
                 initialConditions[:,i,j] = analytical(x,y,t,gamma=gamma)
+    comm.Barrier()
     return filename
 
     

@@ -1,6 +1,6 @@
 /*
     Programmer: Anthony Walker
-    The equation specific functions (2D Euler).
+    The equation specific functions (2D Example).
 */
 __device__ __constant__  double DX;
 __device__ __constant__  double DY;
