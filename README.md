@@ -1,147 +1,192 @@
-
 # PySweep
 
-This is a package containing the functions to implement the swept space-time decomposition rule for solving unsteady PDEs in 2 dimensions on heterogeneous computing architecture.
+This is a package containing the functions to implement the swept space time decomposition rule in 2 dimensions on
+heterogeneous computing architecture.
 
-### Constraints
-- The grid used is structured.
-- block_size is constrained to  <em>b = (2nf)<sup>2</sup></em> and constrained by your GPU. Note the block_size should have the same x and y dimension.
+### Installation
+
+The plan is to make this pip and conda installable.
+
+#### Dependencies
+
+PySweep depends heavily on HDF5, h5py, MPI, and mpi4py. HDF5 has to be built in parallel to function properly. First install MPI/mpi4py through whatever means you prefer, e.g., conda. I personally built mpich ([guide](https://www.mpich.org/static/downloads/3.3.2/mpich-3.3.2-installguide.pdf)) and mpi4py from source.
+
+I installed mpich from the source directory as
+```shell
+./configure -prefix=/opt/mpich --with-device=ch4:ofi --disable-fortran |& tee c.txt
+make 2>&1 | tee m.txt
+make install |& tee mi.txt
+```
+
+I installed mpi4py from the source directory as
+```shell
+python setup.py build --mpicc=/opt/mpich/bin/mpicc
+python setup.py install
+```
+
+Then get the source distribution of HDF5 and h5py. Install HDF5 first via
+```shell
+export CC=/opt/mpich/bin/mpicc #export CC path - change as is needed
+./configure --enable-parallel --enable-shared --prefix=/opt/hdf5-1.12.0/ #configure from hdf5 source dir
+make
+make check
+make install #You may or may not need sudo for this depending on your prefix
+```
+Next, install h5py from the source directory ([git](https://github.com/h5py/h5py)) via
+```shell
+export CC=/opt/mpich/bin/mpicc #doesn't need repeated if done in previous step and the same shell
+export HDF5_MPI="ON"
+python setup.py configure --hdf5=/opt/hdf5-1.12.0
+python setup.py build
+python setup.py install
+```
+
+
+# Constraints
+- The grid used is uniform and rectangular.
+- block_size should be 2^n and constrained by your GPU. It is also constrained by the relation mod(b,2*k)==0 where k is the number of points on each side of the operating point, e.g., 2 for a 5 point stencil.
 - A total of three functions must be named accordingly and take specific arguments.
-- This code is currently limited to periodic boundary conditions.
+- This code is currently limited to periodic boundary conditions
 
-### Using PySweep
 
-PySweep requires 3 specifically named functions be created and the file path to these functions be given. Python functions should be put into 1 function and CUDA functions should be put into the other.
-
-The Python functions should look something like this:
+The first two functions are python functions, a `step` function and a `set_globals` function. These functions will be used as they are named to take a step and to set global variables for the simulation; simple examples are provided below.
 
 ```python
-    def step(state,iidx,ts,gts):
-        """This is the method that will be called by the swept solver.
-        state - 4D numpy array(t,v,x,y (v is variables length))
-        iidx -  an iterable of indexs
-        ts - the current time step
-        gts - a step counter that allows implementation of the scheme
-        """
-        half = 0.5
-        TSO = 2
-        vSlice = slice(0,state.shape[1],1)
-        for idx,idy in iidx:
-            ntidx = (ts+1,vSlice,idx,idy)  #next step index
-            cidx = (ts,vSlice,idx,idy)
-            pidx = (ts-1,vSlice,idx,idy) #next step index
-            if (gts+1)%TSO==0: #Corrector
-                state[ntidx] = (state[pidx])+2
-            else: #Predictor
-                state[ntidx] = (state[cidx])+1
-        return state
 
-    def set_globals(gpu,source_mod,*args):
-        """Use this function to set cpu and gpu global variables"""
-        t0,tf,dt,dx,dy,gam = args
-        if gpu:
-            keys = "DT","DX","DY","GAMMA","GAM_M1"
-            nargs = args[2:]+(gam-1,)
-            fc = lambda x:np.float32(x)
-            for i,key in enumerate(keys):
-                ckey,_ = source_mod.get_global(key)
-                cuda.memcpy_htod(ckey,fc(nargs[i]))
-        else:
-            global dtdx
-            dtdx = dt/dx
-            global dtdy
-            dtdy = dt/dy
-            global gamma
-            gamma = gam
-```  
-The function names and inputs should be identical to this.
-
-The CUDA kernel should look something like this:
-
-```c++
-    __device__
-    void step(float * shared_state, int idx, int gts)
-    {
-
-      float tval[NVC]={0,0,0,0};
-       __syncthreads();
-
-      if ((gts+1)%TSO==0) //Corrector step
-      {
-          for (int i = 0; i < NVC; i++)
-          {
-              tval[i] = shared_state[idx-STS]+2;
-          }
-      }
-      else //Predictor
-      {
-
-          for (int i = 0; i < NVC; i++)
-          {
-              tval[i] = shared_state[idx]+1;
-
-          }
-      }
-      __syncthreads();
-
-      for (int i = 0; i < NVC; i++)
-      {
-          shared_state[idx+i*SGIDS]=tval[i];
-      }
-    }
-
+#Step function in example.py
+def set_globals(*args,source_mod=None):
+    """Use this function to set cpu global variables"""
+    global dt,dx,dy,scheme #true for one step
+    t0,tf,dt,dx,dy,scheme = args
+    if source_mod is not None:
+        keys = "DT","DX","DY"
+        nargs = args[2:]
+        fc = lambda x:numpy.float32(x)
+        for i,key in enumerate(keys):
+            ckey,_ = source_mod.get_global(key)
+            cuda.memcpy_htod(ckey,fc(nargs[i]))
+        ckey,_ = source_mod.get_global("SCHEME")
+        cuda.memcpy_htod(ckey,numpy.intc(scheme))
 ```
-
-After your functions are created, you can set up your problem. It will look something like this.
 
 ```python
-  import numpy as np
-  from pysweep.distributed.sweep.distsweep import dsweep
-  from pysweep.distributed.decomposition.ddecomp import ddecomp
-  from pysweep.analytical.ahde import TIC
-
-  if __name__ == "__main__":
-      #Creating input array
-      nx = ny = 120
-      arr = np.ones((1,nx,ny))
-      #Spatial Inputs
-      X = Y = 10
-      dx = X/nx
-      dy = Y/ny
-      #Numerical inputs
-      tso = 2 #Number of steps taken by temporal scheme
-      ops = 1 #Number of points on one side of the current point being solved
-      #GPU inputs
-      bs = 12 #Block size
-      aff = 0.9 #GPU affinity
-      #Heat Diffusion Stability Considerations
-      alpha = 5
-      Fo = 0.24
-      #Time Variables
-      t0 = 0 #Initial time
-      dt = Fo*(X/nx)**2/alpha
-      tf = dt*500
-      #Filling input array with initial conditions
-      arr = TIC(nx,ny,X,Y,1,373,298)[0,:,:,:]
-      #Arguments for solvers
-      gargs = (t0,tf,dt,dx,dy,alpha)
-      swargs = (tso,ops,bs,aff,"./pysweep/equations/hde.h","./pysweep/equations/hde.py")
-      #This will solve using the swept solver
-      dsweep(arr,gargs,swargs,filename="test",exid=[])
-      #This will solve using the standard
-      ddecomp(arr,gargs,swargs,filename="test",exid=[])
+#set_globals in example.py
+def set_globals(*args,source_mod=None):
+    """Use this function to set cpu global variables"""
+    global dtdx,dtdy,gamma,gM1
+    t0,tf,dt,dx,dy,gamma = args
+    dtdx = dtdy = dt/dx
+    gM1 = gamma-1
+    if source_mod is not None:
+        keys = "DT","DX","DY","GAMMA","GAM_M1","DTDX","DTDY"
+        nargs = args[2:]+(gamma-1,dt/dx,dt/dy)
+        fc = lambda x:numpy.float64(x)
+        for i,key in enumerate(keys):
+            ckey,_ = source_mod.get_global(key)
+            cuda.memcpy_htod(ckey,fc(nargs[i]))
 ```
 
-You can also modify the pst.py file in Pysweep to execute from the command-line.
-One pre-programmed example looks like this:
+The final function is a CUDA function for the GPU.
+```cpp
+//code in example.cu
+__device__ __constant__  double DX;
+__device__ __constant__  double DY;
+__device__ __constant__  double DT;
+__device__ __constant__ int SCHEME; //Determine which scheme to use
 
+__device__
+void step(double * shared_state, int idx, int globalTimeStep)
+{
+  if (SCHEME)
+  {
+    shared_state[idx+TIMES]=shared_state[idx]+1;
+  }
+  else
+  {
+    bool cond = ((globalTimeStep)%ITS==0); //True on complete steps not intermediate
+    int timeChange = cond ? 1 : 0; //If true rolls back a time step
+    int addition = cond ? 2 : 1; //If true uses 2 instead of 1 for intermediate step
+    shared_state[idx+TIMES]=shared_state[idx-TIMES*timeChange]+addition;
+  }
+}
 ```
-  mpiexec -n 1 python ./pysweep/pst.py swept_vortex -b 12 -a 0.5 --hdf5 \"MyResults\"
 
+# Usage of the code
+
+The main entry point for the code is a script paired with an input yaml file. Staying with the current example, `example.yaml` could look like this
+
+```yaml
+  swept: True
+  filename: "example.hdf5"
+  verbose: True
+  blocksize: 8
+  share: 0.5
+  dtype: float64
+  globals:
+    - 0
+    - 10
+    - 0.1
+    - 0.1
+    - 0.1
+  intermediate_steps: 1
+  operating_points: 1
+  cpu: ./pysweep-git/pysweep/equations/example.py
+  gpu: ./pysweep-git/pysweep/equations/example.cu
 ```
 
-There is also solvers under `pysweep.node` that use different strategies on a single node but these solvers have not been fully tested or validated. The performance of the distributed solver tends to be better anyways so it is the recommended package to use.
+The associated script portion would look like
+```python
+    filename = pysweep.equations.example.createInitialConditions(1,384,384)
+    yfile = os.path.join(path,"inputs")
+    yfile = os.path.join(yfile,"example.yaml")
+    testSolver = pysweep.Solver(filename,yfile)
+    testSolver.simulation=True
+    testSolver()
+```
 
-PySweep was validated using the Euler Vortex problem in 2 dimensions. There are tests in `pysweep.tests` that can demonstrate this if desired.
+The output of calling the solver object will look something like this
 
-The latex for the paper outlining the work done in this code can be found [here](https://github.com/Niemeyer-Research-Group/2019-walker-2dswept-camwa).
+```shell
+Setting up processes...
+
+Creating time step data...
+
+Creating output file...
+
+Creating shared memory arrays and process functions...
+
+Cleaning up solver...
+
+Running simulation...
+
+Pysweep simulation properties:
+	simulation type: swept
+	number of processes: 2
+	gpu source: ./pysweep-git/pysweep/equations/example.cu
+	cpu source: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/example.py
+	output file: example.hdf5
+	verbose: True
+	Array shape: (103, 1, 384, 384)
+	dtype: float64
+	share: 0.5
+	blocksize: 8
+	stencil size: 3
+	intermediate time steps: 1
+	time data (t0,tf,dt): (0,10,0.1)
+
+Cleaning up processes...
+
+Done in 7.3623316287994385 seconds...
+```
+
+### Commandline interface
+This code is setup to run two examples from the command line. Running `pysweep -h` will give the full list of options. To run an example with MPI use something like 
+shell
+```
+mpiexec -n 2 pysweep -f heat -nx 16 -nt 10 -b 8 -s 1 --swept --verbose
+```
+
+
+### General Approach
+
+This code is intended to implement the swept-time rule in two dimensions and is paired with a standard solver for comparison. 
