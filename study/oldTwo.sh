@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH -J hrf						# name of job
+#SBATCH -J gtxSweepTwo						# name of job
 
 #SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
 
-#SBATCH -p mime4								# name of partition or queue
+#SBATCH -p preempt								# name of partition or queue
 
-#SBATCH -F ./nrg-nodes
+#SBATCH -F ./old-nodes
 
 #SBATCH -N 2
 
@@ -16,9 +16,9 @@
 
 #SBATCH --time=7-00:00:00
 
-#SBATCH -o hrf.out					# name of output file for this submission script
+#SBATCH -o gtxSweepTwo.out					# name of output file for this submission script
 
-#SBATCH -e hrf.err					# name of error file for this submission script
+#SBATCH -e gtxSweepTwo.err					# name of error file for this submission script
 
 #SBATCH --mail-type=BEGIN,END,FAIL				# send email when job begins, ends or aborts
 
