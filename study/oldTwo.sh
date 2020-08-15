@@ -42,9 +42,12 @@ do
         do
             for nx in  1344 2624 3904 5184 6464
             do
+                    mpiexec -n 40 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --swept --verbose --ignore --clean
 
-                    mpiexec -n 40 --hostfile ./nrg-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --swept --verbose --ignore --clean
+                    mpiexec -n 40 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --verbose --ignore --clean
             done
         done
     done
 done
+
+mv log.yaml oldTwo.yaml
