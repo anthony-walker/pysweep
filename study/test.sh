@@ -10,21 +10,17 @@
 
 #SBATCH --gres=gpu:1
 
-#SBATCH -N 1
+#SBATCH -N 2
 
 #SBATCH --ntasks-per-node=1
 
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=20
 
 #SBATCH --time=7-00:00:00
 
 #SBATCH -o testPysweep.out					# name of output file for this submission script
 
 #SBATCH -e testPysweep.err					# name of error file for this submission script
-
-#SBATCH --mail-type=BEGIN,END,FAIL				# send email when job begins, ends or aborts
-
-#SBATCH --mail-user=walkanth@oregonstate.edu		# send email to this address
 
 # load any software environment module required for app
 
