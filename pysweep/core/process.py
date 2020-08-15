@@ -47,6 +47,9 @@ def getGPUInfo(solver):
         gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
         #gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
         numberOfGPUs = len(gpuRank)
+        if numberOfGPUs == 0:
+            solver.share=0
+            warnings.warn('No GPUs found, setting share to zero and continuing calculation.')
     else:
         gpuRank = []
         numberOfGPUs = 0
@@ -206,6 +209,7 @@ def setupProcesses(solver):
     solver.blocks = solver.nodeComm.scatter(blocks)
     solver.gpuRank = solver.nodeComm.scatter(gpuRank)
     solver.gpuBlock = solver.nodeComm.bcast(gpuBlock) #total gpu block in shared array
+    solver.share = solver.nodeComm.bcast(solver.share) #recast solver.share if it was updated
     solver.globalBlock = solver.nodeComm.bcast(solver.globalBlock) #total cpu block in shared array
     solver.sharedShape = solver.nodeComm.bcast(solver.sharedShape) #shape of node shared array
     solver.gpuBool = True if solver.gpuRank is not None else False
