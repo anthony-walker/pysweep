@@ -34,8 +34,8 @@
 
 echo $SLURM_JOB_ID
 
-mpiexec -n 40 --hostfile=./old-nodes pysweep -f euler -nx 1344 -nt 500 -b 16 -s 0.5 --swept --verbose --ignore
+mpiexec -n 40 --hostfile=./test-nodes pysweep -f euler -nx 1344 -nt 500 -b 16 -s 0.5 --swept --verbose --ignore
 
-mpiexec -n 40 --hostfile=./old-nodes pysweep -f euler -nx 1344 -nt 500 -b 16 -s 0.5 --verbose --ignore
+mpiexec -n 40 --hostfile=./test-nodes pysweep -f euler -nx 1344 -nt 500 -b 16 -s 0.5 --verbose --ignore
 
 mv log.yaml test.yaml
