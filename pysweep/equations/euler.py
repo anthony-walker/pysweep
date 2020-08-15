@@ -2,8 +2,11 @@
 #This file contains functions to solve the eulers equations in 2 dimensions with
 #the swept rule or in a standard way
 
-import sys,itertools,numpy,h5py,mpi4py.MPI as MPI,pycuda.driver as cuda, pysweep.equations.sodShock as sod
-
+import sys,itertools,numpy,h5py,mpi4py.MPI as MPI, pysweep.equations.sodShock as sod
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    pass
 #----------------------------------Globals-------------------------------------#
 gamma = 1.4
 dtdx = 0
