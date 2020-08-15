@@ -30,7 +30,8 @@
 
 echo $SLURM_JOB_ID
 
-mpiexec -n 12 python cluster.py
+conda activate pysweep-dev
+
 for eq in heat euler
 do
     for bs in 8 12 16 24 32
