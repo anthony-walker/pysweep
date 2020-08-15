@@ -3,8 +3,6 @@
 import sys, os, numpy, warnings
 import pysweep.core.block as block
 from itertools import cycle
-import matplotlib as mpl
-mpl.use("tkAgg")
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gsc
 from matplotlib import cm
