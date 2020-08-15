@@ -18,7 +18,7 @@
 
 #SBATCH --cpus-per-task=20
 
-#SBATCH --time=2-00:00:00
+#SBATCH --time=7-00:00:00
 
 #SBATCH -o testPysweep.out					# name of output file for this submission script
 
@@ -36,6 +36,6 @@ echo $SLURM_JOB_ID
 
 #mpiexec -n 40 --hostfile=./nrg-nodes pysweep -f euler -nx 1344 -nt 100 -b 16 -s 0.5 --swept --verbose --ignore
 
-#mpiexec -n 2 --hostfile=./nrg-nodes pysweep -f heat -nx 32 -nt 10 -b 16 -s 0.5 --swept --verbose
+mpiexec -n 2 --hostfile=./nrg-nodes pysweep -f heat -nx 32 -nt 10 -b 16 -s 0.5 --swept --verbose
 
-mpiexec -n 2 --hostfile=./test-nodes nvidia-smi --list-gpus
+mv log.yaml test.yaml

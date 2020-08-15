@@ -8,6 +8,8 @@
 
 #SBATCH -p dgxs								# name of partition or queue
 
+#SBATCH --gres=gpu:1
+
 #SBATCH -F ./new-nodes
 
 #SBATCH -N 2

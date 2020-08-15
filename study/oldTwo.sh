@@ -6,7 +6,9 @@
 
 #SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
 
-#SBATCH -p preempt								# name of partition or queue
+#SBATCH -p preempt
+
+#SBATCH --gres=gpu:1
 
 #SBATCH -F ./old-nodes
 
