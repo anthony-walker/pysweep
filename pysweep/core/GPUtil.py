@@ -96,7 +96,6 @@ def getGPUs():
         line = lines[g]
         vals = line.split(', ')
         for i in range(12):
-            # print(vals[i])
             if (i == 0):
                 deviceIds = int(vals[i])
             elif (i == 1):

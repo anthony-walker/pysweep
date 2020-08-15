@@ -62,9 +62,11 @@ def getBlockBoundaries(Rows,Devices,nodeID,deviceType,multiplier):
     multiplier: a variable used for determining boundary
     """
     #Decomposition
+    print(Rows,Devices,nodeID,deviceType,multiplier)
     k = (Rows-Rows%Devices)/Devices if Devices!=0 else 0.0
     n = Rows%Devices if Devices!=0 else 0.0
     m = Devices-n
+    print(k,n,m,(k+1)*n+k*m,Rows)
     assert (k+1)*n+k*m == Rows, "{}: Problem with decomposition.".format(deviceType)
 
     if deviceType == "GPU": #Different boundary functions for GPU and CPU
