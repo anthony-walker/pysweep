@@ -1,6 +1,7 @@
 import numpy,time, warnings, mpi4py.MPI as MPI,traceback
 import pysweep.core.GPUtil as GPUtil
 import pysweep.core.io as io
+import socket
 
 def pseudoCluster(rank):
     """This is a temporary function to rename processors based on rank."""
@@ -43,6 +44,7 @@ def getGPUInfo(solver):
     #Getting gpus if share is greater than 0
     ranksPerNode = solver.nodeComm.Get_size() #number of ranks for each node
     print(ranksPerNode)
+    print(socket.gethostname())
     if solver.share>0:  
         gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
         #gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
