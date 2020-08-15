@@ -1,5 +1,5 @@
 import sys, os, yaml, numpy, warnings, time, h5py, importlib.util
-import pysweep.core.GPUtil as GPUtil
+import GPUtil
 import pysweep.core.io as io
 import pysweep.core.process as process
 import pysweep.core.functions as functions

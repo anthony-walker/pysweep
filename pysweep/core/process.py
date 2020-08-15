@@ -1,5 +1,5 @@
 import numpy,time, warnings, mpi4py.MPI as MPI,traceback
-import pysweep.core.GPUtil as GPUtil
+import GPUtil
 import pysweep.core.io as io
 
 def pseudoCluster(rank):
@@ -128,13 +128,7 @@ def MajorSplit(solver,nodeID):
     numberOfRows = solver.arrayShape[1]/solver.blocksize[0] #total number of rows
     gpuMult = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(len(numberOfGPUsList))] #GPU multipliers
     cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
-    #Handles issues with GPU not being found
-    if numberOfGPUs == 0 and solver.share>0:
-        print("NO GPUS FOUND")
-        warnings.warn('No GPUs found, setting share to zero and continuing calculation.')
-        GPURows = 0
-    else:
-        GPURows = numpy.ceil(numberOfRows*solver.share)  #round up for GPU rows
+    GPURows = numpy.ceil(numberOfRows*solver.share)  #round up for GPU rows
     CPURows = numberOfRows-GPURows #remaining rows to CPUs
     #Get gpu boundaries
     gpuLowerBound,gpuUpperBound = getBlockBoundaries(GPURows,totalGPUs,nodeID,"GPU",gpuMult)
