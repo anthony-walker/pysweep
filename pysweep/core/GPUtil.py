@@ -83,6 +83,7 @@ def getGPUs():
     except:
         return []
     output = stdout.decode('UTF-8')
+    print(output)
     # output = output[2:-1] # Remove b' and ' from string added by python
     #print(output)
     ## Parse output

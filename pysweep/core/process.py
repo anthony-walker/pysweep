@@ -43,12 +43,9 @@ def getGPUInfo(solver):
     """Use this function to return info about the GPUs on the system."""
     #Getting gpus if share is greater than 0
     ranksPerNode = solver.nodeComm.Get_size() #number of ranks for each node
-    print(ranksPerNode)
-    print(socket.gethostname())
     if solver.share>0:  
         gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
         #gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
-        print(gpuRank)
         numberOfGPUs = len(gpuRank)
     else:
         gpuRank = []
@@ -66,11 +63,11 @@ def getBlockBoundaries(Rows,Devices,nodeID,deviceType,multiplier):
     multiplier: a variable used for determining boundary
     """
     #Decomposition
-    print(Rows,Devices,nodeID,deviceType,multiplier)
+    # print(Rows,Devices,nodeID,deviceType,multiplier)
     k = (Rows-Rows%Devices)/Devices if Devices!=0 else 0.0
     n = Rows%Devices if Devices!=0 else 0.0
     m = Devices-n
-    print(k,n,m,(k+1)*n+k*m,Rows)
+    # print(k,n,m,(k+1)*n+k*m,Rows)
     assert (k+1)*n+k*m == Rows, "{}: Problem with decomposition.".format(deviceType)
 
     if deviceType == "GPU": #Different boundary functions for GPU and CPU
