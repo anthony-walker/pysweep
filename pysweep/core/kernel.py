@@ -1,8 +1,11 @@
 # Programmer: Anthony Walker
 # This file contains functions used in strictly testing a GPU kernel
 import os, numpy
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+except Exception as e:
+    pass
 
 def step(state,arrayTimeIndex,globalTimeStep,ops=2):
     """This function takes a step using cuda."""

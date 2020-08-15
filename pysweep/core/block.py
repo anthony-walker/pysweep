@@ -3,7 +3,10 @@ import numpy,mpi4py.MPI as MPI,ctypes,os
 import pysweep.core.geometry as geometry
 import pysweep.core.io as io
 from itertools import product
-import pycuda.driver as cuda
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    pass
 
 def createCPUSharedArray(solver,arrayBytes):
     """Use this function to create shared memory arrays for node communication."""

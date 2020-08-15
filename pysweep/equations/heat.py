@@ -1,6 +1,9 @@
 import numpy, h5py, os, sys
 import mpi4py.MPI as MPI
-import pycuda.driver as cuda
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    pass
 #Matplotlib imports
 import matplotlib.pyplot as plt
 from matplotlib import cm

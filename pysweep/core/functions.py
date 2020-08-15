@@ -2,9 +2,11 @@
 #This file contains all of the necessary functions for implementing the swept rule.
 #------------------------------Decomp Functions----------------------------------
 import numpy
-import pysweep.core.io as io
-import pycuda.driver as cuda
-
+try:
+    import pysweep.core.io as io
+    import pycuda.driver as cuda
+except Exception as e:
+    pass
 #------------------------------Swept Functions----------------------------------
 
 def FirstPrism(solver):

@@ -1,8 +1,12 @@
 
 import numpy, h5py, os, sys
 import mpi4py.MPI as MPI
-import pycuda.driver as cuda
 import pysweep.core.io as io
+try:
+    import pycuda.driver as cuda
+except Exception as e:
+    pass
+
 scheme = True
 pi = numpy.pi
 piSq = pi*pi

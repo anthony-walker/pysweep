@@ -31,3 +31,17 @@
 echo $SLURM_JOB_ID
 
 mpiexec -n 12 python cluster.py
+for eq in heat euler
+do
+    for bs in 8 12 16 24 32
+    do
+        for gs in $(seq 0 0.10 1)
+        do
+            for nx in  1344 2624 3904 5184 6464
+            do
+
+                    mpiexec -n 40 --hostfile ./nrg-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --swept --verbose --ignore --clean
+            done
+        done
+    done
+done

@@ -5,9 +5,12 @@ import pysweep.tests as tests
 import pysweep.core.kernel as kt
 import pysweep.core.io as io
 #Cuda stuff
-import pycuda.driver as cuda
-from pycuda.compiler import SourceModule
-import pycuda.autoinit
+try:
+    import pycuda.driver as cuda
+    from pycuda.compiler import SourceModule
+    import pycuda.autoinit
+except Exception as e:
+    pass
 
 def writeOut(array):
     for row in array:

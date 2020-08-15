@@ -1,8 +1,11 @@
 import sys, os, h5py, time, yaml, numpy
 from datetime import datetime
 from collections import Iterable
-from pycuda.compiler import SourceModule
-import pycuda.driver as cuda
+try:
+    from pycuda.compiler import SourceModule
+    import pycuda.driver as cuda
+except Exception as e:
+    pass
 
 def updateLogFile(solver,clocktime):
     """Use this function to update log.yaml"""
