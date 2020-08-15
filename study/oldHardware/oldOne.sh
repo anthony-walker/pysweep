@@ -2,7 +2,7 @@
 
 #SBATCH -J gtxSweepOne						# name of job
 
-#SBATCH —-get-user-env                      #Use user env
+#SBATCH --get-user-env                      #Use user env
 
 #SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
 
