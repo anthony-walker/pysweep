@@ -22,6 +22,10 @@
 
 #SBATCH -e testPysweep.err					# name of error file for this submission script
 
+#SBATCH --mail-type=BEGIN,END,FAIL				# send email when job begins, ends or aborts
+
+#SBATCH --mail-user=walkanth@oregonstate.edu		# send email to this address
+
 # load any software environment module required for app
 
 # run my jobs
