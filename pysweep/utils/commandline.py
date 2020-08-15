@@ -28,7 +28,7 @@ def runEuler(args):
     if not args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = pysweep.equations.euler.createInitialConditions(args.spacesteps,args.spacesteps)
-    simwarn = True if args.ignore else False
+    simwarn = False if args.ignore else True
     solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
     #Setting globals
     d = 0.1
@@ -67,7 +67,7 @@ def runHeat(args):
     if not args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps)
-    simwarn = True if args.ignore else False
+    simwarn = False if args.ignore else True
     solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
     #Setting globals
     d = 0.1

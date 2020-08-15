@@ -1,4 +1,5 @@
 import numpy, h5py, os, sys
+import itertools
 import mpi4py.MPI as MPI
 try:
     import pycuda.driver as cuda
@@ -68,13 +69,22 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
     t: time of initial conditions
     """
     comm = MPI.COMM_WORLD
-    with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
-        initialConditions = hf.create_dataset("data",(1,npx,npy))
+    rank = comm.Get_rank()
+    if rank == 0:
         X = numpy.linspace(0,1,npx,endpoint=False)
         Y = numpy.linspace(0,1,npy,endpoint=False)
-        for i,x in enumerate(X):
-            for j,y in enumerate(Y):
-                initialConditions[0,i,j] = analyticalEquation(x,y,t=t,alpha=alpha)
+        combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
+        combos = numpy.array_split(combos,comm.Get_size())
+    else:
+        combos = None
+    combos = comm.scatter(combos)
+    with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
+        initialConditions = hf.create_dataset("data",(1,npx,npy))
+        for cmb in combos:
+            i,j,x,y = cmb
+            i = int(i)
+            j = int(j)
+            initialConditions[0,i,j] = analyticalEquation(x,y,t=t,alpha=alpha)
     comm.Barrier()
     return filename
 

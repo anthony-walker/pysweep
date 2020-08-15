@@ -38,16 +38,23 @@ def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5
     t: time of initial conditions
     """
     comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank == 0:
+        L = 5 #From shu
+        X = numpy.linspace(-L,L,npx,endpoint=False)
+        Y = numpy.linspace(-L,L,npy,endpoint=False)
+        combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
+        combos = numpy.array_split(combos,comm.Get_size())
+    else:
+        combos = None
+    combos = comm.scatter(combos)
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
         initialConditions = hf.create_dataset("data",(4,npx,npy))
-        L = 5 #From shu
-        xRange = numpy.linspace(-L,L,npx,endpoint=False)
-        yRange = numpy.linspace(-L,L,npy,endpoint=False)
-        dx = 1/npx
-        dy = 1/npy
-        for i,x in enumerate(xRange):
-            for j,y in enumerate(yRange):
-                initialConditions[:,i,j] = analytical(x,y,t,gamma=gamma)
+        for cmb in combos:
+            i,j,x,y = cmb
+            i = int(i)
+            j = int(j)
+            initialConditions[:,i,j] = analytical(x,y,t,gamma=gamma)
     comm.Barrier()
     return filename
 

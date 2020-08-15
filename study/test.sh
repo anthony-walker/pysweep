@@ -2,7 +2,7 @@
 
 #SBATCH -J testPysweep						# name of job
 
-#SBATCH —-get-user-env                      #Use user env
+#SBATCH --get-user-env                      #Use user env
 
 #SBATCH -A niemeyek 
 
@@ -32,6 +32,6 @@
 
 echo $SLURM_JOB_ID
 
-# mpiexec -n 40 pysweep -f euler -nx 1344 -nt 100 -b 16 -s 0.5 --swept --verbose --ignore
+# mpiexec -n 40 -hosts cn-e-1 , cn-e-2 pysweep -f euler -nx 1344 -nt 100 -b 16 -s 0.5 --swept --verbose --ignore
 
-mpiexec -n 1 pysweep -f heat -nx 1344 -nt 100 -b 16 -s 1 --swept --verbose --ignore
+mpiexec -n 40 -hosts cn-e-1 , cn-e-2 pysweep -f heat -nx 1344 -nt 100 -b 16 -s 0.5 --swept --verbose --ignore
