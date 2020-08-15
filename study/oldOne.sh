@@ -2,6 +2,8 @@
 
 #SBATCH -J gtxSweepOne						# name of job
 
+#SBATCH —-get-user-env                      #Use user env
+
 #SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
 
 #SBATCH -p preempt								# name of partition or queue
@@ -30,7 +32,6 @@
 
 echo $SLURM_JOB_ID
 
-conda activate pysweep-dev
 
 for eq in heat euler
 do

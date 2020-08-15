@@ -2,6 +2,8 @@
 
 #SBATCH -J testPysweep						# name of job
 
+#SBATCH —-get-user-env                      #Use user env
+
 #SBATCH -A niemeyek 
 
 #SBATCH -p mime4 
@@ -29,8 +31,6 @@
 # run my jobs
 
 echo $SLURM_JOB_ID
-
-conda activate pysweep-dev
 
 # mpiexec -n 40 pysweep -f euler -nx 1344 -nt 100 -b 16 -s 0.5 --swept --verbose --ignore
 
