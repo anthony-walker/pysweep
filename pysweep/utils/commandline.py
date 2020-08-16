@@ -73,7 +73,7 @@ def runHeat(args):
     if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     adjustArraySize(args)
-    filename = "eulerConditions{}.hdf5".format(args.spacesteps)
+    filename = "heatConditions{}.hdf5".format(args.spacesteps)
     if not os.path.isfile(filename):
         pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename)
     simwarn = False if args.ignore else True
