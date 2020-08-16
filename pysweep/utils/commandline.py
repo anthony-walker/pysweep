@@ -87,7 +87,7 @@ def runHeat(args):
     solver.dtypeStr = 'float64'
     solver.dtype = numpy.dtype(solver.dtypeStr)
     solver.verbose = False 
-    solver.operating = 2
+    solver.operating = 1
     solver.intermediate = 1
     solver.share = args.share
     solver.simulation = True if args.swept else False
