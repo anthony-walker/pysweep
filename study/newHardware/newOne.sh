@@ -42,9 +42,9 @@ do
         do
             for nx in 160 320 480 640 800 960 1120
             do
-                    mpiexec -n 40 --hostfile ./new-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --swept --verbose --ignore --clean
+                    mpiexec -n 40 --hostfile ./new-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
 
-                    mpiexec -n 40 --hostfile ./new-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --verbose --ignore --clean
+                    mpiexec -n 40 --hostfile ./new-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
             done
         done
     done
