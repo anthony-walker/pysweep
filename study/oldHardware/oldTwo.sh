@@ -49,3 +49,5 @@ do
         done
     done
 done
+
+mpiexec -n 2 --hostfile ./old-nodes nvidia-smi --list-gpus
