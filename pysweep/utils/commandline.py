@@ -19,14 +19,17 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected as string.')
 
-def adjustEulerGlobals(solver,arraysize,timesteps=50):
-    """Use this function to adjust heat equation step size based on arraysize"""
-    
+def adjustArraySize(args):
+    remainder = args.spacesteps%args.blocksize
+    if remainder!=0:
+        args.spacesteps+=args.blocksize-remainder
+        warnings.warn('Adjusting array size to fit blocksize. New array size is {}.'.format(args.spacesteps))
 
 def runEuler(args):
     """Use this function to run Euler example."""
-    if not args.ignore:
+    if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
+    adjustArraySize(args)
     filename = pysweep.equations.euler.createInitialConditions(args.spacesteps,args.spacesteps)
     simwarn = False if args.ignore else True
     solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
@@ -64,8 +67,9 @@ def runEuler(args):
 
 def runHeat(args):
     """Use this function to run Heat example."""
-    if not args.ignore:
+    if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
+    adjustArraySize(args)
     filename = pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps)
     simwarn = False if args.ignore else True
     solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)

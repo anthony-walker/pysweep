@@ -8,7 +8,7 @@ def generateArraySizes():
     divisible =[False,False]
     arraysizes = []
     for i in range(5):
-        arraystart += 32*40
+        arraystart += 32*20
         while not numpy.all(divisible):
             arraystart+=blocksizes[-1]
             divisible =[arraystart%bs==0 for bs in blocksizes]

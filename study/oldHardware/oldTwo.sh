@@ -40,7 +40,7 @@ do
     do
         for gs in $(seq 0 0.10 1)
         do
-            for nx in  1344 2624 3904 5184 6464
+            for nx in 160 320 480 640 800 960 1120
             do
                     mpiexec -n 40 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 1000 -b $bs -s $gs --swept --verbose --ignore --clean
 
