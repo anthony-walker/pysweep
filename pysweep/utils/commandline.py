@@ -30,7 +30,10 @@ def runEuler(args):
     if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     adjustArraySize(args)
-    filename = pysweep.equations.euler.createInitialConditions(args.spacesteps,args.spacesteps)
+
+    filename = "eulerConditions{}.hdf5".format(args.spacesteps)
+    if not os.path.isfile(filename):
+        pysweep.equations.euler.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename)
     simwarn = False if args.ignore else True
     solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
     #Setting globals
@@ -60,7 +63,7 @@ def runEuler(args):
     if args.clean:
         if solver.rank == 0:
             try:
-                os.system("rm {}".format(filename))
+                # os.system("rm {}".format(filename))
                 os.system("rm {}".format(solver.output))
             except Exception as e:
                 pass
@@ -70,7 +73,9 @@ def runHeat(args):
     if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     adjustArraySize(args)
-    filename = pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps)
+    filename = "eulerConditions{}.hdf5".format(args.spacesteps)
+    if not os.path.isfile(filename):
+        pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename)
     simwarn = False if args.ignore else True
     solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
     #Setting globals
@@ -100,7 +105,7 @@ def runHeat(args):
     if args.clean:
         if solver.rank == 0:
             try:
-                os.system("rm {}".format(filename))
+                # os.system("rm {}".format(filename))
                 os.system("rm {}".format(solver.output))
             except Exception as e:
                 pass
