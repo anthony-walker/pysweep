@@ -6,7 +6,7 @@
 
 #SBATCH -A niemeyek 
 
-#SBATCH -p sharegpu
+#SBATCH -p dgx
 
 #SBATCH --gres=gpu:1
 
@@ -16,7 +16,7 @@
 
 #SBATCH --cpus-per-task=16
 
-#SBATCH --time=7-00:00:00
+#SBATCH --time=2-00:00:00
 
 #SBATCH -o testPysweep.out					# name of output file for this submission script
 
