@@ -16,7 +16,7 @@
 
 #SBATCH --ntasks-per-node=1
 
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=16
 
 #SBATCH --time=2-00:00:00
 
@@ -42,9 +42,9 @@ do
         do
             for nx in 160 320 480 640 800 960 1120
             do
-                    mpiexec -n 40 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
+                    mpiexec -n 32 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
 
-                    mpiexec -n 40 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
+                    mpiexec -n 32 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
             done
         done
     done
