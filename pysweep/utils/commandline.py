@@ -102,6 +102,7 @@ def runHeat(args):
     solver.loadCPUModule()
     if args.verbose:
         if solver.rank==0:
+            os.system('nvidia-smi --list-gpus')
             print(solver)
     solver()
     #Clean up 
