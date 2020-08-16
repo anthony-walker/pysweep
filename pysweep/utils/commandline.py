@@ -30,17 +30,18 @@ def runEuler(args):
     if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     adjustArraySize(args)
-
-    filename = "eulerConditions{}.hdf5".format(args.spacesteps)
-    if not os.path.isfile(filename):
-        pysweep.equations.euler.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename)
-    simwarn = False if args.ignore else True
-    solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
-    #Setting globals
+    #step stuff
     d = 0.1
     gamma = 1.4
     dx = 10/(args.spacesteps-1)
     dt = d*dx
+    #Make ic if needed
+    filename = "eulerConditions{}.hdf5".format(args.spacesteps)
+    if not os.path.isfile(filename):
+        pysweep.equations.euler.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename,gamma=gamma)
+    simwarn = False if args.ignore else True
+    solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
+    #Setting globals
     solver.globals = [0,dt*args.timesteps,dt,dx,dx,gamma]
     solver.dtypeStr = 'float64'
     solver.dtype = numpy.dtype(solver.dtypeStr)
@@ -73,16 +74,18 @@ def runHeat(args):
     if args.ignore:
         warnings.filterwarnings('ignore') #Ignore warnings for processes
     adjustArraySize(args)
-    filename = "heatConditions{}.hdf5".format(args.spacesteps)
-    if not os.path.isfile(filename):
-        pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename)
-    simwarn = False if args.ignore else True
-    solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
-    #Setting globals
+    #step stuff
     d = 0.1
     alpha = 1
     dx = 1/(args.spacesteps-1)
     dt = float(d*dx**2/alpha)
+    #Make ics if needed
+    filename = "heatConditions{}.hdf5".format(args.spacesteps)
+    if not os.path.isfile(filename):
+        pysweep.equations.heat.createInitialConditions(args.spacesteps,args.spacesteps,filename=filename,alpha=alpha)
+    simwarn = False if args.ignore else True
+    solver = pysweep.Solver(initialConditions=filename,sendWarning=simwarn)
+    #Setting globals
     solver.globals = [0,dt*args.timesteps,dt,dx,dx,alpha,True]
     solver.dtypeStr = 'float64'
     solver.dtype = numpy.dtype(solver.dtypeStr)

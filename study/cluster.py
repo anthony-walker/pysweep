@@ -1,7 +1,44 @@
-import numpy, yaml
+import numpy, yaml, pysweep, itertools
+import pysweep.utils.validate as validate
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import itertools
+
+
+def makeValidateContours():
+    tsteps = 100
+    npx = 48
+    times = [0,259,499]
+    #Euler stuf
+    d = 0.1
+    gamma = 1.4
+    dx = 10/(640-1)
+    dt = d*dx
+
+    for k,t in enumerate(times):
+        #Numerical vortex
+        with h5py.File("./data/eulerOutput.hdf5","r") as f:
+            data = f['data']
+            validate.createContourf(data[:,0,:,:],0,5,5,1,filename="numericalVortex{}.pdf".format(k),LZn=0.4)
+
+        #Analytical Vortex
+        data = numpy.zeros((1,4,npx,npx))
+        data[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t)
+        validate.createContourf(data[:,0,:,:],0,5,5,1,filename="analyticalVortex{}.pdf".format(k),LZn=0.4)
+
+    #Heat stuff
+    alpha = 1
+    dt = float(d*dx**2/alpha)
+    for k,t in enumerate(times):
+        #Analytical Heat Surface
+        data = numpy.zeros((1,1,npx,npx))
+        data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,alpha=alpha)
+        validate.createSurface(data[:,0,:,:],0,1,1,1,filename="analyticalHeatSurface{}.pdf".format(k))
+
+        #Numerical Heat Surface
+        with h5py.File("./data/heatOutput.hdf5","r") as f:
+            data = f['data']
+            validate.createSurface(data[:,0,:,:],0,1,1,1,filename="numericalHeatSurface{}.pdf".format(k))
+
 
 def generateArraySizes():
     """Use this function to generate array sizes based on block sizes."""
