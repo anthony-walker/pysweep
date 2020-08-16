@@ -49,5 +49,3 @@ do
         done
     done
 done
-
-mv log.yaml newOne.yaml

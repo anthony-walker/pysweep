@@ -38,4 +38,3 @@ mpiexec -n 40 --hostfile=./test-nodes pysweep -f euler -nx 1344 -nt 500 -b 16 -s
 
 mpiexec -n 40 --hostfile=./test-nodes pysweep -f euler -nx 1344 -nt 500 -b 16 -s 0.5 --verbose --ignore
 
-mv log.yaml test.yaml
