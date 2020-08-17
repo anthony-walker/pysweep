@@ -34,6 +34,4 @@
 
 echo $SLURM_JOB_ID
 
-mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx 1120 -nt 500 -b 16 -s 0.1 --swept --verbose --ignore --clean
-
-mpiexec -n 2 --hostfile ./old-nodes nvidia-smi --list-gpus
+mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx 160 -nt 50 -b 16 -s 0.1 --swept --verbose --ignore --clean
