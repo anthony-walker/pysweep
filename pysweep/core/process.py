@@ -1,5 +1,6 @@
 import numpy,GPUtil, os, time, warnings, mpi4py.MPI as MPI,traceback
 import pysweep.core.io as io
+import socket
 
 def pseudoCluster(rank):
     """This is a temporary function to rename processors based on rank."""
@@ -126,7 +127,7 @@ def MajorSplit(solver,nodeID):
     totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
     numberOfRows = solver.arrayShape[1]/solver.blocksize[0] #total number of rows
     gpuMult = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(len(numberOfGPUsList))] #GPU multipliers
-    print(numberOfGPUs,numberOfGPUsList,totalGPUs,gpuRank)
+    print(numberOfGPUs,numberOfGPUsList,totalGPUs,gpuRank,socket.gethostname())
     cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
     GPURows = numpy.ceil(numberOfRows*solver.share)  #round up for GPU rows
     CPURows = numberOfRows-GPURows #remaining rows to CPUs
