@@ -1,4 +1,4 @@
-import numpy, yaml, pysweep, itertools
+import numpy, yaml, pysweep, itertools, h5py
 import pysweep.utils.validate as validate
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -16,28 +16,28 @@ def makeValidateContours():
 
     for k,t in enumerate(times):
         #Numerical vortex
-        with h5py.File("./data/eulerOutput.hdf5","r") as f:
+        with h5py.File("./data/eulerOutputSwept.hdf5","r") as f:
             data = f['data']
-            validate.createContourf(data[:,0,:,:],0,5,5,1,filename="numericalVortex{}.pdf".format(k),LZn=0.4)
+            validate.createContourf(data[:,0,:,:],0,5,5,1,filename="./figures/numericalVortex{}.pdf".format(k),LZn=0.4)
 
         #Analytical Vortex
         data = numpy.zeros((1,4,npx,npx))
         data[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t)
-        validate.createContourf(data[:,0,:,:],0,5,5,1,filename="analyticalVortex{}.pdf".format(k),LZn=0.4)
+        validate.createContourf(data[:,0,:,:],0,5,5,1,filename="./figuresanalyticalVortex{}.pdf".format(k),LZn=0.4)
 
-    #Heat stuff
-    alpha = 1
-    dt = float(d*dx**2/alpha)
-    for k,t in enumerate(times):
-        #Analytical Heat Surface
-        data = numpy.zeros((1,1,npx,npx))
-        data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,alpha=alpha)
-        validate.createSurface(data[:,0,:,:],0,1,1,1,filename="analyticalHeatSurface{}.pdf".format(k))
+    # #Heat stuff
+    # alpha = 1
+    # dt = float(d*dx**2/alpha)
+    # for k,t in enumerate(times):
+    #     #Analytical Heat Surface
+    #     data = numpy.zeros((1,1,npx,npx))
+    #     data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,alpha=alpha)
+    #     validate.createSurface(data[:,0,:,:],0,1,1,1,filename="analyticalHeatSurface{}.pdf".format(k))
 
-        #Numerical Heat Surface
-        with h5py.File("./data/heatOutput.hdf5","r") as f:
-            data = f['data']
-            validate.createSurface(data[:,0,:,:],0,1,1,1,filename="numericalHeatSurface{}.pdf".format(k))
+    #     #Numerical Heat Surface
+    #     with h5py.File("./data/heatOutput.hdf5","r") as f:
+    #         data = f['data']
+    #         validate.createSurface(data[:,0,:,:],0,1,1,1,filename="numericalHeatSurface{}.pdf".format(k))
 
 
 def generateArraySizes():
@@ -141,9 +141,9 @@ def makeArrayContours(data,arraysizes,blocksizes,shares,minV,maxV,cmap,cbt,fname
     cbar_ax.set_title(cbt,y=1.01)
     if switch:
         mbc = ('k','w')
-    else
+    else:
         mbc = ('w','k')
-    for i,asize in enumerate(arraySizes[1:]) #Skipping smallest size for even number of plots
+    for i,asize in enumerate(arraySizes[1:]): #Skipping smallest size for even number of plots
         B,S,Z = getContourData(data,asize,blocksizes,shares)
         performancePlot(axes[i],B,S,Z,minV,maxV,blocksizes,shares,asize,ccm=cmap,mbc=mbc)
     plt.savefig(fig)
@@ -160,7 +160,8 @@ def getStudyContour(file,equation,appendStr=""):
 
 
 if __name__ == "__main__":
-    getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
-    getStudyContour("./newHardware/log.yaml",'heat',appendStr="Old")
-    getStudyContour("./oldHardware/log.yaml",'euler',appendStr="Old")
-    getStudyContour("./newHardware/log.yaml",'euler',appendStr="Old")
+    # getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
+    # getStudyContour("./newHardware/log.yaml",'heat',appendStr="Old")
+    # getStudyContour("./oldHardware/log.yaml",'euler',appendStr="Old")
+    # getStudyContour("./newHardware/log.yaml",'euler',appendStr="Old")
+    makeValidateContours()
