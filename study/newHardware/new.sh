@@ -34,6 +34,8 @@
 
 echo $SLURM_JOB_ID
 
+export RANKS_PER_NODE=1
+
 for bs in 8 12 16 24 32
 do
     for gs in $(seq 0 0.10 1)
