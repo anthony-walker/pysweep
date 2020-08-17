@@ -109,6 +109,24 @@ def MinorSplit(solver,nodeInfo,gpuRank,adjustment):
         gpuRank.append(None)
     return gpuBlock,dividedBlocks,gpuRank
 
+def adjustGPURanks(share,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows):
+    if  share > 0 and totalGPUs > GPURows:
+        warnings.warn("Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs. Attempting to adjust GPU ranks to continue run.".format(numberOfGPUs,GPURows,share))
+        removeGPUs = totalGPUs-GPURows
+        removeList = [1 for i in range(removeGPUs)]
+        nodeRemoveGPUs = numpy.array_split(removeList,len(numberOfGPUsList))
+        nodeRemoveGPUs = clusterComm.scatter(nodeRemoveGPUs[::-1]) #needs solver.
+        #Adjusting ranks
+        for i in range(len(nodeRemoveGPUs)):
+            gpuRank.pop()
+        #Getting updated GPU variables
+        numberOfGPUs = len(gpuRank)
+        numberOfGPUsList = clusterComm.allgather(numberOfGPUs)
+        totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
+        #Check that adjustment worked
+        assert totalGPUs <= GPURows if share > 0 else True, "GPU rank adjustment failed." 
+    return gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs
+
 def MajorSplit(solver,nodeID):
     """
     This function splits the total number of number of rows (determined from blocksize) amongst a global group for the GPU and CPU.
@@ -122,21 +140,15 @@ def MajorSplit(solver,nodeID):
     gpuRank,numberOfGPUs = getGPUInfo(solver) #getting ranks with gpus and number
     #Assert that the total number of blocks is an integer
     assert (numpy.prod(solver.arrayShape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
-
     #Getting number of rows
     numberOfRows = solver.arrayShape[1]/solver.blocksize[0] #total number of rows
     GPURows = numpy.ceil(numberOfRows*solver.share)  #round up for GPU rows
     CPURows = numberOfRows-GPURows #remaining rows to CPUs
     solver.share=GPURows/numberOfRows #update effective share based on rounding
-
     #Determining number of GPU rows to number of CPU rows
     numberOfGPUsList = solver.clusterComm.allgather(numberOfGPUs)
     totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
-    print(numberOfGPUs,numberOfGPUsList,totalGPUs,gpuRank,socket.gethostname())
-    # if totalGPUs <= GPURows:
-        
-    assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs.".format(numberOfGPUs,GPURows,solver.share)
-
+    gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs = adjustGPURanks(solver.share,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows) #Use this function to remove GPUs if there are too many
     #multipliers for for boundaries
     gpuMult = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(len(numberOfGPUsList))] #GPU multipliers
     cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
