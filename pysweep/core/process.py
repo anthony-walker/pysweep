@@ -122,16 +122,24 @@ def MajorSplit(solver,nodeID):
     gpuRank,numberOfGPUs = getGPUInfo(solver) #getting ranks with gpus and number
     #Assert that the total number of blocks is an integer
     assert (numpy.prod(solver.arrayShape[1:])/numpy.prod(solver.blocksize)).is_integer(), "Provided array dimensions is not divisible by the specified block size."
-    #Determining number of GPU rows to number of CPU rows
-    numberOfGPUsList = solver.clusterComm.allgather(numberOfGPUs)
-    totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
+
+    #Getting number of rows
     numberOfRows = solver.arrayShape[1]/solver.blocksize[0] #total number of rows
-    gpuMult = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(len(numberOfGPUsList))] #GPU multipliers
-    print(numberOfGPUs,numberOfGPUsList,totalGPUs,gpuRank,socket.gethostname())
-    cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
     GPURows = numpy.ceil(numberOfRows*solver.share)  #round up for GPU rows
     CPURows = numberOfRows-GPURows #remaining rows to CPUs
     solver.share=GPURows/numberOfRows #update effective share based on rounding
+
+    #Determining number of GPU rows to number of CPU rows
+    numberOfGPUsList = solver.clusterComm.allgather(numberOfGPUs)
+    totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
+    print(numberOfGPUs,numberOfGPUsList,totalGPUs,gpuRank,socket.gethostname())
+    # if totalGPUs <= GPURows:
+        
+    assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs.".format(numberOfGPUs,GPURows,solver.share)
+
+    #multipliers for for boundaries
+    gpuMult = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(len(numberOfGPUsList))] #GPU multipliers
+    cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
     #Get gpu boundaries
     gpuLowerBound,gpuUpperBound = getBlockBoundaries(GPURows,totalGPUs,nodeID,"GPU",gpuMult)
     #Get cpu boundaries
@@ -143,7 +151,6 @@ def MajorSplit(solver,nodeID):
     nodeInfo = gpuUpperBound-gpuLowerBound,cpuUpperBound-cpuLowerBound #low range, high range, gpu magnitude, cpu magnitude
     #Testing ranks and number of gpus to ensure simulation is viable
     assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
-    assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs.".format(numberOfGPUs,GPURows,solver.share)
     try:
         assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
     except Exception as e:
