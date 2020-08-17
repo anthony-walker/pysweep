@@ -10,6 +10,8 @@
 
 #SBATCH --gres=gpu:1
 
+#SBATCH -F ./test-nodes
+
 #SBATCH -N 2
 
 #SBATCH --ntasks-per-node=1
@@ -32,19 +34,21 @@
 
 echo $SLURM_JOB_ID
 
-mpiexec -n 32 pysweep -f euler -nx 640 -nt 500 -b 16 -s 0.5 --swept --verbose --ignore
+export RANKS_PER_NODE=1
+
+mpiexec -n 32 --hostfile ./test-nodes pysweep -f euler -nx 640 -nt 500 -b 16 -s 0.5 --swept --verbose --ignore
 
 mv eulerOutput.hdf5 /nfs/hpc/share/nrg/walkanth/eulerOutputSwept.hdf5
 
-mpiexec -n 32 pysweep -f euler -nx 640 -nt 500 -b 16 -s 0.5 --verbose --ignore
+mpiexec -n 32 ./test-nodes pysweep -f euler -nx 640 -nt 500 -b 16 -s 0.5 --verbose --ignore
 
 mv eulerOutput.hdf5 /nfs/hpc/share/nrg/walkanth/eulerOutputStandard.hdf5
 
-mpiexec -n 32 pysweep -f heat -nx 640 -nt 500 -b 16 -s 0.5 --swept --verbose --ignore
+mpiexec -n 32 ./test-nodes pysweep -f heat -nx 640 -nt 500 -b 16 -s 0.5 --swept --verbose --ignore
 
 mv heatOutput.hdf5 /nfs/hpc/share/nrg/walkanth/heatOutputSwept.hdf5
 
-mpiexec -n 32 pysweep -f heat -nx 640 -nt 500 -b 16 -s 0.5 --verbose --ignore
+mpiexec -n 32 ./test-nodes pysweep -f heat -nx 640 -nt 500 -b 16 -s 0.5 --verbose --ignore
 
 mv heatOutput.hdf5 /nfs/hpc/share/nrg/walkanth/heatOutputStandard.hdf5
 
