@@ -20,9 +20,9 @@
 
 #SBATCH --time=2-00:00:00
 
-#SBATCH -o gtxSweepOne.out					# name of output file for this submission script
+#SBATCH -o gtxSweepTest.out					# name of output file for this submission script
 
-#SBATCH -e gtxSweepOne.err					# name of error file for this submission script
+#SBATCH -e gtxSweepTest.err					# name of error file for this submission script
 
 #SBATCH --mail-type=BEGIN,END,FAIL				# send email when job begins, ends or aborts
 
