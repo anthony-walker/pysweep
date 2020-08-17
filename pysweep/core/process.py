@@ -109,22 +109,22 @@ def MinorSplit(solver,nodeInfo,gpuRank,adjustment):
         gpuRank.append(None)
     return gpuBlock,dividedBlocks,gpuRank
 
-def adjustGPURanks(share,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows):
-    if  share > 0 and totalGPUs > GPURows:
-        warnings.warn("Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs. Attempting to adjust GPU ranks to continue run.".format(numberOfGPUs,GPURows,share))
+def adjustGPURanks(solver,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows):
+    if  solver.share > 0 and totalGPUs > GPURows:
+        warnings.warn("Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs. Attempting to adjust GPU ranks to continue run.".format(numberOfGPUs,GPURows,solver.share))
         removeGPUs = int(totalGPUs-GPURows)
         removeList = [1 for i in range(removeGPUs)]
         nodeRemoveGPUs = numpy.array_split(removeList,len(numberOfGPUsList))
-        nodeRemoveGPUs = clusterComm.scatter(nodeRemoveGPUs[::-1]) #needs solver.
+        nodeRemoveGPUs = solver.clusterComm.scatter(nodeRemoveGPUs[::-1]) #needs solver.
         #Adjusting ranks
         for i in range(len(nodeRemoveGPUs)):
             gpuRank.pop()
         #Getting updated GPU variables
         numberOfGPUs = len(gpuRank)
-        numberOfGPUsList = clusterComm.allgather(numberOfGPUs)
+        numberOfGPUsList = solver.clusterComm.allgather(numberOfGPUs)
         totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
         #Check that adjustment worked
-        assert totalGPUs <= GPURows if share > 0 else True, "GPU rank adjustment failed." 
+        assert totalGPUs <= GPURows if solver.share > 0 else True, "GPU rank adjustment failed." 
     return gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs
 
 def MajorSplit(solver,nodeID):
@@ -148,7 +148,7 @@ def MajorSplit(solver,nodeID):
     #Determining number of GPU rows to number of CPU rows
     numberOfGPUsList = solver.clusterComm.allgather(numberOfGPUs)
     totalGPUs = numpy.sum(numberOfGPUsList) #getting total number of GPUs
-    gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs = adjustGPURanks(solver.share,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows) #Use this function to remove GPUs if there are too many
+    gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs = adjustGPURanks(solver,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows) #Use this function to remove GPUs if there are too many
     #multipliers for for boundaries
     gpuMult = [0]+[numberOfGPUsList[i]+sum(numberOfGPUsList[:i]) for i in range(len(numberOfGPUsList))] #GPU multipliers
     cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
