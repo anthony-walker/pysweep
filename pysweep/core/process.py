@@ -204,7 +204,7 @@ def setupProcesses(solver):
     solver.blocks = solver.nodeComm.scatter(blocks)
     solver.gpuRank = solver.nodeComm.scatter(gpuRank)
     solver.gpuBlock = solver.nodeComm.bcast(gpuBlock) #total gpu block in shared array
-    solver.share = solver.nodeComm.bcast(share) #update effective share
+    solver.share = solver.nodeComm.bcast(solver.share) #update effective share
     solver.globalBlock = solver.nodeComm.bcast(solver.globalBlock) #total cpu block in shared array
     solver.sharedShape = solver.nodeComm.bcast(solver.sharedShape) #shape of node shared array
     solver.gpuBool = True if solver.gpuRank is not None else False
