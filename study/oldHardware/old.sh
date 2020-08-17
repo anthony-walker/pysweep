@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J gtxSweepTwo						# name of job
+#SBATCH -J gtxSweepOne						# name of job
 
 #SBATCH --get-user-env                      #Use user env
 
@@ -20,9 +20,9 @@
 
 #SBATCH --time=2-00:00:00
 
-#SBATCH -o gtxSweepTwo.out					# name of output file for this submission script
+#SBATCH -o gtxSweepOne.out					# name of output file for this submission script
 
-#SBATCH -e gtxSweepTwo.err					# name of error file for this submission script
+#SBATCH -e gtxSweepOne.err					# name of error file for this submission script
 
 #SBATCH --mail-type=BEGIN,END,FAIL				# send email when job begins, ends or aborts
 
@@ -34,18 +34,15 @@
 
 echo $SLURM_JOB_ID
 
-for eq in heat euler
+for bs in 8 12 16 24 32
 do
-    for bs in 8 12 16 24 32
+    for gs in $(seq 0 0.10 1)
     do
-        for gs in $(seq 0 0.10 1)
+        for nx in 160 320 480 640 800 960 1120
         do
-            for nx in 160 320 480 640 800 960 1120
-            do
-                    mpiexec -n 32 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
+                mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
 
-                    mpiexec -n 32 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
-            done
+                mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
         done
     done
 done

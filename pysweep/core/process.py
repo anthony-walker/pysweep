@@ -1,5 +1,4 @@
-import numpy,time, warnings, mpi4py.MPI as MPI,traceback
-import GPUtil
+import numpy,GPUtil, os, time, warnings, mpi4py.MPI as MPI,traceback
 import pysweep.core.io as io
 
 def pseudoCluster(rank):
@@ -41,10 +40,10 @@ def cleanupProcesses(solver,start,stop):
 def getGPUInfo(solver):
     """Use this function to return info about the GPUs on the system."""
     #Getting gpus if share is greater than 0
-    ranksPerNode = solver.nodeComm.Get_size() #number of ranks for each node
+    ranksPerNode = os.getenv('RANKS_PER_NODE') #make an environment variable available
+    ranksPerNode = solver.nodeComm.Get_size() if ranksPerNode is None else int(ranksPerNode) #number of ranks for each node
     if solver.share>0:  
         gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
-        #gpuRank = pseudoGPU(gpuRank,solver.rank) #TEMPORARY REMOVE ME
         numberOfGPUs = len(gpuRank)
     else:
         gpuRank = []
@@ -130,6 +129,7 @@ def MajorSplit(solver,nodeID):
     cpuMult = numpy.arange(0,numOfNodes+1,1,dtype=numpy.intc) if solver.share < 1 else numpy.zeros(numOfNodes+1,dtype=numpy.intc) #CPU multipliers
     GPURows = numpy.ceil(numberOfRows*solver.share)  #round up for GPU rows
     CPURows = numberOfRows-GPURows #remaining rows to CPUs
+    solver.share=GPURows/numberOfRows #update effective share based on rounding
     #Get gpu boundaries
     gpuLowerBound,gpuUpperBound = getBlockBoundaries(GPURows,totalGPUs,nodeID,"GPU",gpuMult)
     #Get cpu boundaries
@@ -140,9 +140,8 @@ def MajorSplit(solver,nodeID):
     solver.globalBlock = slice(0,solver.arrayShape[0],1),slice(start,stop,1),slice(0,solver.arrayShape[-1],1) #part of initial conditions for this node
     nodeInfo = gpuUpperBound-gpuLowerBound,cpuUpperBound-cpuLowerBound #low range, high range, gpu magnitude, cpu magnitude
     #Testing ranks and number of gpus to ensure simulation is viable
-    assert totalGPUs <= solver.comm.Get_size() if solver.share < 1 else True,"The affinity specifies use of heterogeneous system but number of GPUs exceeds number of specified ranks."
     assert totalGPUs > 0 if solver.share > 0 else True, "There are no avaliable GPUs"
-    assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS, add more GPU rows, increase affinity, or exclude GPUs."
+    assert totalGPUs <= GPURows if solver.share > 0 else True, "Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs.".format(numberOfGPUs,GPURows,solver.share)
     try:
         assert totalGPUs >= solver.nodeComm.Get_size() if solver.share == 1 else True,"Not enough GPUs for ranks"
     except Exception as e:
@@ -205,6 +204,7 @@ def setupProcesses(solver):
     solver.blocks = solver.nodeComm.scatter(blocks)
     solver.gpuRank = solver.nodeComm.scatter(gpuRank)
     solver.gpuBlock = solver.nodeComm.bcast(gpuBlock) #total gpu block in shared array
+    solver.share = solver.nodeComm.bcast(share) #update effective share
     solver.globalBlock = solver.nodeComm.bcast(solver.globalBlock) #total cpu block in shared array
     solver.sharedShape = solver.nodeComm.bcast(solver.sharedShape) #shape of node shared array
     solver.gpuBool = True if solver.gpuRank is not None else False

@@ -6,7 +6,7 @@
 
 #SBATCH -A niemeyek 
 
-#SBATCH -p dgx
+#SBATCH -p dgxs
 
 #SBATCH --gres=gpu:1
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J gtxSweepOne						# name of job
+#SBATCH -J gtxSweepTest						# name of job
 
 #SBATCH --get-user-env                      #Use user env
 
@@ -34,20 +34,6 @@
 
 echo $SLURM_JOB_ID
 
-for eq in heat euler
-do
-    for bs in 8 12 16 24 32
-    do
-        for gs in $(seq 0 0.10 1)
-        do
-            for nx in 160 320 480 640 800 960 1120
-            do
-                    mpiexec -n 32 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
-
-                    mpiexec -n 32 --hostfile ./old-nodes pysweep -f $eq -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
-            done
-        done
-    done
-done
+mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx 1120 -nt 500 -b 16 -s 0.1 --swept --verbose --ignore --clean
 
 mpiexec -n 2 --hostfile ./old-nodes nvidia-smi --list-gpus
