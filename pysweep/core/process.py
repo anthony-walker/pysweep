@@ -112,7 +112,7 @@ def MinorSplit(solver,nodeInfo,gpuRank,adjustment):
 def adjustGPURanks(share,gpuRank,totalGPUs,numberOfGPUsList,numberOfGPUs,GPURows):
     if  share > 0 and totalGPUs > GPURows:
         warnings.warn("Not enough rows for the number of GPUS({}), add more GPU rows({}), increase share({}), or exclude GPUs. Attempting to adjust GPU ranks to continue run.".format(numberOfGPUs,GPURows,share))
-        removeGPUs = totalGPUs-GPURows
+        removeGPUs = int(totalGPUs-GPURows)
         removeList = [1 for i in range(removeGPUs)]
         nodeRemoveGPUs = numpy.array_split(removeList,len(numberOfGPUsList))
         nodeRemoveGPUs = clusterComm.scatter(nodeRemoveGPUs[::-1]) #needs solver.
