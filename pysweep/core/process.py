@@ -86,6 +86,7 @@ def MinorSplit(solver,nodeInfo,gpuRank,adjustment):
         adjustment: used to adjust standard solver for boundary condition purposes
 
     """
+    ranksPerNode = solver.nodeComm.Get_size() #getting number of ranks per node
     gpuSize, cpuSize = nodeInfo
     variableSlice = slice(0,solver.arrayShape[0],1)
     start = adjustment #Convert to actual array size
