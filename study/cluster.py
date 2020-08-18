@@ -1,7 +1,9 @@
 import numpy, yaml, pysweep, itertools, h5py
 import pysweep.utils.validate as validate
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 from matplotlib import cm
+from matplotlib import tri
 
 
 def makeValidateContours():
@@ -54,56 +56,45 @@ def generateArraySizes():
         arraysizes.append(arraystart)
     return arraysizes
 
-def getYamlData(file,savename,equation):
+def getYamlData(file,equation):
     document = open(file,'r')
     yamlFile = yaml.load(document,Loader=yaml.FullLoader)
-    arraySizes = []
-    blockSizes = []
-    shares = []
-    speedup = []
-    swepttime = {}
-    standardtime = {}
-    swepttpt = {}
-    standardtpt = {}
-    speedup = {}
-    for key in yamlFile:
+    standardSizes = numpy.asarray([160, 320, 480, 640, 800, 960, 1120])
+    dataLen = len(yamlFile.keys())
+    data = numpy.zeros((dataLen,6))
+    
+    for i,key in enumerate(yamlFile):
         if equation in yamlFile[key]['cpu']:
             asize = yamlFile[key]['array_shape'][2]
-            bsize = yamlFile[key]['blocksize']
-            cshare = yamlFile[key]['share']
-            arraySizes.append(asize)
-            blockSizes.append(bsize)
-            shares.append(cshare)
-            if yamlFile[key]['swept']:
-                swepttime[(asize,bsize,cshare)] = yamlFile[key]['runtime']
-                swepttpt[(asize,bsize,cshare)] = yamlFile[key]['time_per_step']
-            else:
-                standardtime[(asize,bsize,cshare)] = yamlFile[key]['runtime']
-                standardtpt[(asize,bsize,cshare)] = yamlFile[key]['time_per_step']
-        
-    arraySizes = list(set(arraySizes))
-    blockSizes = list(set(blockSizes))
-    shares = list(set(shares))
-    arraySizes.sort()
-    blockSizes.sort()
-    shares.sort()
-    keys = list(itertools.product(arraySizes,blockSizes,shares,))
+            mins = numpy.abs(standardSizes-asize)
+            idx = numpy.where(numpy.amin(mins)==mins)[0][0]
+            asize = standardSizes[idx]
+            swept = 1 if yamlFile[key]['swept'] else 0
+            data[i,0] = float(swept)
+            data[i,1] = float(asize)
+            data[i,2] = float(yamlFile[key]['blocksize'])
+            data[i,3] = float(yamlFile[key]['share'])
+            data[i,4] = float(yamlFile[key]['runtime'])
+            data[i,5] = float(yamlFile[key]['time_per_step'])
+    data = numpy.array(data,)
+    indexes = numpy.lexsort((data[:,1],data[:,0]))
+    sortedData = numpy.zeros(data.shape)
+    for i,idx in enumerate(indexes):
+        sortedData[i,:] = data[idx,:] 
+    return sortedData
 
-    for key in keys:
-        try:
-            speedup[key] = standardtime[key]/swepttime[key]
-        except:
-            pass
-
-    return speedup,swepttime,standardtime,swepttpt,standardtpt,arraySizes,blockSizes,shares,keys
-
-def getContourData(data,arraysizes,uBlocks,uShares):
-    Z = np.zeros((len(uBlocks),len(uShares)))
-    S,B = np.meshgrid(uShares,uBlocks)
+def getContourData(data,arraysize,uBlocks,uShares):
+    Z = numpy.zeros((len(uBlocks),len(uShares)))
+    triang = tri.Triangulation(uBlocks, uShares)
+    interpolator = tri.LinearTriInterpolator(triang, z)
+    S,B = numpy.meshgrid(uShares,uBlocks)
     for i,blk in enumerate(uBlocks):
         for j,share in enumerate(uShares):
             key = (arraysize,blk,share)
-            Z[i,j] = data[key]
+            try:
+                Z[i,j] = data[key]
+            except:
+                Z[i,j] = 0
     return B,S,Z
 
 def performancePlot(ax,B,S,Z,minV,maxV,uBlocks,uShares,ArrSize,ccm = cm.inferno,markbest=True,markworst=True,mbc=('w','k')):
@@ -117,21 +108,21 @@ def performancePlot(ax,B,S,Z,minV,maxV,uBlocks,uShares,ArrSize,ccm = cm.inferno,
     ax.yaxis.labelpad = 0.5
     ax.xaxis.labelpad = 0.5
     if markbest:
-        x,y = np.where(Z==np.amax(Z))
-        ax.plot(uBlocks[x],uShares[y],linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
+        x,y = numpy.where(Z==numpy.amax(Z))
+        ax.plot(uBlocks[x[0]],uShares[y[0]],linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
     if markworst:
-        x,y = np.where(Z==np.amin(Z))
-        ax.plot(uBlocks[x],uShares[y],linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
-
+        x,y = numpy.where(Z==numpy.amin(Z))
+        ax.plot(uBlocks[x[0]],uShares[y[0]],linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
 
 def makeArrayContours(data,arraysizes,blocksizes,shares,minV,maxV,cmap,cbt,fname,switch=False):
     #Make speed up figure
     fig, axes = plt.subplots(ncols=3,nrows=2)
     fig.subplots_adjust(wspace=0.2,hspace=0.3,right=0.8)
-    axes = np.reshape(axes,(6,))
+    axes = numpy.reshape(axes,(6,))
     cbar_ax = fig.add_axes([0.85, 0.11, 0.05, 0.77])
-    cbounds = np.linspace(minV,maxV,100)
+    cbounds = numpy.linspace(minV,maxV,100)
     interval = (maxV-minV)//4 #Determine interval based on 4 points
+    interval = 1 if interval<1 else interval
     cbs = numpy.arange(minV,maxV,interval)
     cbar = fig.colorbar(cm.ScalarMappable(cmap=cmap),cax=cbar_ax,boundaries=cbounds)
     cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbs]])
@@ -143,25 +134,25 @@ def makeArrayContours(data,arraysizes,blocksizes,shares,minV,maxV,cmap,cbt,fname
         mbc = ('k','w')
     else:
         mbc = ('w','k')
-    for i,asize in enumerate(arraySizes[1:]): #Skipping smallest size for even number of plots
+    for i,asize in enumerate(arraysizes[1:]): #Skipping smallest size for even number of plots
         B,S,Z = getContourData(data,asize,blocksizes,shares)
         performancePlot(axes[i],B,S,Z,minV,maxV,blocksizes,shares,asize,ccm=cmap,mbc=mbc)
-    plt.savefig(fig)
+    plt.savefig(fname)
 
 def getStudyContour(file,equation,appendStr=""):
     #Get data
-    speedup,swepttime,standardtime,swepttpt,standardtpt,arraySizes,blockSizes,shares,keys = getYamlData(file,savename,equation)
-    #Make contour
-    makeArrayContours(speedup,arraySizes,blockSizes,shares,0,4,cm.inferno,'Speedup',"speedUp{}.pdf".format(equation+appendStr),switch=True)
-    makeArrayContours(swepttime,arraySizes,blockSizes,shares,0,500,cm.inferno_r,'Time [s]',"sweptTime{}.pdf".format(equation+appendStr))
-    makeArrayContours(standardtime,arraySizes,blockSizes,shares,0,500,cm.inferno_r,'Time [s]',"standard{}.pdf".format(equation+appendStr))
-    makeArrayContours(swepttpt,arraySizes,blockSizes,shares,0,4,cm.inferno,'Time/Step',"sweptTpt{}.pdf".format(equation+appendStr),switch=True)
-    makeArrayContours(swepttpt,arraySizes,blockSizes,shares,0,4,cm.inferno,'Time/Step',"standardTpt{}.pdf".format(equation+appendStr),switch=True)
+    getYamlData(file,equation)
+    # #Make contour
+    # makeArrayContours(speedup,arraySizes,blockSizes,shares,0,2,cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+appendStr),switch=True)
+    # makeArrayContours(swepttime,arraySizes,blockSizes,shares,0,100,cm.inferno_r,'Time [s]',"./plots/sweptTime{}.pdf".format(equation+appendStr))
+    # makeArrayContours(standardtime,arraySizes,blockSizes,shares,0,100,cm.inferno_r,'Time [s]',"./plots/standard{}.pdf".format(equation+appendStr))
+    # makeArrayContours(swepttpt,arraySizes,blockSizes,shares,0,1,cm.inferno,'Time/Step',"./plots/sweptTpt{}.pdf".format(equation+appendStr),switch=True)
+    # makeArrayContours(swepttpt,arraySizes,blockSizes,shares,0,1,cm.inferno,'Time/Step',"./plots/standardTpt{}.pdf".format(equation+appendStr),switch=True)
 
 
 if __name__ == "__main__":
-    # getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
+    getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
     # getStudyContour("./newHardware/log.yaml",'heat',appendStr="Old")
     # getStudyContour("./oldHardware/log.yaml",'euler',appendStr="Old")
     # getStudyContour("./newHardware/log.yaml",'euler',appendStr="Old")
-    makeValidateContours()
+    # makeValidateContours()
