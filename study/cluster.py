@@ -103,7 +103,7 @@ def validateEuler():
         
 def generateArraySizes():
     """Use this function to generate array sizes based on block sizes."""
-    blocksizes = [8, 12, 16, 24, 32] #blocksizes with most options
+    blocksizes = [8, 12, 16, 20, 24, 32] #blocksizes with most options
     arraystart = 0
     divisible =[False,False]
     arraysizes = []
@@ -148,7 +148,7 @@ def getContourData(data,arraysize,uBlocks,uShares):
     Z = interpolator(B, S)
     return B,S,Z
 
-def performancePlot(ax,B,S,Z,minV,maxV,ArrSize,ccm=cm.inferno,markbest=True,markworst=True,mbc=('w','k')):
+def performancePlot(ax,B,S,Z,minV,maxV,ArrSize,ccm=cm.inferno,markbest=True,markworst=True,mbc=('w','k'),printer=False):
     ax.contourf(B,S*100,Z,cmap=ccm,vmin=minV,vmax=maxV)
     ax.set_title('Array Size: ${}$'.format(ArrSize))
     ax.set_ylabel('Share [%]')
@@ -160,14 +160,20 @@ def performancePlot(ax,B,S,Z,minV,maxV,ArrSize,ccm=cm.inferno,markbest=True,mark
     ax.xaxis.labelpad = 0.5
 
     if markbest:
-        x,y = numpy.where(Z==numpy.amax(Z))
+        Zmax = numpy.amax(Z)
+        x,y = numpy.where(Z==Zmax)
+        if printer:
+            print(ArrSize,Zmax,x,y)
         ax.plot(blockSizes[x[0]],shares[y[0]]*100,linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
 
     if markworst:
-        x,y = numpy.where(Z==numpy.amin(Z))
+        Zmin = numpy.amin(Z)
+        x,y = numpy.where(Z==Zmin)
+        if printer:
+            print(ArrSize,Zmin,x,y)
         ax.plot(blockSizes[x[0]],shares[y[0]]*100,linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
 
-def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False):
+def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,printer=False):
     #Make speed up figure
     ai = lambda x: slice(int(data.shape[0]//len(standardSizes)*x),int(data.shape[0]//len(standardSizes)*(x+1)),1)
     fig, axes = plt.subplots(ncols=3,nrows=2)
@@ -187,7 +193,7 @@ def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False):
         mbc = ('w','k')
     for i,asize in enumerate(standardSizes[1:],start=1): #Skipping smallest size for even number of plots
         B,S,Z = getContourData(data[ai(i)],asize,rBlocks[ai(i)],rShares[ai(i)])
-        performancePlot(axes[i-1],B,S,Z,cbounds[0],cbounds[-1],asize,ccm=cmap,mbc=mbc)
+        performancePlot(axes[i-1],B,S,Z,cbounds[0],cbounds[-1],asize,ccm=cmap,mbc=mbc,printer=printer)
     plt.savefig(fname)
 
 def getStudyContour(file,equation,appendStr=""):
@@ -196,6 +202,7 @@ def getStudyContour(file,equation,appendStr=""):
     standarddata = data[:data.shape[0]//2,:]
     sweptdata = data[data.shape[0]//2:,:]
     speedup = standarddata[:,4]/sweptdata[:,4]
+    print(numpy.mean(speedup))
     #Make contour
     makeArrayContours(speedup,sweptdata[:,2],sweptdata[:,3],numpy.arange(0.8,1.6,0.1),cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+appendStr),switch=True)
     makeArrayContours(sweptdata[:,4],sweptdata[:,2],sweptdata[:,3],numpy.arange(0,400,100),cm.inferno_r,'Clocktime [s]',"./plots/clockTimeSwept{}.pdf".format(equation+appendStr))
@@ -205,8 +212,12 @@ def getStudyContour(file,equation,appendStr=""):
     return sweptdata
 
 if __name__ == "__main__":
-    sweptOld = getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
-    sweptNew = getStudyContour("./newHardware/log.yaml",'heat',appendStr="New")
-    makeArrayContours(sweptOld[:,4]/sweptNew[:,4],sweptNew[:,2],sweptNew[:,3],numpy.arange(0.75,1.01,0.05),cm.inferno,'Speedup',"./plots/hardwareSpeedupHeat.pdf")
-    validateHeat()
-    validateEuler()
+    print(generateArraySizes())
+    # sweptOld = getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
+    # sweptNew = getStudyContour("./newHardware/log.yaml",'heat',appendStr="New")
+    # speedup=sweptOld[:,4]/sweptNew[:,4]
+    # print(numpy.mean(speedup))
+    # makeArrayContours(speedup,sweptNew[:,2],sweptNew[:,3],numpy.arange(0.75,1.01,0.05),cm.inferno,'Speedup',"./plots/hardwareSpeedupHeat.pdf",switch=True)
+
+    # validateHeat()
+    # validateEuler()
