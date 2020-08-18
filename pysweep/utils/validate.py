@@ -5,6 +5,20 @@ from matplotlib import cm
 from mpl_toolkits import mplot3d
 from matplotlib import animation, rc
 
+def heatContourAx(ax,data,Lx,Ly):
+    shape = numpy.shape(data)
+    x = numpy.linspace(0,Lx,shape[0])
+    y = numpy.linspace(0,Ly,shape[1])
+    X,Y = numpy.meshgrid(x,y)
+    ax.contourf(X,Y,data,cmap=cm.inferno,vmin=-1,vmax=1)
+
+def eulerContourAx(ax,data,Lx,Ly):
+    shape = numpy.shape(data)
+    x = numpy.linspace(-Lx,Lx,shape[0])
+    y = numpy.linspace(-Ly,Ly,shape[1])
+    X,Y = numpy.meshgrid(x,y)
+    ax.contourf(X,Y,data,cmap=cm.inferno,vmin=0.4,vmax=1)
+
 def createSurface(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="surface.pdf",gif=False,elev=45,azim=25,gmod=1):
     """Use this as a function for create gif."""
     global fig,ax,X,Y,gifData,LZ,LX,LY
@@ -21,7 +35,6 @@ def createSurface(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="surface.pdf",gif
     shape = numpy.shape(data)
     x = numpy.linspace(-Lx,Lx,shape[1])
     y = numpy.linspace(-Ly,Ly,shape[2])
-    X,Y = numpy.meshgrid(x,y)
     X,Y = numpy.meshgrid(x,y)
     if gif:
         gifDataRange = range(0,len(data),gmod)

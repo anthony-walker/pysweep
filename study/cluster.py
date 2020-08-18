@@ -4,14 +4,59 @@ import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib import cm
 from matplotlib import tri
+from mpl_toolkits import mplot3d
 
 #Global data
 standardSizes = numpy.asarray([160, 320, 480, 640, 800, 960, 1120])
 blockSizes = numpy.asarray([8,12,16,24,32])
 shares = numpy.arange(0,1.1,0.1)
 
-def makeValidateContours():
-    tsteps = 100
+def validateHeat():
+    npx = 48
+    times = [0,100,350]
+    #Numerical stuff
+    d = 0.1
+    dx = 10/(320-1)
+    alpha = 1
+    dt = float(d*dx**2/alpha)
+    
+    #Plotting
+    elev=45
+    azim=25
+    fig =  plt.figure()
+    axes = [fig.add_subplot(2, 3, i+1) for i in range(6)]
+    fig.subplots_adjust(wspace=0.55,hspace=0.45,right=0.8)
+    cbounds=numpy.linspace(-1,1,11)
+    cbar_ax = fig.add_axes([0.85, 0.11, 0.05, 0.77])
+    ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
+    cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
+    cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
+    tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
+    cbar.locator = tick_locator
+    cbar.update_ticks()
+    cbar_ax.set_title('T(x,y,t)',y=1.01)
+    for i,ax in enumerate(axes[:3]):
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.yaxis.labelpad=-1
+        ax.set_title('Analytical,\n$t={:0.4f}$'.format(times[i]*dt))
+        data = numpy.zeros((1,1,npx,npx))
+        data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t=times[i]*dt,alpha=alpha)
+        validate.heatContourAx(ax,data[0,0],1,1)
+
+    # with h5py.File("./data/heatOutputSwept.hdf5","r") as f:
+    #     data = f['data']
+    #     for i,ax in enumerate(axes[3:]):
+    #         ax.set_xlabel("X")
+    #         ax.set_ylabel("Y")
+    #         ax.yaxis.labelpad=-1
+    #         ax.set_title('Numerical,\n$t={:0.4f}$'.format(times[i]*dt))
+    #         validate.heatContourAx(ax,data[times[i],0],1,1)
+
+    plt.savefig("./plots/heatValidate.pdf")
+    plt.close()
+
+def validateEuler():
     npx = 48
     times = [0,259,499]
     #Euler stuf
@@ -19,33 +64,43 @@ def makeValidateContours():
     gamma = 1.4
     dx = 10/(640-1)
     dt = d*dx
-
-    for k,t in enumerate(times):
-        #Numerical vortex
-        with h5py.File("./data/eulerOutputSwept.hdf5","r") as f:
-            data = f['data']
-            validate.createContourf(data[:,0,:,:],0,5,5,1,filename="./figures/numericalVortex{}.pdf".format(k),LZn=0.4)
-
-        #Analytical Vortex
+    
+    #Plotting
+    elev=45
+    azim=25
+    fig =  plt.figure()
+    axes = [fig.add_subplot(2, 3, i+1) for i in range(6)]
+    fig.subplots_adjust(wspace=0.55,hspace=0.45,right=0.8)
+    cbounds=numpy.linspace(0.4,1,11)
+    cbar_ax = fig.add_axes([0.85, 0.11, 0.05, 0.77])
+    ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
+    cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
+    cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
+    tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
+    cbar.locator = tick_locator
+    cbar.update_ticks()
+    cbar_ax.set_title('$\\rho(x,y,t)$',y=1.01)
+    for i,ax in enumerate(axes[:3]):
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.yaxis.labelpad=-1
+        ax.set_title('A:$t={:0.4f}$'.format(times[i]*dt))
         data = numpy.zeros((1,4,npx,npx))
-        data[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t)
-        validate.createContourf(data[:,0,:,:],0,5,5,1,filename="./figuresanalyticalVortex{}.pdf".format(k),LZn=0.4)
+        data[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=times[i]*dt)
+        validate.eulerContourAx(ax,data[0,0],1,1)
 
-    # #Heat stuff
-    # alpha = 1
-    # dt = float(d*dx**2/alpha)
-    # for k,t in enumerate(times):
-    #     #Analytical Heat Surface
-    #     data = numpy.zeros((1,1,npx,npx))
-    #     data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,alpha=alpha)
-    #     validate.createSurface(data[:,0,:,:],0,1,1,1,filename="analyticalHeatSurface{}.pdf".format(k))
-
-    #     #Numerical Heat Surface
-    #     with h5py.File("./data/heatOutput.hdf5","r") as f:
+    # with h5py.File("./data/heatOutputSwept.hdf5","r") as f:
     #         data = f['data']
-    #         validate.createSurface(data[:,0,:,:],0,1,1,1,filename="numericalHeatSurface{}.pdf".format(k))
+    #     for i,ax in enumerate(axes[3:]):
+    #         ax.set_xlabel("X")
+    #         ax.set_ylabel("Y")
+    #         ax.yaxis.labelpad=-1
+    #         ax.set_title('N:$t={:0.4f}$'.format(times[i]*dt))
+    #         validate.eulerContourAx(ax,data[times[i],0],1,1)
 
-
+    plt.savefig("./plots/eulerValidate.pdf")
+    plt.close()
+        
 def generateArraySizes():
     """Use this function to generate array sizes based on block sizes."""
     blocksizes = [8, 12, 16, 24, 32] #blocksizes with most options
@@ -87,7 +142,6 @@ def getYamlData(file,equation):
     return sortedData,standardSizes
 
 def getContourData(data,arraysize,uBlocks,uShares):
-    
     triang = tri.Triangulation(uBlocks, uShares)
     interpolator = tri.LinearTriInterpolator(triang, data)
     S,B = numpy.meshgrid(shares,blockSizes)
@@ -143,16 +197,16 @@ def getStudyContour(file,equation,appendStr=""):
     sweptdata = data[data.shape[0]//2:,:]
     speedup = standarddata[:,4]/sweptdata[:,4]
     #Make contour
-    makeArrayContours(speedup,sweptdata[:,2],sweptdata[:,3],numpy.arange(0.8,1.25,0.1),cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+appendStr),switch=True)
+    makeArrayContours(speedup,sweptdata[:,2],sweptdata[:,3],numpy.arange(0.8,1.6,0.1),cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+appendStr),switch=True)
     makeArrayContours(sweptdata[:,4],sweptdata[:,2],sweptdata[:,3],numpy.arange(0,400,100),cm.inferno_r,'Clocktime [s]',"./plots/clockTimeSwept{}.pdf".format(equation+appendStr))
     makeArrayContours(standarddata[:,4],standarddata[:,2],standarddata[:,3],numpy.arange(0,400,100),cm.inferno_r,'Clocktime [s]',"./plots/clockTimeStandard{}.pdf".format(equation+appendStr))
     makeArrayContours(sweptdata[:,5],sweptdata[:,2],sweptdata[:,3],numpy.arange(0,0.7,0.1),cm.inferno_r,'Time/Step',"./plots/timePerStepSwept{}.pdf".format(equation+appendStr))
     makeArrayContours(standarddata[:,5],standarddata[:,2],standarddata[:,3],numpy.arange(0,0.7,0.1),cm.inferno_r,'Time/Step',"./plots/timePerStepStandard{}.pdf".format(equation+appendStr))
-
+    return sweptdata
 
 if __name__ == "__main__":
-    getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
-    # getStudyContour("./newHardware/log.yaml",'heat',appendStr="Old")
-    # getStudyContour("./oldHardware/log.yaml",'euler',appendStr="Old")
-    # getStudyContour("./newHardware/log.yaml",'euler',appendStr="Old")
-    # makeValidateContours()
+    sweptOld = getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
+    sweptNew = getStudyContour("./newHardware/log.yaml",'heat',appendStr="New")
+    makeArrayContours(sweptOld[:,4]/sweptNew[:,4],sweptNew[:,2],sweptNew[:,3],numpy.arange(0.75,1.01,0.05),cm.inferno,'Speedup',"./plots/hardwareSpeedupHeat.pdf")
+    validateHeat()
+    validateEuler()
