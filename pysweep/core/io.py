@@ -12,14 +12,19 @@ def updateLogFile(solver,clocktime):
     if os.path.isfile('log.yaml'):
         with open('log.yaml','r') as f:
             previous = yaml.load(f,Loader=yaml.FullLoader)
-        new = generateYamlEntry(solver,clocktime)
+        new = getShortEntry(solver,clocktime)
         previous.update(new)
         with open('log.yaml','w') as f:
             yaml.dump(previous,f)
     else:
         with open('log.yaml','w') as f:
-            entry = generateYamlEntry(solver,clocktime)
+            entry = getShortEntry(solver,clocktime)
             yaml.dump(entry,f)
+
+def getShortEntry(obj,clocktime):
+    """Use this function for a condensed yaml entry."""
+    rundata = {"runtime":clocktime,"swept":obj.simulation,"blocksize":int(obj.blocksize[0]),"share":float(obj.share),"cpu":obj.cpuStr,"array_shape":list(obj.arrayShape),"time_per_step":float(clocktime/(obj.arrayShape[0]-1))}
+    return {datetime.now().strftime("%m/%d/%Y-%H:%M:%S"):rundata}
 
 def generateYamlEntry(obj,clocktime):
     """Use this function to generate a yaml entry."""
