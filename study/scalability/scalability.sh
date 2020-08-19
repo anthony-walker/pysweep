@@ -29,8 +29,8 @@
 #run me with sbatch --nodes=N scalability.sh
 echo $SLURM_JOB_ID
 
-export SCALE_NPROC = $PYSWEEP_NODES*32
-export SCALE_ARR = $PYSWEEP_NODES*960
+SCALE_NPROC=$(($PYSWEEP_NODES*32))
+SCALE_ARR=$(($PYSWEEP_NODES*960))
 
 echo $SCALE_NPROC $SCALE_ARR
 
