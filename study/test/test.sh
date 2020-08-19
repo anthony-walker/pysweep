@@ -6,7 +6,7 @@
 
 #SBATCH -A niemeyek 
 
-#SBATCH -p sharegpu
+#SBATCH -p preempt
 
 #SBATCH --gres=gpu:1
 
