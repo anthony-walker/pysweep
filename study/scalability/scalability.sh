@@ -20,7 +20,6 @@
 
 #SBATCH --mail-user=walkanth@oregonstate.edu		# send email to this address
 
-#SBATCH -F ./hosts/$PYSWEEP_FILE
 # load any software environment module required for app
 
 # run my jobs
