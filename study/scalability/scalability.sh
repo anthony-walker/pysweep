@@ -34,10 +34,7 @@ SCALE_ARR=$(($PYSWEEP_NODES*960))
 
 echo $SCALE_NPROC $SCALE_ARR
 
-mpiexec -n $SCALE_NPROC --hostfile ./scale-nodes  pysweep -f euler -nx $SCALE_ARR -nt 1000 -b 16 -s 0.8 --swept --verbose --ignore --clean
+mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.8 --swept --verbose --ignore --clean
 
-mpiexec -n $SCALE_NPROC --hostfile ./scale-nodes  pysweep -f euler -nx $SCALE_ARR -nt 1000 -b 16 -s 0.8 --verbose --ignore --clean
+mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.8 --verbose --ignore --clean
 
-mpiexec -n $SCALE_NPROC --hostfile ./scale-nodes  pysweep -f heat -nx $SCALE_ARR -nt 1000 -b 16 -s 0.8 --swept --verbose --ignore --clean
-
-mpiexec -n $SCALE_NPROC --hostfile ./scale-nodes  pysweep -f heat -nx $SCALE_ARR -nt 1000 -b 16 -s 0.8 --verbose --ignore --clean
