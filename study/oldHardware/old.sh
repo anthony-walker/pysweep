@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#SBATCH -J gtxSweepOne						# name of job
-
 #SBATCH --get-user-env                      #Use user env
 
 #SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
@@ -36,17 +34,10 @@ echo $SLURM_JOB_ID
 
 export RANKS_PER_NODE=1
 
-for bs in 8 12 16 24 32
+for nx in 160 320 480 640 800 960 1120
 do
-    for gs in $(seq 0 0.10 1)
-    do
-        for nx in 160 320 480 640 800 960 1120
-        do
-                mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $nx -nt 500 -b $bs -s $gs --swept --verbose --ignore --clean
+        mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $nx -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE  --swept --verbose --ignore --clean
 
-                mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $nx -nt 500 -b $bs -s $gs --verbose --ignore --clean
-        done
-    done
+        mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $nx -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE  --verbose --ignore --clean
 done
 
-mpiexec -n 2 --hostfile ./old-nodes nvidia-smi --list-gpus
