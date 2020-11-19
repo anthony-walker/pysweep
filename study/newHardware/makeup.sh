@@ -16,7 +16,7 @@
 
 #SBATCH --cpus-per-task=16
 
-#SBATCH --time=2-00:00:00
+#SBATCH --time=1-00:00:00
 
 #SBATCH -o dgxsSweepOne.out					# name of output file for this submission script
 
