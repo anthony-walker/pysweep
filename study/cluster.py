@@ -107,7 +107,7 @@ def generateArraySizes():
     arraystart = 0
     divisible =[False,False]
     arraysizes = []
-    for i in range(5):
+    for i in range(7):
         arraystart += 32*20
         while not numpy.all(divisible):
             arraystart+=blocksizes[-1]
