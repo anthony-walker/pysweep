@@ -4,11 +4,11 @@
 
 #SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
 
-#SBATCH -p dgxs								# name of partition or queue
+#SBATCH -p preempt
 
 #SBATCH --gres=gpu:1
 
-#SBATCH -F ./new-nodes
+#SBATCH -F ./old-nodes
 
 #SBATCH -N 2
 
@@ -18,9 +18,9 @@
 
 #SBATCH --time=2-00:00:00
 
-#SBATCH -o dgxsSweepOne.out					# name of output file for this submission script
+#SBATCH -o gtxSweepOne.out					# name of output file for this submission script
 
-#SBATCH -e dgxsSweepOne.err					# name of error file for this submission script
+#SBATCH -e gtxSweepOne.err					# name of error file for this submission script
 
 #SBATCH --mail-type=BEGIN,END,FAIL				# send email when job begins, ends or aborts
 
@@ -34,4 +34,4 @@ echo $SLURM_JOB_ID
 
 export RANKS_PER_NODE=1
 
-mpiexec -n 32 --hostfile ./new-nodes pysweep -f $PYSWEEP_EQN -nx $PYSWEEP_ARRSIZE -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE --swept --verbose --ignore --clean
+mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $PYSWEEP_ARRSIZE -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE --swept --verbose --ignore --clean

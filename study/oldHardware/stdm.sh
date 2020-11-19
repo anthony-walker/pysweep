@@ -34,4 +34,4 @@ echo $SLURM_JOB_ID
 
 export RANKS_PER_NODE=1
 
-mpiexec -n 32 --hostfile ./new-nodes pysweep -f $PYSWEEP_EQN -nx $PYSWEEP_ARRSIZE -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE --verbose --ignore --clean
+mpiexec -n 32 --hostfile ./old-nodes pysweep -f $PYSWEEP_EQN -nx $PYSWEEP_ARRSIZE -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE --verbose --ignore --clean
