@@ -39,7 +39,7 @@ do
         export PYSWEEP_SHARE=$2
         export PYSWEEP_BLOCK=$1
         export PYSWEEP_ARRSIZE=$nx
-        sbatch -J "oldSw"$PYSWEEP_EQN$bs$gs sweptm.sh
-        sbatch -J "oldSt"$PYSWEEP_EQN$bs$gs stdm.sh
+        sbatch -J "oldSw"$PYSWEEP_EQN$1$2 sweptm.sh
+        sbatch -J "oldSt"$PYSWEEP_EQN$1$2 stdm.sh
     done 
 done
