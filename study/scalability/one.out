@@ -1,0 +1,36 @@
+123186
+32 960
+
+Pysweep simulation properties:
+	simulation type: swept
+	number of processes: 32
+	gpu source: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.cu
+	cpu source: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+	output file: eulerOutput.hdf5
+	verbose: False
+	Array shape: (4, 960, 960)
+	dtype: float64
+	share: 0.8
+	blocksize: 16
+	stencil size: 5
+	intermediate time steps: 2
+	time data (t0,tf,dt): (0,0.5213764337851929,0.0010427528675703858)
+	globals: [0,0.5213764337851929,0.0010427528675703858,0.010427528675703858,0.010427528675703858,1.4]
+
+
+Pysweep simulation properties:
+	simulation type: standard
+	number of processes: 32
+	gpu source: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.cu
+	cpu source: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+	output file: eulerOutput.hdf5
+	verbose: False
+	Array shape: (4, 960, 960)
+	dtype: float64
+	share: 0.8
+	blocksize: 16
+	stencil size: 5
+	intermediate time steps: 2
+	time data (t0,tf,dt): (0,0.5213764337851929,0.0010427528675703858)
+	globals: [0,0.5213764337851929,0.0010427528675703858,0.010427528675703858,0.010427528675703858,1.4]
+
