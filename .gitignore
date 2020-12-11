@@ -1,6 +1,6 @@
 #Dont Track These
 former/
-log.yaml
+*.pdf
 *.pyc
 *__pycache__/
 *.m

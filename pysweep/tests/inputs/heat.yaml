@@ -1,0 +1,25 @@
+  swept: True
+
+  filename: "heat.hdf5"
+
+  verbose: False
+
+  blocksize: 8
+
+  share: 1
+  dtype: float64
+
+  globals:
+    - 0
+    - 0.5
+    - 0.00001
+    - 0.0026041666666666665
+    - 0.0026041666666666665
+    - 0.00016563
+    - True
+
+  intermediate_steps: 1
+  operating_points: 1
+
+  cpu: ./pysweep-git/pysweep/equations/heat.py
+  gpu: ./pysweep-git/pysweep/equations/heat.cu

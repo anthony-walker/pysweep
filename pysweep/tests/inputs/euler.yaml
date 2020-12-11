@@ -1,0 +1,24 @@
+  swept: True
+
+  filename: "euler.hdf5"
+
+  verbose: False
+
+  blocksize: 8
+
+  share: 1
+  dtype: float64
+
+  globals:
+    - 0
+    - 0.5
+    - 0.00001
+    - 0.0026041666666666665
+    - 0.0026041666666666665
+    - 1.4
+
+  intermediate_steps: 2
+  operating_points: 2
+
+  cpu: ./pysweep-git/pysweep/equations/euler.py
+  gpu: ./pysweep-git/pysweep/equations/euler.cu

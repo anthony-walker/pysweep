@@ -135,6 +135,7 @@ def getYamlData(file,equation):
             data[i,4] = float(yamlFile[key]['runtime'])
             data[i,5] = float(yamlFile[key]['time_per_step'])
     data = numpy.array(data,)
+    data = numpy.unique(data,axis=0)
     indexes = numpy.lexsort((data[:,1],data[:,0]))
     sortedData = numpy.zeros(data.shape)
     for i,idx in enumerate(indexes):
@@ -202,22 +203,25 @@ def getStudyContour(file,equation,appendStr=""):
     standarddata = data[:data.shape[0]//2,:]
     sweptdata = data[data.shape[0]//2:,:]
     speedup = standarddata[:,4]/sweptdata[:,4]
-    print(numpy.mean(speedup))
+    # print(numpy.mean(speedup))
     #Make contour
     makeArrayContours(speedup,sweptdata[:,2],sweptdata[:,3],numpy.arange(0.8,1.6,0.1),cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+appendStr),switch=True)
     makeArrayContours(sweptdata[:,4],sweptdata[:,2],sweptdata[:,3],numpy.arange(0,400,100),cm.inferno_r,'Clocktime [s]',"./plots/clockTimeSwept{}.pdf".format(equation+appendStr))
     makeArrayContours(standarddata[:,4],standarddata[:,2],standarddata[:,3],numpy.arange(0,400,100),cm.inferno_r,'Clocktime [s]',"./plots/clockTimeStandard{}.pdf".format(equation+appendStr))
-    makeArrayContours(sweptdata[:,5],sweptdata[:,2],sweptdata[:,3],numpy.arange(0,0.7,0.1),cm.inferno_r,'Time/Step',"./plots/timePerStepSwept{}.pdf".format(equation+appendStr))
-    makeArrayContours(standarddata[:,5],standarddata[:,2],standarddata[:,3],numpy.arange(0,0.7,0.1),cm.inferno_r,'Time/Step',"./plots/timePerStepStandard{}.pdf".format(equation+appendStr))
+    makeArrayContours(sweptdata[:,5],sweptdata[:,2],sweptdata[:,3],numpy.arange(0,0.7,0.1),cm.inferno_r,'Time/Step [s]',"./plots/timePerStepSwept{}.pdf".format(equation+appendStr))
+    makeArrayContours(standarddata[:,5],standarddata[:,2],standarddata[:,3],numpy.arange(0,0.7,0.1),cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+appendStr))
     return sweptdata
+
 
 if __name__ == "__main__":
     print(generateArraySizes())
-    # sweptOld = getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
-    # sweptNew = getStudyContour("./newHardware/log.yaml",'heat',appendStr="New")
-    # speedup=sweptOld[:,4]/sweptNew[:,4]
-    # print(numpy.mean(speedup))
-    # makeArrayContours(speedup,sweptNew[:,2],sweptNew[:,3],numpy.arange(0.75,1.01,0.05),cm.inferno,'Speedup',"./plots/hardwareSpeedupHeat.pdf",switch=True)
+    # sweptOldHeat = getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
+    # sweptNewHeat = getStudyContour("./newHardware/log.yaml",'heat',appendStr="New")
+    sweptOldEuler = getStudyContour("./oldHardware/log.yaml",'heat',appendStr="Old")
+    # sweptNewEuler = getStudyContour("./newHardware/log.yaml",'euler',appendStr="New")
+    # speedupHeat=sweptOldHeat[:,4]/sweptNewHeat[:,4]
+    # print(numpy.mean(speedupHeat))
+    # makeArrayContours(speedupHeat,sweptNewHeat[:,2],sweptNewHeat[:,3],numpy.arange(0.75,1.01,0.05),cm.inferno,'Speedup',"./plots/hardwareSpeedupHeat.pdf",switch=True)
 
     # validateHeat()
     # validateEuler()

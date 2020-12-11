@@ -1,0 +1,25 @@
+  swept: True
+
+  filename: "checker.hdf5"
+
+  verbose: True
+
+  blocksize: 32
+
+  share: 0.5
+
+  dtype: float64
+
+  globals:
+    - 0
+    - 10
+    - 0.1
+    - 0.1
+    - 0.1
+    - True
+
+  intermediate_steps: 1
+  operating_points: 1
+
+  cpu: ./pysweep-git/pysweep/equations/checker.py
+  gpu: ./pysweep-git/pysweep/equations/checker.cu
