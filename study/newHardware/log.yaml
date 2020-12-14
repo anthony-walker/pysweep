@@ -32794,3 +32794,15 @@
   share: 0.3
   swept: false
   time_per_step: 34.61276109218598
+12/14/2020-08:41:09:
+  array_shape:
+  - 501
+  - 4
+  - 1128
+  - 1128
+  blocksize: 24
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 26613.342211008072
+  share: 0.0
+  swept: true
+  time_per_step: 53.22668442201614
