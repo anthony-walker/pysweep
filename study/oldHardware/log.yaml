@@ -34312,3 +34312,51 @@
   share: 0.20212765957446807
   swept: false
   time_per_step: 36.37351881599426
+12/17/2020-20:17:26:
+  array_shape:
+  - 501
+  - 4
+  - 1120
+  - 1120
+  blocksize: 8
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 22161.357928276062
+  share: 0.0
+  swept: false
+  time_per_step: 44.32271585655212
+12/17/2020-22:09:06:
+  array_shape:
+  - 501
+  - 4
+  - 960
+  - 960
+  blocksize: 24
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 6680.660382032394
+  share: 0.6
+  swept: false
+  time_per_step: 13.36132076406479
+12/18/2020-00:45:09:
+  array_shape:
+  - 501
+  - 4
+  - 1128
+  - 1128
+  blocksize: 24
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 9339.965020418167
+  share: 0.6170212765957447
+  swept: true
+  time_per_step: 18.679930040836336
+12/18/2020-03:15:19:
+  array_shape:
+  - 501
+  - 4
+  - 1128
+  - 1128
+  blocksize: 24
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 8980.185449361801
+  share: 0.6170212765957447
+  swept: false
+  time_per_step: 17.960370898723603
