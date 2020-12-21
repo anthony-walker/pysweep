@@ -38,75 +38,18 @@ def calcNumberOfPts():
 # print(shares.shape,blockSizes.shape,standardSizes.shape)
 
 def validateHeat():
-    
-    times = [0,100,350]
-
     #Plotting
     elev=45
     azim=25
     fig =  plt.figure()
-    axes = [fig.add_subplot(2, 3, i+1) for i in range(6)]
-    fig.subplots_adjust(wspace=0.55,hspace=0.45,right=0.8)
-    cbounds=numpy.linspace(-1,1,11)
-    cbar_ax = fig.add_axes([0.85, 0.11, 0.05, 0.77])
-    ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
-    cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
-    cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
-    tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
-    cbar.locator = tick_locator
-    cbar.update_ticks()
-    cbar_ax.set_title('T(x,y,t)',y=1.01)
-
-    #Numerical
-    with h5py.File("./data/heatOutput.hdf5","r") as f:
-        data = f['data']
-        #Numerical stuff
-        d = 0.1
-        dx = 1/(numpy.shape(data)[2]-1)
-        alpha = 1
-        dt = float(d*dx**2/alpha)
-        for i,ax in enumerate(axes[3:]):
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.yaxis.labelpad=-1
-            ax.set_title('Numerical,\n$t={:0.4f}$'.format(times[i]*dt))
-            validate.heatContourAx(ax,data[times[i],0],1,1)
-    
-    #Analytical
-    npx = 48
-    
-    for i,ax in enumerate(axes[:3]):
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.yaxis.labelpad=-1
-        ax.set_title('Analytical,\n$t={:0.4f}$'.format(times[i]*dt))
-        data = numpy.zeros((1,1,npx,npx))
-        data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t=times[i]*dt,alpha=alpha)
-        validate.heatContourAx(ax,data[0,0],1,1)
-
-    
-    
-    
-    plt.savefig("./plots/heatValidate.pdf")
-    plt.close()
-
-def validateEuler():
-    npx = 48
-    times = [0,259,499]
-    #Euler stuf
-    d = 0.1
-    gamma = 1.4
-    dx = 10/(640-1)
-    dt = d*dx
-    
-    #Plotting
-    elev=45
-    azim=25
-    fig =  plt.figure()
-    axes = [fig.add_subplot(2, 3, i+1) for i in range(6)]
-    fig.subplots_adjust(wspace=0.55,hspace=0.45,right=0.8)
-    cbounds=numpy.linspace(0.4,1,11)
-    cbar_ax = fig.add_axes([0.85, 0.11, 0.05, 0.77])
+    nrows = 2
+    ncols = 3
+    axes = [fig.add_subplot(nrows, ncols, i+1) for i in range(nrows*ncols)]
+    fig.subplots_adjust(wspace=0.75,hspace=0.8,right=0.8)
+    #Physical Colorbar
+    cbounds=numpy.linspace(0.4,1,6)
+    # cbar_ax = fig.add_axes([0.89, 0.39, 0.05, 0.51]) #left bottom width height
+    cbar_ax = fig.add_axes([0.89, 0.11, 0.05, 0.76]) #left bottom width height
     ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
     cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
     cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
@@ -114,24 +57,127 @@ def validateEuler():
     cbar.locator = tick_locator
     cbar.update_ticks()
     cbar_ax.set_title('$\\rho(x,y,t)$',y=1.01)
-    for i,ax in enumerate(axes[:3]):
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.yaxis.labelpad=-1
-        ax.set_title('A:$t={:0.4f}$'.format(times[i]*dt))
-        data = numpy.zeros((1,4,npx,npx))
-        data[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=times[i]*dt)
-        validate.eulerContourAx(ax,data[0,0],1,1)
+    #Error Colorbar
+    # cbounds=numpy.linspace(0,1e-15,3)
+    # cbar_ax = fig.add_axes([0.87, 0.07, 0.05, 0.25])
+    # ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
+    # cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.Reds),cax=cbar_ax,boundaries=ibounds)
+    # cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
+    # tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
+    # cbar.locator = tick_locator
+    # cbar.update_ticks()
+    # cbar_ax.set_title('Error',y=1.01)
+    #Opening Results File
+    with h5py.File("./data/heatOutput.hdf5","r") as f:
+        data = f['data']
+        times = [0,] #Times to plot
+        times.append(numpy.shape(data)[0]//2)
+        times.append(numpy.shape(data)[0]-1)
+        #Numerical stuff
+        d = 0.1
+        dx = 1/(numpy.shape(data)[2]-1)
+        alpha = 1
+        dt = float(d*dx**2/alpha)
+        for i,ax in enumerate(axes[3:6]):
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.yaxis.labelpad=-1
+            ax.set_title('N:$t={:0.2e}$'.format(times[i]*dt))
+            validate.heatContourAx(ax,data[times[i],0],1,1)
+        #Analytical
+        npx = numpy.shape(data)[2]
+        for i,ax in enumerate(axes[:3]):
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.yaxis.labelpad=-1
+            ax.set_title('A:$t={:0.2e}$'.format(times[i]*dt))
+            adata = numpy.zeros((1,1,npx,npx))
+            adata[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t=(times[i])*dt,alpha=alpha)
+            validate.heatContourAx(ax,adata[0,0],1,1)
+        # #Error
+        # for i,ax in enumerate(axes[6:]):
+        #     ax.set_xlabel("X")
+        #     ax.set_ylabel("Y")
+        #     ax.yaxis.labelpad=-1
+        #     ax.set_title('E:$t={:0.2e}$'.format(times[i]*dt))
+        #     l = numpy.linspace(0,1,npx)
+        #     X,Y = numpy.meshgrid(l,l)
+        #     Error = numpy.absolute(adata[0,0]-data[times[i],0])
+        #     print(numpy.amax(Error))
+        #     ax.contourf(X,Y,Error,cmap=cm.Reds)
 
-    # with h5py.File("./data/eulerOutputSwept.hdf5","r") as f:
-    #     data = f['data']
-    #     for i,ax in enumerate(axes[3:]):
-    #         ax.set_xlabel("X")
-    #         ax.set_ylabel("Y")
-    #         ax.yaxis.labelpad=-1
-    #         ax.set_title('N:$t={:0.4f}$'.format(times[i]*dt))
-    #         validate.eulerContourAx(ax,data[times[i],0],1,1)
+    plt.savefig("./plots/heatValidate.pdf")
+    plt.close()
 
+def validateEuler(): 
+    #Plotting
+    elev=45
+    azim=25
+    fig =  plt.figure()
+    nrows = 2
+    ncols = 3
+    axes = [fig.add_subplot(nrows, ncols, i+1) for i in range(nrows*ncols)]
+    fig.subplots_adjust(wspace=0.75,hspace=0.8,right=0.8)
+    #Physical Colorbar
+    cbounds=numpy.linspace(0.4,1,6)
+    # cbar_ax = fig.add_axes([0.89, 0.39, 0.05, 0.51]) #left bottom width height
+    cbar_ax = fig.add_axes([0.89, 0.11, 0.05, 0.76]) #left bottom width height
+    ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
+    cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
+    cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
+    tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
+    cbar.locator = tick_locator
+    cbar.update_ticks()
+    cbar_ax.set_title('$\\rho(x,y,t)$',y=1.01)
+    # #Error Colorbar
+    # cbounds=numpy.linspace(0,0.4,3)
+    # cbar_ax = fig.add_axes([0.89, 0.07, 0.05, 0.25])
+    # ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
+    # cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.Reds),cax=cbar_ax,boundaries=ibounds)
+    # cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
+    # tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
+    # cbar.locator = tick_locator
+    # cbar.update_ticks()
+    # cbar_ax.set_title('Error',y=1.01)
+    #Open Result file
+    with h5py.File("./data/eulerOutput.hdf5","r") as f:
+        data = f['data']
+        times = [0,] #Times to plot
+        times.append(numpy.shape(data)[0]//2)
+        times.append(numpy.shape(data)[0]-1)
+        #Euler stuff
+        d = 0.1
+        gamma = 1.4
+        dx = 10/(640-1)
+        dt = d*dx
+        #Numerical
+        for i,ax in enumerate(axes[3:6]):
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.yaxis.labelpad=-1
+            ax.set_title('N:$t={:0.2e}$'.format(times[i]*dt))
+            validate.eulerContourAx(ax,data[times[i],0],1,1)
+        #Analytical
+        npx = numpy.shape(data)[2]
+        for i,ax in enumerate(axes[:3]):
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.yaxis.labelpad=-1
+            ax.set_title('A:$t={:0.2e}$'.format(times[i]*dt))
+            adata = numpy.zeros((1,4,npx,npx))
+            adata[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=(times[i])*dt)
+            validate.eulerContourAx(ax,adata[0,0],1,1)
+        # #Error
+        # for i,ax in enumerate(axes[6:]):
+        #     ax.set_xlabel("X")
+        #     ax.set_ylabel("Y")
+        #     ax.yaxis.labelpad=-1
+        #     ax.set_title('E:$t={:0.2e}$'.format(times[i]*dt))
+        #     l = numpy.linspace(0,1,npx)
+        #     X,Y = numpy.meshgrid(l,l)
+        #     Error = numpy.absolute(adata[0,0]-data[times[i],0])
+        #     # print(numpy.amax(Error))
+        #     ax.contourf(X,Y,Error,cmap=cm.Reds)
     plt.savefig("./plots/eulerValidate.pdf")
     plt.close()
         
@@ -326,12 +372,12 @@ if __name__ == "__main__":
     calcNumberOfPts()
     
     # Produce contour plots
-    # sweptEuler = getStudyContour('heat')
-    # sweptEuler = getStudyContour('euler')
+    sweptEuler = getStudyContour('heat')
+    sweptEuler = getStudyContour('euler')
 
-    #Scalability
-    # ScalabilityPlots()
+    # Scalability
+    ScalabilityPlots()
 
     # Produce physical plots
     validateHeat()
-    # validateEuler()
+    validateEuler()
