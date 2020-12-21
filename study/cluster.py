@@ -107,7 +107,7 @@ def validateHeat():
         #     ax.contourf(X,Y,Error,cmap=cm.Reds)
 
     plt.savefig("./plots/heatValidate.pdf")
-    plt.close()
+    plt.close('all')
 
 def validateEuler(): 
     #Plotting
@@ -179,7 +179,7 @@ def validateEuler():
         #     # print(numpy.amax(Error))
         #     ax.contourf(X,Y,Error,cmap=cm.Reds)
     plt.savefig("./plots/eulerValidate.pdf")
-    plt.close()
+    plt.close('all')
         
 def generateArraySizes():
     """Use this function to generate array sizes based on block sizes."""
@@ -297,6 +297,7 @@ def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,p
         axes[i-1].yaxis.labelpad = 0.5
         axes[i-1].xaxis.labelpad = 0.5
     plt.savefig(fname)
+    plt.close('all')
 
 def getContourYamlData(file,equation):
     data,standardSizes = getYamlData(file,equation)
@@ -336,6 +337,14 @@ def getStudyContour(equation):
     makeArrayContours(newsweptdata[:,5],newsweptdata[:,2],newsweptdata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepSwept{}.pdf".format(equation+"New"))
     makeArrayContours(oldstandarddata[:,5],oldstandarddata[:,2],oldstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"Old"))
     makeArrayContours(newstandarddata[:,5],newstandarddata[:,2],newstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"New"))
+
+    #Hardware Speedup
+    hardwareSpeedUp = newsweptdata[:,5]/oldsweptdata[:,5]
+    speedLimits = getDataLimits([hardwareSpeedUp,])
+    if equation == "heat":
+        speedLimits = numpy.linspace(1,2,11)
+    makeArrayContours(hardwareSpeedUp,oldsweptdata[:,2],oldsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/hardwareSpeedUp{}.pdf".format(equation),switch=True)
+    
     #3D plot
     # ThreeDimPlot(oldsweptdata[:,2],100*oldsweptdata[:,3],oldspeedup,speedLimits)
     return oldsweptdata,newsweptdata
@@ -349,8 +358,7 @@ def ThreeDimPlot(x,y,z,lims):
     ax.set_yticks([0,25,50,75,100])
     ax.set_zlim([lims[0],lims[-1]])
     ax.yaxis.labelpad = 0.5
-    ax.xaxis.labelpad = 0.5
-    plt.savefig("./plots/weakScalability.pdf")
+    ax.xaxis.labelpad = 0.5  
     # plt.show()
 
 def ScalabilityPlots():
@@ -366,7 +374,9 @@ def ScalabilityPlots():
     l1 = ax.plot(sweptdata[:,1],sweptdata[:,4],marker="o",color='b')
     l2 = ax.plot(standarddata[:,1],standarddata[:,4],marker="o",color="r")
     ax.legend(["Swept","Standard"])
-    plt.show()
+    plt.savefig("./plots/weakScalability.pdf")
+    plt.close('all')
+    # plt.show()
 
 if __name__ == "__main__":
     calcNumberOfPts()
