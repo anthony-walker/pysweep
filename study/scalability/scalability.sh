@@ -32,7 +32,7 @@ SCALE_ARR=$(($PYSWEEP_NODES*960))
 
 echo $SCALE_NPROC $SCALE_ARR
 
-mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.8 --swept --verbose --ignore --clean
+mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 32 -s 1 --swept --verbose --ignore --clean
 
-mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.8 --verbose --ignore --clean
+mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 32 -s 1 --verbose --ignore --clean
 
