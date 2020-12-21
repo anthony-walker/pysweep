@@ -38,14 +38,9 @@ def calcNumberOfPts():
 # print(shares.shape,blockSizes.shape,standardSizes.shape)
 
 def validateHeat():
-    npx = 48
-    times = [0,100,350]
-    #Numerical stuff
-    d = 0.1
-    dx = 10/(320-1)
-    alpha = 1
-    dt = float(d*dx**2/alpha)
     
+    times = [0,100,350]
+
     #Plotting
     elev=45
     azim=25
@@ -61,6 +56,25 @@ def validateHeat():
     cbar.locator = tick_locator
     cbar.update_ticks()
     cbar_ax.set_title('T(x,y,t)',y=1.01)
+
+    #Numerical
+    with h5py.File("./data/heatOutput.hdf5","r") as f:
+        data = f['data']
+        #Numerical stuff
+        d = 0.1
+        dx = 1/(numpy.shape(data)[2]-1)
+        alpha = 1
+        dt = float(d*dx**2/alpha)
+        for i,ax in enumerate(axes[3:]):
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.yaxis.labelpad=-1
+            ax.set_title('Numerical,\n$t={:0.4f}$'.format(times[i]*dt))
+            validate.heatContourAx(ax,data[times[i],0],1,1)
+    
+    #Analytical
+    npx = 48
+    
     for i,ax in enumerate(axes[:3]):
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
@@ -70,15 +84,9 @@ def validateHeat():
         data[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t=times[i]*dt,alpha=alpha)
         validate.heatContourAx(ax,data[0,0],1,1)
 
-    with h5py.File("./data/heatOutputSwept.hdf5","r") as f:
-        data = f['data']
-        for i,ax in enumerate(axes[3:]):
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.yaxis.labelpad=-1
-            ax.set_title('Numerical,\n$t={:0.4f}$'.format(times[i]*dt))
-            validate.heatContourAx(ax,data[times[i],0],1,1)
-
+    
+    
+    
     plt.savefig("./plots/heatValidate.pdf")
     plt.close()
 
@@ -325,5 +333,5 @@ if __name__ == "__main__":
     # ScalabilityPlots()
 
     # Produce physical plots
-    # validateHeat()
-    validateEuler()
+    validateHeat()
+    # validateEuler()

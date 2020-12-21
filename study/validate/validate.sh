@@ -34,4 +34,11 @@ echo $SLURM_JOB_ID
 
 export RANKS_PER_NODE=1
 
-mpiexec -n 32 --hostfile ./validate-nodes pysweep -f $PYSWEEP_EQN -nx $PYSWEEP_ARRSIZE -nt 500 -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE --swept --verbose --ignore
+if [ $PYSWEEP_EQN == heat ]
+then
+export NT=2500
+else
+export NT=500
+fi
+
+mpiexec -n 32 --hostfile ./validate-nodes pysweep -f $PYSWEEP_EQN -nx $PYSWEEP_ARRSIZE -nt $NT -b $PYSWEEP_BLOCK -s $PYSWEEP_SHARE --swept --verbose --ignore
