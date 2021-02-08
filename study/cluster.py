@@ -1,5 +1,6 @@
-import numpy, yaml, pysweep, itertools, h5py, math
-import pysweep.utils.validate as validate
+import numpy, yaml, itertools, h5py, math
+# import pysweep.utils.validate as validate
+# import pysweep
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib import cm
@@ -12,7 +13,13 @@ standardSizes = numpy.asarray([160, 320, 480, 640, 800, 960, 1120])
 blockSizes = numpy.asarray([8,12,16,20,24,32])
 shares = numpy.arange(0,1.1,0.1)
 combos = []
-cutoffs = []
+cutoffs = [0,]
+
+def printArray(a):
+    for row in a:
+        for item in row:
+            print("{:8.3f}".format(col), end=" ")
+        print("")
 
 def calcNumberOfPts():
     npts = 0
@@ -57,17 +64,6 @@ def validateHeat():
     cbar.locator = tick_locator
     cbar.update_ticks()
     cbar_ax.set_title('$T(x,y,t)$',y=1.01)
-    #Error Colorbar
-    # cbounds=numpy.linspace(0,1e-15,3)
-    # cbar_ax = fig.add_axes([0.87, 0.07, 0.05, 0.25])
-    # ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
-    # cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.Reds),cax=cbar_ax,boundaries=ibounds)
-    # cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
-    # tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
-    # cbar.locator = tick_locator
-    # cbar.update_ticks()
-    # cbar_ax.set_title('Error',y=1.01)
-    #Opening Results File
     with h5py.File("./data/heatOutput.hdf5","r") as f:
         data = f['data']
         times = [0,] #Times to plot
@@ -94,18 +90,6 @@ def validateHeat():
             adata = numpy.zeros((1,1,npx,npx))
             adata[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t=(times[i])*dt,alpha=alpha)
             validate.heatContourAx(ax,adata[0,0],1,1)
-        # #Error
-        # for i,ax in enumerate(axes[6:]):
-        #     ax.set_xlabel("X")
-        #     ax.set_ylabel("Y")
-        #     ax.yaxis.labelpad=-1
-        #     ax.set_title('E:$t={:0.2e}$'.format(times[i]*dt))
-        #     l = numpy.linspace(0,1,npx)
-        #     X,Y = numpy.meshgrid(l,l)
-        #     Error = numpy.absolute(adata[0,0]-data[times[i],0])
-        #     print(numpy.amax(Error))
-        #     ax.contourf(X,Y,Error,cmap=cm.Reds)
-
     plt.savefig("./plots/heatValidate.pdf")
     plt.close('all')
 
@@ -129,17 +113,6 @@ def validateEuler():
     cbar.locator = tick_locator
     cbar.update_ticks()
     cbar_ax.set_title('$\\rho(x,y,t)$',y=1.01)
-    # #Error Colorbar
-    # cbounds=numpy.linspace(0,0.4,3)
-    # cbar_ax = fig.add_axes([0.89, 0.07, 0.05, 0.25])
-    # ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
-    # cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.Reds),cax=cbar_ax,boundaries=ibounds)
-    # cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
-    # tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
-    # cbar.locator = tick_locator
-    # cbar.update_ticks()
-    # cbar_ax.set_title('Error',y=1.01)
-    #Open Result file
     with h5py.File("./data/eulerOutput.hdf5","r") as f:
         data = f['data']
         times = [0,] #Times to plot
@@ -167,17 +140,6 @@ def validateEuler():
             adata = numpy.zeros((1,4,npx,npx))
             adata[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=(times[i])*dt)
             validate.eulerContourAx(ax,adata[0,0],1,1)
-        # #Error
-        # for i,ax in enumerate(axes[6:]):
-        #     ax.set_xlabel("X")
-        #     ax.set_ylabel("Y")
-        #     ax.yaxis.labelpad=-1
-        #     ax.set_title('E:$t={:0.2e}$'.format(times[i]*dt))
-        #     l = numpy.linspace(0,1,npx)
-        #     X,Y = numpy.meshgrid(l,l)
-        #     Error = numpy.absolute(adata[0,0]-data[times[i],0])
-        #     # print(numpy.amax(Error))
-        #     ax.contourf(X,Y,Error,cmap=cm.Reds)
     plt.savefig("./plots/eulerValidate.pdf")
     plt.close('all')
         
@@ -236,24 +198,6 @@ def getContourData(data,arraysize,uBlocks,uShares):
     Z = interpolator(B, S)
     return B,S,Z
 
-def performancePlot(ax,B,S,Z,minV,maxV,ArrSize,ccm=cm.inferno,markbest=True,markworst=True,mbc=('w','k'),printer=False):
-    ax.contourf(B,S*100,Z,cmap=ccm,vmin=minV,vmax=maxV)
-    
-
-    if markbest:
-        Zmax = numpy.amax(Z)
-        x,y = numpy.where(Z==Zmax)
-        if printer:
-            print(ArrSize,Zmax,x,y)
-        ax.plot(blockSizes[x[0]],shares[y[0]]*100,linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
-
-    if markworst:
-        Zmin = numpy.amin(Z)
-        x,y = numpy.where(Z==Zmin)
-        if printer:
-            print(ArrSize,Zmin,x,y)
-        ax.plot(blockSizes[x[0]],shares[y[0]]*100,linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
-
 def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,printer=False):
     #Make speed up figure
     ai = lambda x: slice(int(data.shape[0]//len(standardSizes)*x),int(data.shape[0]//len(standardSizes)*(x+1)),1)
@@ -273,29 +217,27 @@ def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,p
         mbc = ('k','w')
     else:
         mbc = ('w','k')
-
-    for i in range(1,len(cutoffs),1):
-        lb = cutoffs[i-1]+1
-        ub = cutoffs[i]+1
+    for i in range(0,len(cutoffs)-2,1):
+        lb = cutoffs[i+1]
+        ub = cutoffs[i+2]
         xw= numpy.where(numpy.amax(data[lb:ub])==data[lb:ub])
         xb= numpy.where(numpy.amin(data[lb:ub])==data[lb:ub])
         #Contours
-        axes[i-1].tricontour(rBlocks[lb:ub],rShares[lb:ub]*100,data[lb:ub],
+        axes[i].tricontour(rBlocks[lb:ub],rShares[lb:ub]*100,data[lb:ub],
                  colors=('k',),linestyles=('-',),linewidths=(0.25,),vmin=cbounds[0],vmax=cbounds[-1])
-        axes[i-1].tricontourf(rBlocks[lb:ub],rShares[lb:ub]*100,data[lb:ub],cmap=cmap,vmin=cbounds[0],vmax=cbounds[-1])
+        axes[i].tricontourf(rBlocks[lb:ub],rShares[lb:ub]*100,data[lb:ub],cmap=cmap,vmin=cbounds[0],vmax=cbounds[-1])
         #Marking best and worst
-        axes[i-1].plot(rBlocks[lb:ub][xb],rShares[lb:ub][xb]*100,linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
-        axes[i-1].plot(rBlocks[lb:ub][xw],rShares[lb:ub][xw]*100,linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
-
+        axes[i].plot(rBlocks[lb:ub][xb],rShares[lb:ub][xb]*100,linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
+        axes[i].plot(rBlocks[lb:ub][xw],rShares[lb:ub][xw]*100,linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
         #Labels
-        axes[i-1].set_title('Array Size: ${}$'.format(standardSizes[i]))
-        axes[i-1].set_ylabel('Share [%]')
-        axes[i-1].set_xlabel('Block Size')
-        axes[i-1].grid(color='k', linewidth=1)
-        axes[i-1].set_xticks([8,16,24,32])
-        axes[i-1].set_yticks([0,25,50,75,100])
-        axes[i-1].yaxis.labelpad = 0.5
-        axes[i-1].xaxis.labelpad = 0.5
+        axes[i].set_title('Array Size: ${}$'.format(standardSizes[i+1]))
+        axes[i].set_ylabel('Share [%]')
+        axes[i].set_xlabel('Block Size')
+        axes[i].grid(color='k', linewidth=1)
+        axes[i].set_xticks([8,16,24,32])
+        axes[i].set_yticks([0,25,50,75,100])
+        axes[i].yaxis.labelpad = 0.5
+        axes[i].xaxis.labelpad = 0.5
     plt.savefig(fname)
     plt.close('all')
 
@@ -320,10 +262,13 @@ def getStudyContour(equation):
     olddata,oldstandarddata,oldsweptdata,oldstandardSizes,oldspeedup = getContourYamlData("./oldHardware/log.yaml",equation)
     #Make contour
     #Speedup contours
+    print("New Speed Up Average {}:{:0.4f}".format(equation,numpy.mean(newspeedup)))
+    print("Old Speed Up Average {}:{:0.4f}".format(equation,numpy.mean(oldspeedup)))
+    print("New Speed Up Min,Max {}:{:0.4f},{:0.4f}".format(equation,numpy.amin(newspeedup),numpy.amax(newspeedup)))
+    print("Old Speed Up Min,Max {}:{:0.4f},{:0.4f}".format(equation,numpy.amin(oldspeedup),numpy.amax(oldspeedup)))
     speedLimits = getDataLimits([newspeedup,oldspeedup])
     makeArrayContours(oldspeedup,oldsweptdata[:,2],oldsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+"Old"),switch=True)
     makeArrayContours(newspeedup,newsweptdata[:,2],newsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+"New"),switch=True)
-    
     #Time Contours
     timeLimits = getDataLimits([oldsweptdata[:,4],newsweptdata[:,4],oldstandarddata[:,4],newstandarddata[:,4]])
     makeArrayContours(oldsweptdata[:,4],oldsweptdata[:,2],oldsweptdata[:,3],timeLimits,cm.inferno_r,'Clocktime [s]',"./plots/clockTimeSwept{}.pdf".format(equation+"Old"))
@@ -339,14 +284,15 @@ def getStudyContour(equation):
     makeArrayContours(newstandarddata[:,5],newstandarddata[:,2],newstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"New"))
 
     #Hardware Speedup
-    hardwareSpeedUp = newsweptdata[:,5]/oldsweptdata[:,5]
+    hardwareSpeedUp = oldsweptdata[:,5]/newsweptdata[:,5]
+    print("Hardware Speed Up Average {}:{:0.4f}".format(equation,numpy.mean(hardwareSpeedUp)))
     speedLimits = getDataLimits([hardwareSpeedUp,])
-    if equation == "heat":
-        speedLimits = numpy.linspace(1,2,11)
+    # if equation == "heat":
+    #     speedLimits = numpy.linspace(1,2,11)
     makeArrayContours(hardwareSpeedUp,oldsweptdata[:,2],oldsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/hardwareSpeedUp{}.pdf".format(equation),switch=True)
     
-    #3D plot
-    # ThreeDimPlot(oldsweptdata[:,2],100*oldsweptdata[:,3],oldspeedup,speedLimits)
+    # 3D plot
+    ThreeDimPlot(oldsweptdata[:,2],100*oldsweptdata[:,3],oldspeedup,speedLimits)
     return oldsweptdata,newsweptdata
 
 
@@ -364,16 +310,45 @@ def ThreeDimPlot(x,y,z,lims):
 def ScalabilityPlots():
     data,standardSizes = getYamlData("./scalability/scalability.yaml","euler")
     dl = len(data)
-    sweptdata = data[dl//2:]
-    standarddata = data[:dl//2]
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.set_ylabel("Clocktime [s]")
+    eulersweptdata = data[dl//2:]
+    eulerstandarddata = data[:dl//2]
+
+    data,standardSizes = getYamlData("./scalability/scalability.yaml","heat")
+    dl = len(data)
+    heatsweptdata = data[dl//2:]
+    heatstandarddata = data[:dl//2]
+
+    fig, axes = plt.subplots(ncols=2,nrows=1)
+    fig.subplots_adjust(wspace=0.55)
+    #Euler
+    ax=axes[0]
+    ymax = numpy.ceil(numpy.amax([eulersweptdata,eulerstandarddata])+1000)
+    ymin = numpy.floor(numpy.amin([eulersweptdata,eulerstandarddata]))
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim([0,ymax])
+    ax.set_ylim([ymin,ymax])
+    ax.set_ylabel("Clock time [s]")
     ax.set_xlabel("Array Size")
+    ax.set_title("Compressible Euler Equations")
     # ax.set_title("Weak Scalability")
-    l1 = ax.plot(sweptdata[:,1],sweptdata[:,4],marker="o",color='b')
-    l2 = ax.plot(standarddata[:,1],standarddata[:,4],marker="o",color="r")
+    l1 = ax.plot(eulersweptdata[:,1],eulersweptdata[:,4],marker="o",color='b')
+    l2 = ax.plot(eulerstandarddata[:,1],eulerstandarddata[:,4],marker="o",color="r")
     ax.legend(["Swept","Standard"])
+    #Heat
+    ax=axes[1]
+    ymax = numpy.ceil(numpy.amax([heatsweptdata,heatstandarddata])+500)
+    ymin = numpy.floor(numpy.amin([heatsweptdata,heatstandarddata])) 
+    ax.set_ylabel("Clock time [s]")
+    ax.set_xlabel("Array Size")
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim([0,ymax])
+    ax.set_ylim([ymin,ymax])
+    ax.set_title("Heat Diffusion Equation")
+    # ax.set_title("Weak Scalability")
+    l1 = ax.plot(heatsweptdata[:,1],heatsweptdata[:,4],marker="o",color='b')
+    l2 = ax.plot(heatstandarddata[:,1],heatstandarddata[:,4],marker="o",color="r")
+    ax.legend(["Swept","Standard"])
+
     plt.savefig("./plots/weakScalability.pdf")
     plt.close('all')
     # plt.show()
@@ -384,10 +359,10 @@ if __name__ == "__main__":
     # Produce contour plots
     sweptEuler = getStudyContour('heat')
     sweptEuler = getStudyContour('euler')
-
+    print(cutoffs)
     # Scalability
     ScalabilityPlots()
-
+    
     # Produce physical plots
     validateHeat()
     validateEuler()
