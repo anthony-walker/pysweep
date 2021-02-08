@@ -1,6 +1,6 @@
 import numpy, yaml, itertools, h5py, math
-# import pysweep.utils.validate as validate
-# import pysweep
+import pysweep.utils.validate as validate
+import pysweep
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib import cm
