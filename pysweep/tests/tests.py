@@ -82,15 +82,15 @@ def debugging(func):
     It's purpose is to contain a set of test conditions and wrap tests with those conditions.
     exid, share, globals, cpu, gpu, operating_points, and intermediate_steps should be set in test
     """
-    def testConfigurations(arraysize=120):
-        shares = [0.9,] #Shares for GPU
-        sims = [False,] #different simulations
-        blocksizes = [12,] #blocksizes with most options
+    def testConfigurations(arraysize=120,timesteps=200,runTest=True):
+        shares = [1,] #Shares for GPU
+        sims = [True,] #different simulations
+        blocksizes = [24,] #blocksizes with most options
         #Create solver object
         solver = pysweep.Solver(sendWarning=False)
         solver.dtypeStr = 'float64'
         solver.dtype = numpy.dtype(solver.dtypeStr)
-        solver.verbose=False
+        solver.verbose=True
         for sim in sims:
             for bs in blocksizes:
                 for sh in shares:
@@ -98,17 +98,17 @@ def debugging(func):
                     solver.share = sh
                     solver.simulation = sim
                     solver.blocksize = (bs,bs,1)
-                    func(solver,arraysize)
+                    func(solver,arraysize,timesteps=timesteps,runTest=runTest)
     return testConfigurations
 
 #----------------------------------End Decorator Functions-------------------------------------------
 
 @debugging
-def testEulerVortex(solver,arraysize,printError=True):
+def testEulerVortex(solver,arraysize,printError=True,timesteps=200,runTest=True):
     """Use this funciton to validate the swept solver with a 2D euler vortex"""
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "eulerConditions.hdf5"
-    adjustEulerGlobals(solver,arraysize,timesteps=testTimeSteps)
+    adjustEulerGlobals(solver,arraysize,timesteps=timesteps)
     global globalArraySize
     # if not arraysize == globalArraySize:
     filename = pysweep.equations.euler.createInitialConditions(arraysize,arraysize)
@@ -123,41 +123,43 @@ def testEulerVortex(solver,arraysize,printError=True):
     solver.output = "testingVortex.hdf5"
     solver.loadCPUModule()
     solver()
-    if solver.clusterMasterBool:
-        steps = solver.arrayShape[0]
-        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
-    else:
-        stepRange = []
-    stepRange = solver.comm.scatter(stepRange)
-    error = []
-    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
-        data = f["data"]
-        failed = False
-        for i in stepRange:
-            analytical = pysweep.equations.euler.getAnalyticalArray(arraysize,arraysize,t=solver.globals[2]*i)
-            error.append(numpy.amax(numpy.absolute(data[i,:]-analytical[:])))
-            try:
-                assert numpy.allclose(data[i,:],analytical[:])
-            except Exception as e:
-                failed = True
-        analytical = pysweep.equations.euler.getAnalyticalArray(arraysize,arraysize,t=testTimeSteps//2*solver.globals[2])
-        sameStepError = numpy.amax(data[int(testTimeSteps//2),:,:,:]-analytical[:,:,:])
 
-    failed = solver.comm.allgather(failed)
-    if solver.clusterMasterBool:
-        solver.compactPrint()
-        masterFail = numpy.all(failed)
-        print("{} testEulerVortex".format("Failed:" if masterFail else "Success:"))
-
-    if printError:
-        error = solver.comm.allgather(error)
+    if runTest:
         if solver.clusterMasterBool:
-            finalError = []
-            for eL in error:
-                finalError.append(numpy.amax(eL))
-            print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
-    if solver.clusterMasterBool:
-        print("\n") #Final end line
+            steps = solver.arrayShape[0]
+            stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
+        else:
+            stepRange = []
+        stepRange = solver.comm.scatter(stepRange)
+        error = []
+        with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
+            data = f["data"]
+            failed = False
+            for i in stepRange:
+                analytical = pysweep.equations.euler.getAnalyticalArray(arraysize,arraysize,t=solver.globals[2]*i)
+                error.append(numpy.amax(numpy.absolute(data[i,:]-analytical[:])))
+                try:
+                    assert numpy.allclose(data[i,:],analytical[:])
+                except Exception as e:
+                    failed = True
+            analytical = pysweep.equations.euler.getAnalyticalArray(arraysize,arraysize,t=timesteps//2*solver.globals[2])
+            sameStepError = numpy.amax(data[int(timesteps//2),:,:,:]-analytical[:,:,:])
+
+        failed = solver.comm.allgather(failed)
+        if solver.clusterMasterBool:
+            solver.compactPrint()
+            masterFail = numpy.all(failed)
+            print("{} testEulerVortex".format("Failed:" if masterFail else "Success:"))
+
+        if printError:
+            error = solver.comm.allgather(error)
+            if solver.clusterMasterBool:
+                finalError = []
+                for eL in error:
+                    finalError.append(numpy.amax(eL))
+                print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
+        if solver.clusterMasterBool:
+            print("\n") #Final end line
     solver.comm.Barrier()
         
 #-------------------------------------Completed Tests------------------#
@@ -184,11 +186,11 @@ def adjustEulerGlobals(solver,arraysize,timesteps=50):
     solver.globals = [0,dt*timesteps,dt,dx,dx,gamma]
 
 @debugging
-def testEulerShock(solver,arraysize,printError=True):
+def testEulerShock(solver,arraysize,printError=True,timesteps=200,runTest=True):
     """Use this funciton to validate the swept solver with a 2D euler vortex"""
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "eulerConditions.hdf5"
-    adjustEulerGlobals(solver,arraysize,timesteps=testTimeSteps)
+    adjustEulerGlobals(solver,arraysize,timesteps=tSteps)
     global globalArraySize
     # if not arraysize == globalArraySize:
     ic = pysweep.equations.euler.getPeriodicShock(arraysize,0)
@@ -203,18 +205,18 @@ def testEulerShock(solver,arraysize,printError=True):
     solver.output = "testingShock.hdf5"
     solver.loadCPUModule()
     solver()
-
-    if solver.clusterMasterBool:
-        failed = False
-        solver.compactPrint()
-        with h5py.File(solver.output,"r") as f:
-            data = f["data"]
-            for i in range(solver.arrayShape[0]):
-                try:
-                    assert numpy.all(data[i,:,:,:]==pysweep.equations.euler.getPeriodicShock(arraysize,solver.globals[2]*i))
-                except Exception as e:
-                    failed = True
-        print("{} testEulerShock\n".format("Failed:" if failed else "Success:"))
+    if runTest:
+        if solver.clusterMasterBool:
+            failed = False
+            solver.compactPrint()
+            with h5py.File(solver.output,"r") as f:
+                data = f["data"]
+                for i in range(solver.arrayShape[0]):
+                    try:
+                        assert numpy.all(data[i,:,:,:]==pysweep.equations.euler.getPeriodicShock(arraysize,solver.globals[2]*i))
+                    except Exception as e:
+                        failed = True
+            print("{} testEulerShock\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
 
 @testing
@@ -405,11 +407,11 @@ def testCheckerTwo(solver,arraysize):
         print("{} testCheckerTwo\n".format("Failed:" if failed else "Success:"))
     solver.comm.Barrier()
 
-@testing
-def testHeatForwardEuler(solver,arraysize,printError=True):
+@debugging
+def testHeatForwardEuler(solver,arraysize,printError=True,timesteps=200,runTest=True):
     warnings.filterwarnings('ignore') #Ignore warnings for processes
     filename = "heatConditions.hdf5"
-    adjustHeatGlobals(solver,arraysize,True,timesteps=testTimeSteps)
+    adjustHeatGlobals(solver,arraysize,True,timesteps=timesteps)
     global globalArraySize
     if not arraysize == globalArraySize:
         filename = pysweep.equations.heat.createInitialConditions(arraysize,arraysize,alpha=solver.globals[-2])
@@ -423,41 +425,42 @@ def testHeatForwardEuler(solver,arraysize,printError=True):
     solver.output = "testingHeatFE.hdf5"
     solver.loadCPUModule()
     solver()
-    if solver.clusterMasterBool:
-        steps = solver.arrayShape[0]
-        stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
-    else:
-        stepRange = []
-    stepRange = solver.comm.scatter(stepRange)
-    error = []
-    with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
-        data = f["data"]
-        failed = False
-        for i in stepRange:
-            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
-            error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
-            try:
-                assert numpy.allclose(data[i,0],T[0])
-            except Exception as e:
-                failed = True
-        T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=testTimeSteps//2*solver.globals[2],alpha=solver.globals[-2])
-        sameStepError = numpy.amax(data[int(testTimeSteps//2),0,:,:]-T[0,:,:])
-
-    failed = solver.comm.allgather(failed)
-    if solver.clusterMasterBool:
-        solver.compactPrint()
-        masterFail = numpy.all(failed)
-        print("{} testHeatForwardEuler".format("Failed:" if masterFail else "Success:"))
-
-    if printError:
-        error = solver.comm.allgather(error)
+    if runTest:
         if solver.clusterMasterBool:
-            finalError = []
-            for eL in error:
-                finalError.append(numpy.amax(eL))
-            print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
-    if solver.clusterMasterBool:
-        print("\n") #Final end line
+            steps = solver.arrayShape[0]
+            stepRange = numpy.array_split(numpy.arange(0,steps),solver.comm.Get_size())
+        else:
+            stepRange = []
+        stepRange = solver.comm.scatter(stepRange)
+        error = []
+        with h5py.File(solver.output,"r",driver="mpio",comm=solver.comm) as f:
+            data = f["data"]
+            failed = False
+            for i in stepRange:
+                T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=solver.globals[2]*i,alpha=solver.globals[-2])
+                error.append(numpy.amax(numpy.absolute(data[i,0]-T[0])))
+                try:
+                    assert numpy.allclose(data[i,0],T[0])
+                except Exception as e:
+                    failed = True
+            T,x,y = pysweep.equations.heat.analytical(arraysize,arraysize,t=timesteps//2*solver.globals[2],alpha=solver.globals[-2])
+            sameStepError = numpy.amax(data[int(timesteps//2),0,:,:]-T[0,:,:])
+
+        failed = solver.comm.allgather(failed)
+        if solver.clusterMasterBool:
+            solver.compactPrint()
+            masterFail = numpy.all(failed)
+            print("{} testHeatForwardEuler".format("Failed:" if masterFail else "Success:"))
+
+        if printError:
+            error = solver.comm.allgather(error)
+            if solver.clusterMasterBool:
+                finalError = []
+                for eL in error:
+                    finalError.append(numpy.amax(eL))
+                print("Max Error: {}, Process Max Average: {}, Same Step Error {}".format(numpy.amax(finalError),numpy.mean(finalError),sameStepError))
+        if solver.clusterMasterBool:
+            print("\n") #Final end line
     solver.comm.Barrier()
 
 @testing
@@ -558,13 +561,12 @@ def testVerifyOrderForwardEulerHeat(fname="forwardEuler",printError=True):
         plt.title("Forward Euler Order Verification")
         plt.xlabel("dt")
         plt.ylabel("error")
-        plt.savefig(pltname)
-    
+        plt.savefig(pltname)    
 
 def adjustHeatGlobals(solver,arraysize,scheme,timesteps=50):
     """Use this function to adjust heat equation step size based on arraysize"""
     d = 0.1
-    alpha = 1
+    alpha = 0.01
     dx = 1/arraysize
     dt = float(d*dx**2/alpha)
     solver.globals = [0,dt*timesteps,dt,dx,dx,alpha,scheme]

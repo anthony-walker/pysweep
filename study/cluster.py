@@ -1,19 +1,16 @@
 import numpy, yaml, itertools, h5py, math
-# import pysweep.utils.validate as validate
-# import pysweep
+import pysweep.utils.validate as validate
+import pysweep.tests as tests
+import pysweep
 import matplotlib 
-if 0:
-    matplotlib.rcParams.update({'text.color' : "white",
-                     'axes.labelcolor' : "white","axes.edgecolor":"white","xtick.color":"white","ytick.color":"white","grid.color":"white","savefig.facecolor":"#333333","savefig.edgecolor":"#333333","axes.facecolor":"#333333"})
-    for k in matplotlib.rcParams:
-        if "color" in k:
-            print(k)
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib import cm
 from matplotlib import tri
 from mpl_toolkits import mplot3d
 from matplotlib.colors import Normalize
+import mpi4py.MPI as MPI
+import os
 
 #Global data
 standardSizes = numpy.asarray([160, 320, 480, 640, 800, 960, 1120])
@@ -23,6 +20,14 @@ worst = []
 shares = numpy.arange(0,1.1,0.1)
 combos = []
 cutoffs = [0,]
+
+def switchColorScheme(printParams=False):
+    matplotlib.rcParams.update({'text.color' : "white",
+                     'axes.labelcolor' : "white","axes.edgecolor":"white","xtick.color":"white","ytick.color":"white","grid.color":"white","savefig.facecolor":"#333333","savefig.edgecolor":"#333333","axes.facecolor":"#333333"})
+    if printParams:
+        for k in matplotlib.rcParams:
+            if "color" in k:
+                print(k)
 
 def printArray(a):
     for row in a:
@@ -51,9 +56,7 @@ def calcNumberOfPts():
         cutoffs.append(npts)
     return npts
 
-# print(shares.shape,blockSizes.shape,standardSizes.shape)
-
-def validateHeat():
+def validateClusterEuler(): 
     #Plotting
     elev=45
     azim=25
@@ -72,56 +75,7 @@ def validateHeat():
     tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
     cbar.locator = tick_locator
     cbar.update_ticks()
-    cbar_ax.set_title('$T(x,y,t)$',y=1.01)
-    with h5py.File("./data/heatOutput.hdf5","r") as f:
-        data = f['data']
-        times = [0,] #Times to plot
-        times.append(numpy.shape(data)[0]//2)
-        times.append(numpy.shape(data)[0]-1)
-        #Numerical stuff
-        d = 0.1
-        dx = 1/(numpy.shape(data)[2]-1)
-        alpha = 1
-        dt = float(d*dx**2/alpha)
-        for i,ax in enumerate(axes[3:6]):
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.yaxis.labelpad=-1
-            ax.set_title('N:$t={:0.2e}$'.format(times[i]*dt))
-            validate.heatContourAx(ax,data[times[i],0],1,1)
-        #Analytical
-        npx = numpy.shape(data)[2]
-        for i,ax in enumerate(axes[:3]):
-            ax.set_xlabel("X")
-            ax.set_ylabel("Y")
-            ax.yaxis.labelpad=-1
-            ax.set_title('A:$t={:0.2e}$'.format(times[i]*dt))
-            adata = numpy.zeros((1,1,npx,npx))
-            adata[0,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t=(times[i])*dt,alpha=alpha)
-            validate.heatContourAx(ax,adata[0,0],1,1)
-    plt.savefig("./plots/heatValidate.pdf")
-    plt.close('all')
-
-def validateEuler(): 
-    #Plotting
-    elev=45
-    azim=25
-    fig =  plt.figure()
-    nrows = 2
-    ncols = 3
-    axes = [fig.add_subplot(nrows, ncols, i+1) for i in range(nrows*ncols)]
-    fig.subplots_adjust(wspace=0.75,hspace=0.8,right=0.8)
-    #Physical Colorbar
-    cbounds=numpy.linspace(0.4,1,6)
-    # cbar_ax = fig.add_axes([0.89, 0.39, 0.05, 0.51]) #left bottom width height
-    cbar_ax = fig.add_axes([0.89, 0.11, 0.05, 0.76]) #left bottom width height
-    ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
-    cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
-    cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
-    tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
-    cbar.locator = tick_locator
-    cbar.update_ticks()
-    cbar_ax.set_title('$\\rho(x,y,t)$',y=1.01)
+    cbar_ax.set_title('$\\rho(x,y,t)$\n$[kg/m^3]$',y=1.01)
     with h5py.File("./data/eulerOutput.hdf5","r") as f:
         data = f['data']
         times = [0,] #Times to plot
@@ -130,25 +84,27 @@ def validateEuler():
         #Euler stuff
         d = 0.1
         gamma = 1.4
-        dx = 10/(640-1)
+        dx = 10/(data.shape[-1]-1)
         dt = d*dx
         #Numerical
         for i,ax in enumerate(axes[3:6]):
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
             ax.yaxis.labelpad=-1
-            ax.set_title('N:$t={:0.2e}$'.format(times[i]*dt))
+            ax.set_title('N:$t={:0.2e}$ [s]'.format(times[i]*dt))
             validate.eulerContourAx(ax,data[times[i],0],1,1)
+            ax.grid('on',color="k")
         #Analytical
         npx = numpy.shape(data)[2]
         for i,ax in enumerate(axes[:3]):
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
             ax.yaxis.labelpad=-1
-            ax.set_title('A:$t={:0.2e}$'.format(times[i]*dt))
+            ax.set_title('A:$t={:0.2e}$ [s]'.format(times[i]*dt))
             adata = numpy.zeros((1,4,npx,npx))
             adata[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=(times[i])*dt)
             validate.eulerContourAx(ax,adata[0,0],1,1)
+            ax.grid('on',color="k")
     plt.savefig("./plots/eulerValidate.pdf")
     plt.close('all')
         
@@ -401,20 +357,167 @@ def modePlots():
     leg = ax2.legend(["Best","Worst"])
     plt.savefig("./plots/caseModes.pdf")
 
+def validateHeat(adata,ndata,times):
+    #Plotting
+    fig =  plt.figure()
+    nrows = 2
+    ncols = 3
+    axes = [fig.add_subplot(nrows, ncols, i+1) for i in range(nrows*ncols)]
+    fig.subplots_adjust(wspace=0.75,hspace=0.8,right=0.8)
+    #Physical Colorbar
+    cbounds=numpy.linspace(0.4,1,6)
+    # cbar_ax = fig.add_axes([0.89, 0.39, 0.05, 0.51]) #left bottom width height
+    cbar_ax = fig.add_axes([0.89, 0.11, 0.05, 0.76]) #left bottom width height
+    ibounds = numpy.linspace(cbounds[0],cbounds[-1],100)
+    cbar = fig.colorbar(cm.ScalarMappable(cmap=cm.inferno),cax=cbar_ax,boundaries=ibounds)
+    cbar.ax.set_yticklabels([["{:0.1f}".format(i) for i in cbounds]])
+    tick_locator = ticker.MaxNLocator(nbins=len(cbounds))
+    cbar.locator = tick_locator
+    cbar.update_ticks()
+    cbar_ax.set_title('$T(x,y,t) [K]$',y=1.01)
+    #Numerical stuff
+    for i,ax in enumerate(axes[3:6]):
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.yaxis.labelpad=-1
+        ax.set_title('N:$t={:0.2f}$ [s]'.format(times[i]))
+        validate.heatContourAx(ax,ndata[i],1,1)
 
+    #Analytical
+    npx = numpy.shape(adata)[-1]
+    for i,ax in enumerate(axes[:3]):
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.yaxis.labelpad=-1
+        ax.set_title('N:$t={:0.2f}$ [s]'.format(times[i]))
+        validate.heatContourAx(ax,adata[i],1,1)
+    plt.savefig("./plots/heatValidate.pdf")
+    plt.close('all')
+
+def PresentationHDE():  
+    #MPI stuff
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()  #current rank
+
+    if rank==0:
+        validate.switchColorScheme() #Change color scheme
+
+    npx = 120
+    tsteps = 2000
+    alpha = 0.01
+    tf,dt = pysweep.equations.heat.getFinalTime(npx,tsteps,alpha=alpha)
+    gifmod=100
+    adata = numpy.zeros((3,npx,npx))
+    ndata = numpy.zeros((3,npx,npx))
+    ndata = numpy.zeros((3,npx,npx))
+    times = numpy.zeros((3,))
+    #create conditions
+    pysweep.equations.heat.createInitialConditions(npx,npx)
+
+    #Numerical
+    tests.testHeatForwardEuler(npx,timesteps=tsteps,runTest=False)
+
+    #Numerical plots
+    with h5py.File("testingHeatFE.hdf5","r",driver="mpio",comm=comm) as f:
+        data = f['data']
+        finalsteps = data.shape[0]
+        if rank == 0:
+            validate.createSurface(data[:,0,:,:],0,1,1,1,gif=True,gmod=gifmod,filename="/home/anthony-walker/nrg-swept-project/pysweep-git/study/plots/numericalHeatSurface.pdf")
+            validate.createContourf(data[:,0,:,:],0,1,1,1,gif=True,gmod=gifmod,filename="/home/anthony-walker/nrg-swept-project/pysweep-git/study/plots/numericalHeatContour.pdf")
+            for i,ts in enumerate([finalsteps//10,finalsteps//2,finalsteps-1]):
+                ndata[i,:,:] = data[ts,0,:,:]
+        comm.Barrier()
+    
+    #Analytical solution
+    if rank == 0:
+        points = [(int(i),k) for i,k in enumerate(numpy.linspace(0,tf,tsteps))]
+        split_points = numpy.array_split(points,comm.Get_size())
+    else:
+        split_points = None
+    split_points = comm.scatter(split_points)
+
+    #Analytical plots
+    with h5py.File('temp.hdf5', 'w', driver="mpio",comm=comm) as f:
+        data = f.create_dataset("data", (tsteps,1,npx,npx))
+        for i,t in split_points:
+            T,x,y = pysweep.equations.heat.analytical(npx,npx,t,alpha=0.01)
+            data[int(i),0,:,:] = T[0,:,:]
+        if rank==0:
+            validate.createSurface(data[:,0,:,:],0,1,1,1,gif=True,gmod=gifmod,filename="/home/anthony-walker/nrg-swept-project/pysweep-git/study/plots/analyticalHeatSurface.pdf")
+            validate.createContourf(data[:,0,:,:],0,1,1,1,gif=True,gmod=gifmod,filename="/home/anthony-walker/nrg-swept-project/pysweep-git/study/plots/analyticalHeatContour.pdf")
+            for i,ts in enumerate([finalsteps//10,finalsteps//2,finalsteps-1]):
+                adata[i,:,:] = data[ts,0,:,:]
+                times[i] =  dt*ts
+    comm.Barrier()
+
+    #Clean up and other plots
+    if rank == 0:
+        validateHeat(adata,ndata,times)
+        os.system("rm temp.hdf5 heatConditions.hdf5 testingHeatFE.hdf5")
+
+def generateEuler(comm,npx,tsteps,gifmod):
+    #Numerical
+    rank = comm.Get_rank()  #current rank
+    pysweep.equations.euler.createInitialConditions(npx,npx) #create initial conditions
+    tests.testEulerVortex(npx,timesteps=tsteps,runTest=False) #Run test
+
+    with h5py.File('testingVortex.hdf5', 'r', driver="mpio",comm=comm) as f:
+        data = f['data']
+        finalsteps = data.shape[0]
+        if rank == 0:
+            validate.createContourf(data[:,0,:,:],0,5,5,1,gif=True,gmod=gifmod,filename="/home/anthony-walker/nrg-swept-project/pysweep-git/study/plots/numericalVortex{:d}.pdf".format(npx),LZn=0.4,gridBool=True)
+    comm.Barrier()
+
+def PresentationEuler():
+    """Use this function to produce presentation data"""
+    #MPI stuff
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()  #current rank
+
+    npx1 = 120
+    tsteps = 1000
+    gamma=1.4
+    d=0.1
+    tf,dt = pysweep.equations.euler.getFinalTime(npx1,tsteps,gamma=gamma)
+ 
+    if rank==0:
+        validate.switchColorScheme() #Change color scheme
+    sizes = [npx1,360,720]
+    for npx in sizes:
+        dx = 10/npx
+        dt = d*dx
+        tsteps = tf//dt
+        gifmod = int((tsteps//20))
+        generateEuler(comm,npx,tsteps,gifmod)
+
+
+    #Clean up and other plots
+    if rank == 0:
+        os.system("eulerConditions.hdf5 testingVortex.hdf5")
 
 if __name__ == "__main__":
+    #Find number of points there should be
     calcNumberOfPts()
     
-    # Produce contour plots
-    sweptEuler = getStudyContour('heat')
-    sweptEuler = getStudyContour('euler')
-    print(cutoffs)
-    # Scalability
-    ScalabilityPlots()
+    #Presentation bool
+    pres = True
+    #Switch colors to match presentation
+    if pres:
+        switchColorScheme()
+
+    # # Produce contour plots
+    # sweptEuler = getStudyContour('heat')
+    # sweptEuler = getStudyContour('euler')
     
-    # #Produce physical plots
-    # validateHeat()
-    # validateEuler()
-    #Other plots
-    modePlots()
+    # # Scalability
+    # ScalabilityPlots()
+    
+    validateClusterEuler()
+    
+    # Produce presentation figures
+    # if pres:
+    #     PresentationEuler()
+    #     PresentationHDE()
+
+    # #mode plots of best and worst cases
+    # modePlots()

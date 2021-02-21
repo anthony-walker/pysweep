@@ -113,6 +113,13 @@ def analytical(npx,npy,t,alpha=0.1):
             u[0,i,j] = numpy.sin(m*pi*x)*numpy.sin(n*pi*y)*numpy.exp(-(m*m+n*n)*pi*pi*alpha*t)
     return u,X,Y
 
+def getFinalTime(npx,tsteps,alpha):
+    d = 0.1
+    alpha = 0.01
+    dx = 1/npx
+    dt = float(d*dx**2/alpha)
+    return dt*tsteps,dt
+
 
 def verifyOrder(schemeBool=True,fname=None):
     """Use this function to verify the order of Runge-Kutta Second order."""

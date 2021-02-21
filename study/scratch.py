@@ -13,8 +13,8 @@ rank = comm.Get_rank()  #current rank
 tsteps = 100
 npx = 48
 vortex = True
-shock = False
-heatSurface = False
+shock = True
+heatSurface = True
 heatContour = False
 main = rank == 0
 
@@ -44,7 +44,6 @@ elif heatSurface or heatContour:
     tests.testHeatForwardEuler() #run heat FE
     if main:
         if heatSurface:
-
             data = numpy.zeros((tsteps,1,npx,npx))
             for i,t in enumerate(numpy.linspace(0,1,tsteps)):
                 data[i,:,:,:],x,y = pysweep.equations.heat.analytical(npx,npx,t)

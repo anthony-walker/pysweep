@@ -1,0 +1,768 @@
+02/16/2021-15:59:57:
+  array_shape:
+  - 2001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 13.637545824050903
+  share: 1.0
+  swept: true
+  time_per_step: 0.0068187729120254515
+02/16/2021-16:01:59:
+  array_shape:
+  - 2001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 15.16516375541687
+  share: 1.0
+  swept: true
+  time_per_step: 0.007582581877708435
+02/16/2021-16:11:48:
+  array_shape:
+  - 2001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 15.883912324905396
+  share: 1.0
+  swept: true
+  time_per_step: 0.007941956162452697
+02/16/2021-16:18:56:
+  array_shape:
+  - 2001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 15.23983383178711
+  share: 1.0
+  swept: true
+  time_per_step: 0.007619916915893555
+02/16/2021-16:47:15:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.7951223850250244
+  share: 1.0
+  swept: true
+  time_per_step: 0.0014038786464214085
+02/16/2021-16:48:43:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.5044994354248047
+  share: 1.0
+  swept: true
+  time_per_step: 0.0012579103141259693
+02/16/2021-16:49:14:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.918776512145996
+  share: 1.0
+  swept: true
+  time_per_step: 0.0014659851894254124
+02/16/2021-16:55:46:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.5088002681732178
+  share: 1.0
+  swept: true
+  time_per_step: 0.0012600704511166337
+02/16/2021-17:02:56:
+  array_shape:
+  - 199
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.2560853958129883
+  share: 1.0
+  swept: true
+  time_per_step: 0.006343865635419133
+02/16/2021-17:03:55:
+  array_shape:
+  - 199
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.186410903930664
+  share: 1.0
+  swept: true
+  time_per_step: 0.005991974262276081
+02/16/2021-17:04:15:
+  array_shape:
+  - 199
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.258549690246582
+  share: 1.0
+  swept: true
+  time_per_step: 0.00635631156690193
+02/16/2021-17:04:24:
+  array_shape:
+  - 298
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.0301153659820557
+  share: 1.0
+  swept: true
+  time_per_step: 0.003468401905663487
+02/16/2021-17:04:38:
+  array_shape:
+  - 2993
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 3.4389517307281494
+  share: 1.0
+  swept: true
+  time_per_step: 0.0011493822629439002
+02/16/2021-17:05:54:
+  array_shape:
+  - 2993
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 3.2205469608306885
+  share: 1.0
+  swept: true
+  time_per_step: 0.0010763860163204174
+02/16/2021-17:06:50:
+  array_shape:
+  - 2993
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 3.132350206375122
+  share: 1.0
+  swept: true
+  time_per_step: 0.0010469084914355355
+02/16/2021-17:08:16:
+  array_shape:
+  - 496
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.325577974319458
+  share: 1.0
+  swept: true
+  time_per_step: 0.0026779353016554708
+02/16/2021-17:09:38:
+  array_shape:
+  - 496
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.6825451850891113
+  share: 1.0
+  swept: true
+  time_per_step: 0.0033990811819982047
+02/16/2021-17:09:42:
+  array_shape:
+  - 496
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.3122749328613281
+  share: 1.0
+  swept: true
+  time_per_step: 0.0026510604704269255
+02/16/2021-17:12:53:
+  array_shape:
+  - 496
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.3207464218139648
+  share: 1.0
+  swept: true
+  time_per_step: 0.0026681745895231613
+02/16/2021-17:28:20:
+  array_shape:
+  - 496
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.3841848373413086
+  share: 1.0
+  swept: true
+  time_per_step: 0.0027963330047299164
+02/16/2021-17:35:10:
+  array_shape:
+  - 991
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.5525012016296387
+  share: 1.0
+  swept: true
+  time_per_step: 0.0015681830319491299
+02/16/2021-17:36:22:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.6025893688201904
+  share: 1.0
+  swept: true
+  time_per_step: 0.0013071769808238023
+02/16/2021-17:39:55:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.594923734664917
+  share: 1.0
+  swept: true
+  time_per_step: 0.0013033268381039262
+02/17/2021-00:11:13:
+  array_shape:
+  - 100
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.0580792427062988
+  share: 1.0
+  swept: true
+  time_per_step: 0.010687669118245443
+02/17/2021-00:11:47:
+  array_shape:
+  - 100
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.184894323348999
+  share: 1.0
+  swept: true
+  time_per_step: 0.011968629528777768
+02/17/2021-00:12:43:
+  array_shape:
+  - 100
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 1.0442001819610596
+  share: 1.0
+  swept: true
+  time_per_step: 0.010547476585465248
+02/17/2021-00:14:01:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.9500856399536133
+  share: 1.0
+  swept: true
+  time_per_step: 0.0014817105173046776
+02/17/2021-00:16:44:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.800854444503784
+  share: 1.0
+  swept: true
+  time_per_step: 0.0014067576315940655
+02/17/2021-00:17:35:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.480276346206665
+  share: 1.0
+  swept: true
+  time_per_step: 0.0012457440211987268
+02/17/2021-00:19:34:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.594208002090454
+  share: 1.0
+  swept: true
+  time_per_step: 0.0013029673541388519
+02/17/2021-00:22:40:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.6041929721832275
+  share: 1.0
+  swept: true
+  time_per_step: 0.0013079824069227662
+02/17/2021-00:22:54:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 3.5680346488952637
+  share: 1.0
+  swept: true
+  time_per_step: 0.0017920816920619104
+02/17/2021-00:43:02:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.1800646781921387
+  share: 1.0
+  swept: true
+  time_per_step: 0.0010949596575550672
+02/17/2021-00:43:23:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.700990676879883
+  share: 1.0
+  swept: true
+  time_per_step: 0.001356600038613703
+02/17/2021-11:48:25:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 2.573762893676758
+  share: 1.0
+  swept: true
+  time_per_step: 0.0012926985904956091
+02/17/2021-12:03:33:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 3.3768861293792725
+  share: 1.0
+  swept: true
+  time_per_step: 0.0016960754040076706
+02/17/2021-12:16:28:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 4.622421026229858
+  share: 1.0
+  swept: true
+  time_per_step: 0.00232165797399792
+02/17/2021-12:36:36:
+  array_shape:
+  - 201
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 3.7676398754119873
+  share: 1.0
+  swept: true
+  time_per_step: 0.018838199377059935
+02/17/2021-12:38:23:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.5205318927764893
+  share: 1.0
+  swept: true
+  time_per_step: 0.025205318927764894
+02/17/2021-12:57:07:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.4939231872558594
+  share: 1.0
+  swept: true
+  time_per_step: 0.024939231872558594
+02/17/2021-12:57:28:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.346107006072998
+  share: 1.0
+  swept: true
+  time_per_step: 0.02346107006072998
+02/17/2021-12:58:12:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.682133436203003
+  share: 1.0
+  swept: true
+  time_per_step: 0.02682133436203003
+02/17/2021-12:59:16:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.880625009536743
+  share: 1.0
+  swept: true
+  time_per_step: 0.02880625009536743
+02/17/2021-13:02:00:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.8608593940734863
+  share: 1.0
+  swept: true
+  time_per_step: 0.028608593940734863
+02/17/2021-13:02:11:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.273618459701538
+  share: 1.0
+  swept: true
+  time_per_step: 0.02273618459701538
+02/17/2021-13:02:33:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.774717092514038
+  share: 1.0
+  swept: true
+  time_per_step: 0.027747170925140383
+02/17/2021-13:03:31:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.9237897396087646
+  share: 1.0
+  swept: true
+  time_per_step: 0.029237897396087648
+02/17/2021-13:07:33:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.5859408378601074
+  share: 1.0
+  swept: true
+  time_per_step: 0.025859408378601074
+02/17/2021-13:07:54:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.585810899734497
+  share: 1.0
+  swept: true
+  time_per_step: 0.02585810899734497
+02/17/2021-13:12:35:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.9946274757385254
+  share: 1.0
+  swept: true
+  time_per_step: 0.029946274757385254
+02/17/2021-13:13:19:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.289381504058838
+  share: 1.0
+  swept: true
+  time_per_step: 0.022893815040588378
+02/17/2021-13:13:37:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 2.996443510055542
+  share: 1.0
+  swept: true
+  time_per_step: 0.02996443510055542
+02/17/2021-13:13:54:
+  array_shape:
+  - 201
+  - 4
+  - 240
+  - 240
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 10.92190957069397
+  share: 1.0
+  swept: true
+  time_per_step: 0.05460954785346985
+02/17/2021-13:14:38:
+  array_shape:
+  - 301
+  - 4
+  - 360
+  - 360
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 30.976125240325928
+  share: 1.0
+  swept: true
+  time_per_step: 0.10325375080108642
+02/17/2021-13:16:37:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 3.214061737060547
+  share: 1.0
+  swept: true
+  time_per_step: 0.032140617370605466
+02/17/2021-13:17:02:
+  array_shape:
+  - 101
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 3.185736894607544
+  share: 1.0
+  swept: true
+  time_per_step: 0.03185736894607544
+02/17/2021-13:17:51:
+  array_shape:
+  - 1001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 11.699828386306763
+  share: 1.0
+  swept: true
+  time_per_step: 0.011699828386306763
+02/17/2021-13:23:25:
+  array_shape:
+  - 1001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 10.238729476928711
+  share: 1.0
+  swept: true
+  time_per_step: 0.01023872947692871
+02/17/2021-13:24:03:
+  array_shape:
+  - 1001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 10.43527889251709
+  share: 1.0
+  swept: true
+  time_per_step: 0.01043527889251709
+02/17/2021-13:28:00:
+  array_shape:
+  - 3001
+  - 4
+  - 360
+  - 360
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 225.92963123321533
+  share: 1.0
+  swept: true
+  time_per_step: 0.07530987707773844
+02/17/2021-13:29:06:
+  array_shape:
+  - 1001
+  - 4
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 8.015848398208618
+  share: 1.0
+  swept: true
+  time_per_step: 0.008015848398208618
+02/17/2021-13:32:48:
+  array_shape:
+  - 3001
+  - 4
+  - 360
+  - 360
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 208.80689978599548
+  share: 1.0
+  swept: true
+  time_per_step: 0.06960229992866517
+02/17/2021-13:46:32:
+  array_shape:
+  - 1992
+  - 1
+  - 120
+  - 120
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/heat.py
+  runtime: 5.594650983810425
+  share: 1.0
+  swept: true
+  time_per_step: 0.0028099703585185458
+02/17/2021-14:00:59:
+  array_shape:
+  - 6001
+  - 4
+  - 720
+  - 720
+  blocksize: 24
+  cpu: /home/anthony-walker/nrg-swept-project/pysweep-git/pysweep/equations/euler.py
+  runtime: 1655.2807207107544
+  share: 1.0
+  swept: true
+  time_per_step: 0.2758801201184591

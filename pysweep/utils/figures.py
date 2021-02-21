@@ -3,6 +3,7 @@
 import sys, os, numpy, warnings
 import pysweep.core.block as block
 from itertools import cycle
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gsc
 from matplotlib import cm
@@ -12,11 +13,16 @@ from mpl_toolkits import mplot3d
 from matplotlib.patches import FancyArrowPatch
 
 
+
 colors = ['dodgerblue','orange','dodgerblue','orange','dodgerblue','orange']
 symbols = cycle(['o','o','o','o'])
 
+#Angle
 elev2 =45
 azim2=45
+#Angle
+gelev=40
+gazim=35
 
 anch_box = (-15,-5,5)
 alps = [0,0.1,1]
@@ -42,10 +48,21 @@ node_alpha = 0.2
 upsets = block.createUpPyramidSets((bsx,bsx,1),ops)
 downsets = block.createDownPyramidSets((bsx,bsx,1),ops)
 yset,xset = block.createBridgeSets((bsx,bsx,1),ops,MPSS)
+USL = len(upsets)
+YSL = len(yset)
+XSL = len(xset)
+DSL = len(downsets)
+H = USL+DSL
 ms = 6
 scale = 1.2
 palp = 0.25
+#Global
+gfig = plt.figure()
+gax = gfig.add_subplot(1,1,1,projection='3d',elev=gelev,azim=gazim)
 
+def switchColorScheme():
+    mpl.rcParams.update({'text.color' : "white",
+                     'axes.labelcolor' : "white","axes.edgecolor":"white","xtick.color":"white","ytick.color":"white","grid.color":"white","savefig.facecolor":"#333333","savefig.edgecolor":"#333333","axes.facecolor":"#333333"})
 
 def make_node_surfaces(ax,colors,spacing):
     """Use this method to make node base colors"""
@@ -110,73 +127,59 @@ def make_block(ax,start,length,width,height,sc="blue",alp=1,edges=True):
     xx, yy = numpy.meshgrid([start[0],start[0]+length], [start[2],start[2]+height])
     ax.plot_surface(xx,zz,yy,color=sc,edgecolors=ec,alpha=alp)
 
-def plot_uppyramid(ax,start=0,edges=True,alp=1):
-    ct = 0
-    for i in range(nd):
-        for j in range(ndy):
-            for k in range(1,len(upsets)+1):
-                make_block(ax,(k*ops+i*bsx,k*ops+j*bsx,k+start),bsx-2*ops*k,bsx-2*ops*k,1,sc=colors[ct],edges=edges,alp=alp)
-        ct+=1
+def plot_uppyramid(ax,start=0,edges=True,alp=1,L=USL+1):
+    color = 'dodgerblue'
+    for k in range(1,L):
+        for i in range(nd): #nd
+            for j in range(ndy): #ndy
+                make_block(ax,(k*ops+i*bsx,k*ops+j*bsx,k+start),bsx-2*ops*k,bsx-2*ops*k,1,sc=color,edges=edges,alp=alp)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
+             
 
-def plot_ybridges(ax,start=0,edges=True,alp=1):
+def plot_ybridges(ax,start=0,edges=True,alp=1,L=YSL+1):
     # Create Y-Bridges
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(yset)+1):
-            make_block(ax,(k*ops+i*bsx,bsx-ops-k*ops,k+start),bsx-2*ops*k,2*ops*(k)+ops,1,sc=colors[ct],edges=edges,alp=alp)
-        ct+=1
-    #Close Edge Y Bridges
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(yset)+1):
-            make_block(ax,(k*ops+i*bsx,0,k+start),bsx-2*ops*k,ops*(k),1,sc=colors[ct],edges=edges,alp=alp)
-        ct+=1
-    #Far Edge Y Bridges
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(yset)+1):
-            make_block(ax,(k*ops+i*bsx,npy-ops*k,k+start),bsx-2*ops*k,ops*(k),1,sc=colors[ct],edges=edges,alp=alp)
-        ct+=1
+    color = 'dodgerblue'
+    for k in range(1,L):
+        for i in range(nd):
+            #Interior
+            make_block(ax,(k*ops+i*bsx,bsx-ops-k*ops,k+start),bsx-2*ops*k,2*ops*(k)+ops,1,sc=color,edges=edges,alp=alp)
+            #Close Edge Y Bridges
+            make_block(ax,(k*ops+i*bsx,0,k+start),bsx-2*ops*k,ops*(k),1,sc=color,edges=edges,alp=alp)
+            #Far Edge Y Bridges
+            make_block(ax,(k*ops+i*bsx,npy-ops*k,k+start),bsx-2*ops*k,ops*(k),1,sc=color,edges=edges,alp=alp)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
 
-def plot_xbridges(ax,start=0,edges=True,alp=1):
+def plot_xbridges(ax,start=0,edges=True,alp=1,L=XSL+1):
     # Create X-Bridges
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(yset)+1):
-            make_block(ax,(bsh+i*bsx-k*ops,bsh+k*ops,k+start),2*ops*(k)+ops,bsx-2*ops*k,1,sc=colors[ct],alp=alp,edges=edges)
-        ct+=1
-    #Close edges
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(yset)+1):
-            make_block(ax,(bsh+i*bsx-k*ops,0,k+start),2*ops*(k),bsh-ops*k,1,sc=colors[ct],alp=alp,edges=edges)
-        ct+=1
-    #Far Edges
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(yset)+1):
-            make_block(ax,(bsh+i*bsx-k*ops,npy-bsh+k*ops,k+start),2*ops*(k),bsh-ops*k,1,sc=colors[ct],alp=alp,edges=edges)
-        ct+=1
+    color = 'dodgerblue'
+    for k in range(1,L):
+        for i in range(nd):
+            make_block(ax,(bsh+i*bsx-k*ops,bsh+k*ops,k+start),2*ops*(k)+ops,bsx-2*ops*k,1,sc=color,alp=alp,edges=edges)
+            #Close Edges
+            make_block(ax,(bsh+i*bsx-k*ops,0,k+start),2*ops*(k),bsh-ops*k,1,sc=color,alp=alp,edges=edges)
+            #Far Edges
+            make_block(ax,(bsh+i*bsx-k*ops,npy-bsh+k*ops,k+start),2*ops*(k),bsh-ops*k,1,sc=color,alp=alp,edges=edges)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
 
-def plot_octahedrons(ax,start=0,edges=True,alp=1):
-    ct = 0
+def plot_octahedrons(ax,start=0,edges=True,alp=1,L = USL+DSL+1):
+    color = 'dodgerblue'
     dsl = len(downsets)
-    for i in range(nd):
-        for j in range(ndy):
-            for k in range(1,len(upsets)+dsl+1):
+    for k in range(1,L,1):
+        for i in range(nd):
+            for j in range(ndy):
                 if k <= dsl:
-                    make_block(ax,(bsh-k*ops+i*bsx,bsh-k*ops+j*bsx,k+start),2*ops*k,2*ops*k,1,sc=colors[ct],alp=alp,edges=edges)
+                    make_block(ax,(bsh-k*ops+i*bsx,bsh-k*ops+j*bsx,k+start),2*ops*k,2*ops*k,1,sc=color,alp=alp,edges=edges)
                 else:
-                    make_block(ax,((k-dsl)*ops+i*bsx,(k-dsl)*ops+j*bsx,k+start),bsx-2*ops*(k-dsl),bsx-2*ops*(k-dsl),1,sc=colors[ct],alp=alp,edges=edges)
-        ct+=1
+                    make_block(ax,((k-dsl)*ops+i*bsx,(k-dsl)*ops+j*bsx,k+start),bsx-2*ops*(k-dsl),bsx-2*ops*(k-dsl),1,sc=color,alp=alp,edges=edges)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
 
-def plot_comm1(ax,start=0,edges=True,alp=1):
-    ct = 0
-    for i in range(nd):
-        for k in range(1,len(upsets)+1):
-            make_block(ax,(0+i*bsx,0,k+start),bsh-ops*k,npy,1,sc=colors[ct],alp=alp,edges=edges)
-            make_block(ax,(bsh+i*bsx+k*ops,0,k+start),bsh-ops*k,npy,1,sc=colors[ct],alp=alp,edges=edges)
-        ct+=1
+def plot_comm1(ax,start=0,edges=True,alp=1,L=USL+1):
+    color = 'dodgerblue'
+    for k in range(1,len(upsets)+1):
+        for i in range(nd):
+            make_block(ax,(0+i*bsx,0,k+start),bsh-ops*k,npy,1,sc=color,alp=alp,edges=edges)
+            make_block(ax,(bsh+i*bsx+k*ops,0,k+start),bsh-ops*k,npy,1,sc=color,alp=alp,edges=edges)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
 
 def plot_comm2(ax,start=0,edges=True,alp=1):
     ct = 0
@@ -190,20 +193,16 @@ def plot_comm2(ax,start=0,edges=True,alp=1):
                 make_block(ax,(bsh+i*bsx+k*ops,0,nz+start),bsh-ops*k,npy,1,sc=colors[ct],alp=alp,edges=edges)
         ct+=1
 
-def plot_dwp(ax,start=0,edges=True,alp=1):
-    ct = 0
-    usl = len(upsets)
-    dsl = len(downsets)
-    for i in range(nd):
-        for j in range(ndy):
-            for k,nz in enumerate(range(usl+1,len(yset)+usl+1,1),1):
-                if k <= dsl:
-                    make_block(ax,(bsh-k*ops+i*bsx,bsh-k*ops+j*bsx,nz+start),2*ops*k,2*ops*k,1,sc=colors[ct],alp=alp,edges=edges)
-        ct+=1
+def plot_dwp(ax,start=0,edges=True,alp=1,L=USL+1):
+    color = 'dodgerblue'
+    for k,nz in enumerate(range(USL+1,L+USL,1)):
+        for i in range(nd):
+            for j in range(ndy):
+                if k <= DSL:
+                    make_block(ax,(bsh-k*ops+i*bsx,bsh-k*ops+j*bsx,nz+start),2*ops*k,2*ops*k,1,sc=color,alp=alp,edges=edges)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
 
-def staxf(elev=40,azim=35):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1,projection='3d',elev=elev,azim=azim)
+def staxf(ax,elev=40,azim=35):
     ax.set_zlim3d((zlims[0],zlims[1]+5))
     ax.set_ylim3d(ylims)
     ax.set_xlim3d(xlims)
@@ -222,79 +221,161 @@ def staxf(elev=40,azim=35):
     fl4 = mpl.lines.Line2D([0],[0], linestyle="none", c='green', marker = 'o',markersize=ms,alpha=node_alpha)
     leg1 = ax.legend([fl1,fl2,fl3,fl4],[' GPU   ',' CPU    ','node 1','node 2'],markerscale=scale,ncol=lnc,loc="lower left", bbox_to_anchor=f(anch_box), #-40,0,-5
           bbox_transform=ax.transData)
-    return fig, ax
+    return ax
 
-def Up1():
-    fig,ax = staxf()
+def Up1(ax,name='UpPyramid1.pdf'):
+    ax = staxf(ax,elev=gelev,azim=gazim)
     plot_uppyramid(ax,0)
-    plt.savefig('UpPyramid1.pdf',bbox_inches='tight')
-    plt.close(fig)
-
-def Y1():
-    fig,ax = staxf()
+    plt.savefig(name,bbox_inches='tight')
+    return ax
+    
+def Y1(ax,name='YBridge1.pdf'):
+    ax = staxf(ax)
     plot_uppyramid(ax,edges=False,alp=palp)
     plot_ybridges(ax)
-    plt.savefig('YBridge1.pdf',bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def Comm1():
-    fig,ax = staxf()
+def Comm1(ax,name='Comm1.pdf'):
+    ax = staxf(ax)
     plot_comm1(ax)
-    plt.savefig('Comm1.pdf',bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def X1():
-    fig,ax = staxf()
+def X1(ax,name='XBridge1.pdf'):
+    ax = staxf(ax)
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax)
-    plt.savefig('XBridge1.pdf',bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def Oct1():
-    fig,ax = staxf(elev=elev2,azim=azim2)
+def Oct1(ax,name='Octahedron1.pdf'):
+    ax = staxf(ax)
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax,edges=False,alp=palp)
     plot_octahedrons(ax)
-    plt.savefig('Octahedron1.pdf',bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def Y2():
-    fig,ax = staxf(elev=elev2,azim=azim2)
+def Y2(ax,name='YBridge2.pdf'):
+    ax = staxf(ax)
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax,edges=False,alp=palp)
     plot_octahedrons(ax,edges=False,alp=palp)
     plot_ybridges(ax,start=len(upsets))
-    plt.savefig('YBridge2.pdf',bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def Comm2():
-    fig,ax = staxf(elev=elev2,azim=azim2)
+def Comm2(ax,name='Comm2.pdf'):
+    ax = staxf(ax)
     plot_comm2(ax)
-    plt.savefig('Comm2.pdf',bbox_inches='tight')
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def X2():
-    fig,ax = staxf(elev=elev2,azim=azim2)
+def X2(ax,name='XBridge2.pdf'):
+    ax = staxf(ax)
     plot_comm2(ax,edges=False,alp=palp)
     plot_xbridges(ax,start=len(upsets))
-    plt.savefig('XBridge2.pdf',bbox_inches='tight')
-    plt.close(fig)
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
-def DWP1():
-    fig,ax = staxf(elev=elev2,azim=azim2)
+def DWP1(ax,name="DownPyramid1.pdf"):
+    ax = staxf(ax)
     plot_comm2(ax,edges=False,alp=palp)
     plot_xbridges(ax,start=len(upsets),edges=False,alp=palp)
     plot_dwp(ax)
-    plt.savefig("DownPyramid1.pdf",bbox_inches='tight')
+    plt.savefig(name,bbox_inches='tight')
+    return ax
 
 def createAll():
     """Use this function to generate all paper figures."""
-    Up1()
-    Y1()
-    Comm1()
-    X1()
-    Oct1()
-    Y2()
-    Comm2()
-    X2()
-    DWP1()
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1,projection='3d',elev=gelev,azim=gazim)
+    Up1(ax)
+    ax.clear()
+    Y1(ax)
+    ax.clear()
+    Comm1(ax)
+    X1(ax)
+    ax.clear()
+    Oct1(ax)
+    ax.clear()
+    Y2(ax)
+    ax.clear()
+    Comm2(ax)
+    ax.clear()
+    X2(ax)
+    ax.clear()
+    DWP1(ax)
+    ax.clear()
+
+
+def createSubFigurePlots():
+    fig = plt.figure()
+    axes = [fig.add_subplot(2,2,i,projection='3d',elev=gelev,azim=gazim) for i in range(1,5,1)]
+    
+    #First subplot
+    name = "SubsPlot1.pdf"
+    fcns1 = [Up1,Y1,Comm1,X1]
+    for i,fcn in enumerate(fcns1):
+        fcn(axes[i],name=name)
+
+    #Second subplot
+    name = "SubsPlot2.pdf"
+    fcns2 = [Oct1,X2,Y2,DWP1]
+    for i,fcn in enumerate(fcns2):
+        axes[i].clear()
+        fcn(axes[i],name=name)    
+
+def createPresentationGif():
+    frames = 9*USL+2
+    anim = animation.FuncAnimation(gfig,plotStep,frames)
+    anim.save("SweptProcess.gif",writer="imagemagick",fps=3)
+    
+def plotStep(i):
+    global gax
+    gax.clear()
+    gax = staxf(gax)
+    if i<USL+1:
+        plot_uppyramid(gax,0,L=i+1)
+    elif i<=2*USL:
+        idx = i-YSL
+        plot_uppyramid(gax,0)#,alp=palp,edges=False)
+        plot_ybridges(gax,L=idx+1)
+    elif i==2*USL+1:
+        plot_comm1(gax)
+    elif i<=3*USL+1:
+        plot_comm1(gax,alp=palp,edges=False)
+        plot_xbridges(gax,L=i%(H))
+    elif i<=5*USL+1:
+        idx = i-3*USL-1
+        plot_comm1(gax,alp=palp,edges=False)
+        plot_xbridges(gax,alp=palp,edges=False)
+        plot_octahedrons(gax,L=idx+1)
+    elif i<=6*USL+1:
+        idx = i-5*USL-1
+        plot_comm1(gax,edges=False,alp=palp)
+        plot_xbridges(gax,edges=False,alp=palp)
+        plot_octahedrons(gax,edges=False,alp=palp)
+        plot_ybridges(gax,start=USL,L=idx+1)
+    elif i==6*USL+2:
+        plot_comm2(gax)
+    elif i<=7*USL+2:
+        idx = i-6*USL-2
+        plot_comm2(gax,alp=palp,edges=False)
+        plot_xbridges(gax,start=USL,L=idx+1)
+    else:
+        idx = i-7*USL-2
+        plot_comm2(gax,edges=False,alp=palp)
+        plot_xbridges(gax,start=USL,edges=False,alp=palp)
+        plot_dwp(gax,L=idx+1)
+
+if __name__ == "__main__":
+    # switchColorScheme()
+    # createAll()
+
+    createSubFigurePlots()
+    createPresentationGif()
+    
+
     

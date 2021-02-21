@@ -1,9 +1,15 @@
 import h5py,numpy
 #Matplotlib imports
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits import mplot3d
 from matplotlib import animation, rc
+gridGlob = False
+
+def switchColorScheme():
+    mpl.rcParams.update({'text.color' : "white",
+                     'axes.labelcolor' : "white","axes.edgecolor":"white","xtick.color":"white","ytick.color":"white","grid.color":"white","savefig.facecolor":"#333333","savefig.edgecolor":"#333333","axes.facecolor":"#333333"})
 
 def heatContourAx(ax,data,Lx,Ly):
     shape = numpy.shape(data)
@@ -55,9 +61,10 @@ def animateSurface(i):
     ax.set_ylim(-LY,LY)
     ax.plot_surface(X,Y,gifData[i],cmap=cm.magma,vmin=-LZ, vmax=LZ)
 
-def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False,gmod=1,LZn=None):
+def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gif=False,gmod=1,LZn=None,gridBool=False):
     """Use this as a function for create gif."""
-    global fig,ax,X,Y,gifData,LZ,LX,LY,LZN
+    global fig,ax,X,Y,gifData,LZ,LX,LY,LZN,gridGlob
+    gridGlob = gridBool
     fig = plt.figure()
     ax =  plt.subplot()
     LZN = -Lz if LZn is None else LZn
@@ -87,4 +94,6 @@ def createContourf(data,tid,Lx,Ly,Lz,xlab="X",ylab="Y",filename="contour.pdf",gi
         plt.savefig(filename)
    
 def animateContour(i): 
+    if gridGlob:
+        ax.grid("on",color="k")
     ax.contourf(X,Y,gifData[i],cmap=cm.magma,vmin=LZN, vmax=LZ)

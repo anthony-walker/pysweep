@@ -58,6 +58,10 @@ def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5
     comm.Barrier()
     return filename
 
+def getFinalTime(npx,timesteps,d=0.1,gamma=1.4):
+    dx = 10/npx
+    dt = d*dx
+    return timesteps*dt,dt
     
 def analytical(x,y,t,gamma=1.4,alpha=numpy.pi/4):
     """This is the primary method to solve the euler vortex that is centered at the origin with periodic boundary conditions
