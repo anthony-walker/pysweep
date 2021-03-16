@@ -291,6 +291,7 @@ def createAll():
     """Use this function to generate all paper figures."""
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1,projection='3d',elev=gelev,azim=gazim)
+    ax.set_facecolor("#333333")
     Up1(ax)
     ax.clear()
     Y1(ax)
@@ -313,21 +314,23 @@ def createAll():
 def createSubFigurePlots():
     fig = plt.figure()
     axes = [fig.add_subplot(2,2,i,projection='3d',elev=gelev,azim=gazim) for i in range(1,5,1)]
-    
+    letters = ["a","b","c","d"]
     #First subplot
     name = "SubsPlot1.pdf"
     fcns1 = [Up1,Y1,Comm1,X1]
     for i,fcn in enumerate(fcns1):
         fcn(axes[i],name=name)
+        axes[i].set_title("({})".format(letters[i]))
 
     #Second subplot
-    name = "SubsPlot2.pdf"
+    name2 = "SubsPlot2.pdf"
     fcns2 = [Oct1,X2,Y2,DWP1]
     for i,fcn in enumerate(fcns2):
         axes[i].clear()
-        fcn(axes[i],name=name)    
+        fcn(axes[i],name=name2)    
 
 def createPresentationGif():
+    
     frames = 9*USL+2
     anim = animation.FuncAnimation(gfig,plotStep,frames)
     anim.save("SweptProcess.gif",writer="imagemagick",fps=3)
@@ -335,6 +338,7 @@ def createPresentationGif():
 def plotStep(i):
     global gax
     gax.clear()
+    gax.set_facecolor("#333333")
     gax = staxf(gax)
     if i<USL+1:
         plot_uppyramid(gax,0,L=i+1)
@@ -370,12 +374,59 @@ def plotStep(i):
         plot_xbridges(gax,start=USL,edges=False,alp=palp)
         plot_dwp(gax,L=idx+1)
 
-if __name__ == "__main__":
-    # switchColorScheme()
-    # createAll()
+def arrowAxes(ax,xlims,ylims,zlims):
+    """This function replaces the normal axes with arrows."""
+    aclr = "k"
+    fac = 4
+    a = Arrow3D([xlims[0], xlims[0]], [ylims[0], ylims[0]],[zlims[0]-2, zlims[1]+2], mutation_scale=mscal, lw=lwidth, arrowstyle=asty, color=aclr)
+    b = Arrow3D([xlims[0], xlims[0]], [ylims[0], ylims[1]+3],[zlims[0], zlims[0]], mutation_scale=mscal, lw=lwidth, arrowstyle=asty, color=aclr)
+    c = Arrow3D([xlims[0], xlims[1]+5], [ylims[0], ylims[0]],[zlims[0], zlims[0]], mutation_scale=mscal, lw=lwidth, arrowstyle=asty, color=aclr)
 
-    createSubFigurePlots()
-    createPresentationGif()
+    ax.text(xlims[1],ylims[0]-3,0,'X')
+    ax.text(xlims[0]-4,ylims[1],0,'Y')
+    ax.text(xlims[0]-3,ylims[0]+2,zlims[1],'t')
+    ax.add_artist(a)
+    ax.add_artist(b)
+    ax.add_artist(c)
+    ax.axis('off')
+
+def numericalImpactImage():
+    color = 'dodgerblue'
+    fig = plt.figure()
+    elev=40
+    azim=35
+    start=0
+    xyl = [0,npx//4]
+    zlmax = 8
+    ax = fig.add_subplot(1,1,1,projection='3d',elev=45,azim=45)
+    ax.set_zlim3d([0,zlmax])
+    ax.set_ylim3d(xyl)
+    ax.set_xlim3d(xyl)
+    ax.get_zaxis().set_ticks([])
+    ax.get_xaxis().set_ticks([])
+    ax.get_yaxis().set_ticks([])
+    ax.xaxis._axinfo['juggled'] = (0,0,0)
+    ax.yaxis._axinfo['juggled'] = (1,1,1)
+    ax.zaxis._axinfo['juggled'] = (2,2,2)
+    arrowAxes(ax,xyl,xyl,[0,zlmax-2])
+    for k in range(USL+1):
+        for i in range(1): #nd
+            for j in range(1): #ndy
+                make_block(ax,(k*ops+i*bsx,k*ops+j*bsx,k+start),bsx-2*ops*k,bsx-2*ops*k,1,sc=color,edges=True,alp=1)
+            color = 'dodgerblue' if color == 'orange' else 'orange'
+    plt.savefig("NumericalImpact-1.pdf")
+    ax.view_init(0, 10)
+    plt.savefig("NumericalImpact-2.pdf")
+    ax.view_init(90, 90)
+    plt.savefig("NumericalImpact-3.pdf")
+
+if __name__ == "__main__":
+    switchColorScheme()
+    # createAll()
+    
+    # createSubFigurePlots()
+    # createPresentationGif()
+    numericalImpactImage()
     
 
     

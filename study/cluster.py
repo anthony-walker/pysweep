@@ -11,6 +11,7 @@ from mpl_toolkits import mplot3d
 from matplotlib.colors import Normalize
 import mpi4py.MPI as MPI
 import os
+from scipy.stats import linregress
 
 #Global data
 standardSizes = numpy.asarray([160, 320, 480, 640, 800, 960, 1120])
@@ -277,7 +278,14 @@ def ThreeDimPlot(x,y,z,lims):
     ax.xaxis.labelpad = 0.5  
     # plt.show()
 
+def lineregressSlope(d1,d2,name):
+    slope, intercept, r_value, p_value, std_err = linregress(d1, d2)
+    print(name,slope)
+
 def ScalabilityPlots():
+
+    tempx = [1,2,3]
+
     data,standardSizes = getYamlData("./scalability/scalability.yaml","euler")
     dl = len(data)
     eulersweptdata = data[dl//2:]
@@ -291,45 +299,52 @@ def ScalabilityPlots():
     fig, axes = plt.subplots(ncols=2,nrows=1)
     fig.subplots_adjust(wspace=0.55)
     #Euler
+    print(tempx,eulersweptdata[:,4])
     ax=axes[0]
     ymax = numpy.ceil(numpy.amax([eulersweptdata,eulerstandarddata])+1000)
     ymin = numpy.floor(numpy.amin([eulersweptdata,eulerstandarddata]))
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim([0,ymax])
+    # ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim([0,4])
     ax.set_ylim([ymin,ymax])
     ax.set_ylabel("Clock time [s]")
-    ax.set_xlabel("Array Size")
+    ax.set_xlabel("Number of Nodes")
     ax.set_title("Compressible Euler Equations")
     # ax.set_title("Weak Scalability")
-    l1 = ax.plot(eulersweptdata[:,1],eulersweptdata[:,4],marker="o",color='b')
-    l2 = ax.plot(eulerstandarddata[:,1],eulerstandarddata[:,4],marker="o",color="r")
-    leg = ax.legend(["Swept","Standard"])
-    #Heat
-    ax=axes[1]
-    ymax = numpy.ceil(numpy.amax([heatsweptdata,heatstandarddata])+500)
-    ymin = numpy.floor(numpy.amin([heatsweptdata,heatstandarddata])) 
-    ax.set_ylabel("Clock time [s]")
-    ax.set_xlabel("Array Size")
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlim([0,ymax])
-    ax.set_ylim([ymin,ymax])
-    ax.set_title("Heat Diffusion Equation")
-    # ax.set_title("Weak Scalability")
-    l1 = ax.plot(heatsweptdata[:,1],heatsweptdata[:,4],marker="o",color='b')
-    l2 = ax.plot(heatstandarddata[:,1],heatstandarddata[:,4],marker="o",color="r")
+    l1 = ax.plot(tempx,eulersweptdata[:,4],marker="o",color='#d95f02')
+    l2 = ax.plot(tempx,eulerstandarddata[:,4],marker="o",color="#7570b3")
+    lineregressSlope(tempx,eulersweptdata[:,4],"Swept Euler ")
+    lineregressSlope(tempx,eulerstandarddata[:,4],"Standard Euler ")
     leg = ax.legend(["Swept","Standard"])
 
+    #Heat
+    ax=axes[1]
+    ymax = numpy.ceil(numpy.amax([heatsweptdata,heatstandarddata]))
+    ymin = numpy.floor(numpy.amin([heatsweptdata,heatstandarddata])) 
+    ax.set_ylabel("Clock time [s]")
+    ax.set_xlabel("Number of Nodes")
+    # ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim([0,4])
+    ax.set_ylim([ymin,1000])
+    ax.set_title("Heat Diffusion Equation")
+    # ax.set_title("Weak Scalability")
+    l1 = ax.plot(tempx,heatsweptdata[:,4],marker="o",color='#d95f02')
+    l2 = ax.plot(tempx,heatstandarddata[:,4],marker="o",color="#7570b3")
+    lineregressSlope(tempx,heatsweptdata[:,4],"Heat Euler ")
+    lineregressSlope(tempx,heatstandarddata[:,4],"Heat Euler ")
+    leg = ax.legend(["Swept","Standard"])
     plt.savefig("./plots/weakScalability.pdf")
     plt.close('all')
     # plt.show()
 
 def getOccurences(vals,targets):
-    return [vals.count(i) for i in targets]
+    L = len(vals)
+    return [vals.count(i)/L*100 for i in targets]
 
 def modePlots():
     global best, worst
     best = [(i[0],round(j[0]*10,0)/10) for i, j in best]
     worst = [(i[0],round(j[0]*10,0)/10) for i, j in worst]
+    
     bBlocks,bShares = zip(*best)
     wBlocks,wShares = zip(*worst)
     bestBlockOccurences = getOccurences(bBlocks,blockSizes) #[:len(bBlocks//2)]
@@ -344,16 +359,16 @@ def modePlots():
 
     ax1,ax2 = axes
 
-    ax1.set_ylabel("Occurences")
+    ax1.set_ylabel("Percentage Of Occurences[%]")
     ax1.set_xlabel("Block Size")
-    ax1.plot(blockSizes,bestBlockOccurences,marker="o",color='b')
-    ax1.plot(blockSizes,worstBlockOccurences,marker="o",color='r')
+    ax1.plot(blockSizes,bestBlockOccurences,marker="o",color='#d95f02')
+    ax1.plot(blockSizes,worstBlockOccurences,marker="o",color="#7570b3")
     leg = ax1.legend(["Best","Worst"])
 
-    ax2.set_ylabel("Occurences")
+    ax2.set_ylabel("Percentage Of Occurences[%]")
     ax2.set_xlabel("Share")
-    ax2.plot(shares,bestShareOccurences,marker="o",color='b')
-    ax2.plot(shares,worstShareOccurences,marker="o",color='r')
+    ax2.plot(shares,bestShareOccurences,marker="o",color='#d95f02')
+    ax2.plot(shares,worstShareOccurences,marker="o",color="#7570b3")
     leg = ax2.legend(["Best","Worst"])
     plt.savefig("./plots/caseModes.pdf")
 
@@ -455,6 +470,20 @@ def PresentationHDE():
         validateHeat(adata,ndata,times)
         os.system("rm temp.hdf5 heatConditions.hdf5 testingHeatFE.hdf5")
 
+def generateOtherEulerGIFs():
+    npx = 48
+    tsteps = 100
+    gmod = 5
+    mul=3
+    data = numpy.zeros((int(mul*tsteps),4,npx,npx))
+    sdata = numpy.zeros((tsteps,4,npx,npx))
+    for i,t in enumerate(numpy.linspace(0,mul,mul*tsteps)):
+        data[i,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t)
+    for i,t in enumerate(numpy.linspace(0,1,tsteps)):
+        sdata[i,:,:,:] = pysweep.equations.euler.getPeriodicShock(npx,t)
+    validate.createContourf(data[:,0,:,:],0,5,5,1,gif=True,gmod=mul*gmod,filename="analyticalVortex.pdf",LZn=0.4)
+    validate.createSurface(sdata[:,0,:,:],0,1,1,1,gif=True,gmod=gmod,filename="analyticalShock.pdf")
+
 def generateEuler(comm,npx,tsteps,gifmod):
     #Numerical
     rank = comm.Get_rank()  #current rank
@@ -505,19 +534,19 @@ if __name__ == "__main__":
     if pres:
         switchColorScheme()
 
-    # # Produce contour plots
-    # sweptEuler = getStudyContour('heat')
-    # sweptEuler = getStudyContour('euler')
+    # Produce contour plots
+    sweptEuler = getStudyContour('heat')
+    sweptEuler = getStudyContour('euler')
     
-    # # Scalability
-    # ScalabilityPlots()
+    # Scalability
+    ScalabilityPlots()
     
-    validateClusterEuler()
+    # validateClusterEuler()
     
     # Produce presentation figures
     # if pres:
     #     PresentationEuler()
     #     PresentationHDE()
-
-    # #mode plots of best and worst cases
+        # generateOtherEulerGIFs()
+    #mode plots of best and worst cases
     # modePlots()

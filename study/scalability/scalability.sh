@@ -28,11 +28,24 @@
 echo $SLURM_JOB_ID
 
 SCALE_NPROC=$(($PYSWEEP_NODES*32))
-SCALE_ARR=$(($PYSWEEP_NODES*960))
+
+if [$PYSWEEP_NODES -eq 1]
+then
+    SCALE_ARR=1424
+elif [$PYSWEEP_NODES -eq 2]
+then
+    SCALE_ARR=2000
+elif [$PYSWEEP_NODES -eq 3]
+then
+    SCALE_ARR=2448
+else
+then
+    SCALE_ARR=2832
+fi
 
 echo $SCALE_NPROC $SCALE_ARR
 
-mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 32 -s 1 --swept --verbose --ignore --clean
+mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.9 --swept --verbose --ignore --clean
 
-mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 32 -s 1 --verbose --ignore --clean
+mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.9 --verbose --ignore --clean
 
