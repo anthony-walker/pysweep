@@ -28,18 +28,14 @@
 echo $SLURM_JOB_ID
 
 SCALE_NPROC=$(($PYSWEEP_NODES*32))
-
-if [$PYSWEEP_NODES -eq 1]
-then
+echo $PYSWEEP_NODES
+if [ $PYSWEEP_NODES -eq 1 ]; then 
     SCALE_ARR=1424
-elif [$PYSWEEP_NODES -eq 2]
-then
+elif [ $PYSWEEP_NODES -eq 2 ]; then
     SCALE_ARR=2000
-elif [$PYSWEEP_NODES -eq 3]
-then
+elif [ $PYSWEEP_NODES -eq 3 ]; then
     SCALE_ARR=2448
 else
-then
     SCALE_ARR=2832
 fi
 
