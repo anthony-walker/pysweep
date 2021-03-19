@@ -45,7 +45,7 @@ else
     SCALE_ARR=3742
 fi
 
-echo $SCALE_NPROC $SCALE_ARR
+echo $SCALE_NPROC $SCALE_ARR $PYSWEEP_EQN
 
 mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.9 --swept --verbose --ignore --clean
 
