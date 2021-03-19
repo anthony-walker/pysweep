@@ -70,13 +70,16 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
     """
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    if rank == 0:
-        X = numpy.linspace(0,1,npx,endpoint=False)
-        Y = numpy.linspace(0,1,npy,endpoint=False)
-        combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
+
+    X = numpy.linspace(0,1,comm.Get_size(),endpoint=False)
+    X = X[rank:rank+1]
+    print(X,npx,npx/comm.Get_size())
+    if rank == 0:   
+        # Y = numpy.linspace(0,1,npy,endpoint=False)
+        # combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
+        combos = []
         combos = numpy.array_split(combos,comm.Get_size())
         print(numpy.shape(combos),comm.Get_size())
-        combos = []
     else:
         combos = None
     combos = comm.scatter(combos)
