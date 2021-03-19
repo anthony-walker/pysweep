@@ -78,10 +78,10 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
     Y = numpy.linspace(0,1,npy,endpoint=True)
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
         initialConditions = hf.create_dataset("data",(1,npx,npy))
-        # for i,x in enumerate(X):
-        #     gi = Idx[i]
-        #     for j,y in enumerate(Y):
-        #         initialConditions[0,gi,j] = analyticalEquation(x,y,t=t,alpha=alpha)
+        for i,x in enumerate(X):
+            gi = Idx[i]
+            for j,y in enumerate(Y):
+                initialConditions[0,gi,j] = analyticalEquation(x,y,t=t,alpha=alpha)
     comm.Barrier()
     return filename
 

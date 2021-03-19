@@ -39,22 +39,18 @@ def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5
     """
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    if rank == 0:
-        L = 5 #From shu
-        X = numpy.linspace(-L,L,npx,endpoint=False)
-        Y = numpy.linspace(-L,L,npy,endpoint=False)
-        combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
-        combos = numpy.array_split(combos,comm.Get_size())
-    else:
-        combos = None
-    combos = comm.scatter(combos)
+    csize = comm.Get_size()
+    X = numpy.linspace(-L,L,csize+1,endpoint=True)[rank:rank+2]
+    Idx = numpy.array_split([i for i in range(npx)],csize)[rank]
+    #Get point specific x and y
+    X = numpy.linspace(X[0],X[1],len(Idx),endpoint=True)
+    Y = numpy.linspace(-L,L,npy,endpoint=True)
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
         initialConditions = hf.create_dataset("data",(4,npx,npy))
-        for cmb in combos:
-            i,j,x,y = cmb
-            i = int(i)
-            j = int(j)
-            initialConditions[:,i,j] = analytical(x,y,t,gamma=gamma)
+        for i,x in enumerate(X):
+            gi = Idx[i]
+            for j,y in enumerate(Y):
+                initialConditions[:,gi,j] = analytical(x,y,t,gamma=gamma)
     comm.Barrier()
     return filename
 
