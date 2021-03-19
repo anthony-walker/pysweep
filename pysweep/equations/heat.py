@@ -72,25 +72,16 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
     rank = comm.Get_rank()
     csize = comm.Get_size()
     X = numpy.linspace(0,1,csize+1,endpoint=True)[rank:rank+2]
-    I = numpy.array_split([i for i in range(npx)],csize)[rank]
-    print(X)
-    print(I)
-    if rank == 0:   
-        # Y = numpy.linspace(0,1,npy,endpoint=False)
-        # combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
-        combos = []
-        combos = numpy.array_split(combos,comm.Get_size())
-        print(numpy.shape(combos),comm.Get_size())
-    else:
-        combos = None
-    combos = comm.scatter(combos)
+    Idx = numpy.array_split([i for i in range(npx)],csize)[rank]
+    #Get point specific x and y
+    X = numpy.linspace(X[0],X[1],len(Idx),endpoint=True)
+    Y = numpy.linspace(0,1,npy,endpoint=True)
     with h5py.File(filename,"w",driver="mpio",comm=comm) as hf:
         initialConditions = hf.create_dataset("data",(1,npx,npy))
-        for cmb in combos:
-            i,j,x,y = cmb
-            i = int(i)
-            j = int(j)
-            initialConditions[0,i,j] = analyticalEquation(x,y,t=t,alpha=alpha)
+        for i,x in enumerate(X):
+            gi = Idx[i]
+            for j,y in enumerate(Y):
+                initialConditions[0,gi,j] = analyticalEquation(x,y,t=t,alpha=alpha)
     comm.Barrier()
     return filename
 
