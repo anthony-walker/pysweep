@@ -4,7 +4,7 @@
 
 #SBATCH --get-user-env                      #Use user env
 
-#SBATCH -A niemeyek						# name of my sponsored account, e.g. class or research group
+#SBATCH -A nrg						# name of my sponsored account, e.g. class or research group
 
 #SBATCH -p preempt								# name of partition or queue
 
