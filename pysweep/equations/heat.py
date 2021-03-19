@@ -75,6 +75,9 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
         Y = numpy.linspace(0,1,npy,endpoint=False)
         combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
         combos = numpy.array_split(combos,comm.Get_size())
+        print(len(combos))
+        for c in combos:
+            print(c)
     else:
         combos = None
     combos = comm.scatter(combos)

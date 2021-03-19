@@ -46,5 +46,5 @@ echo $SLURM_JOB_ID $PYSWEEP_NODES $SCALE_NPROC $SCALE_ARR $PYSWEEP_EQN
 
 mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.9 --swept --verbose --ignore --clean
 
-mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.9 --verbose --ignore --clean
+# mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 500 -b 16 -s 0.9 --verbose --ignore --clean
 

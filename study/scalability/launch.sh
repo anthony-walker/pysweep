@@ -1,13 +1,13 @@
 #!/bin/bash
-a=1
-for name in one two three four five
+a=4
+for name in four five #one two three
 do
-    for eqn in heat euler
-    do
+    # for eqn in heat euler
+    # do
         export PYSWEEP_NODES=$a
         export PYSWEEP_FILE=$name
-        export PYSWEEP_EQN=$eqn
+        export PYSWEEP_EQN=heat #$eqn
         sbatch -N $a --nodefile ./hosts/$name scalability.sh
-    done
+    # done
     a=$((a+1))
 done
