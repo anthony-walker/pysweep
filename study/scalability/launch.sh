@@ -1,6 +1,6 @@
 #!/bin/bash
-a=4
-for name in four five #one two three
+a=3
+for name in three four #one two three four five
 do
     # for eqn in heat euler
     # do
