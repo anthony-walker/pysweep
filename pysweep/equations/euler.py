@@ -40,6 +40,7 @@ def createInitialConditions(npx,npy,t=0,gamma=1.4,filename="eulerConditions.hdf5
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     csize = comm.Get_size()
+    L = 5 #from Shu
     X = numpy.linspace(-L,L,csize+1,endpoint=True)[rank:rank+2]
     Idx = numpy.array_split([i for i in range(npx)],csize)[rank]
     #Get point specific x and y
