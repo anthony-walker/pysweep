@@ -70,10 +70,11 @@ def createInitialConditions(npx,npy,alpha=0.1,t=0,filename="heatConditions.hdf5"
     """
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-
-    X = numpy.linspace(0,1,comm.Get_size(),endpoint=False)
-    X = X[rank:rank+1]
-    print(X,npx,npx/comm.Get_size())
+    csize = comm.Get_size()
+    X = numpy.linspace(0,1,csize+1,endpoint=True)[rank:rank+2]
+    I = numpy.array_split([i for i in range(npx)],csize)[rank]
+    print(X)
+    print(I)
     if rank == 0:   
         # Y = numpy.linspace(0,1,npy,endpoint=False)
         # combos = [(i,j,x,y) for i,x in enumerate(X) for j,y in enumerate(Y)]
