@@ -35,8 +35,14 @@ elif [ $PYSWEEP_NODES -eq 2 ]; then
     SCALE_ARR=2000
 elif [ $PYSWEEP_NODES -eq 3 ]; then
     SCALE_ARR=2448
-else
+elif [ $PYSWEEP_NODES -eq 4 ]; then
     SCALE_ARR=2832
+elif [ $PYSWEEP_NODES -eq 5 ]; then
+    SCALE_ARR=3162
+elif [ $PYSWEEP_NODES -eq 6 ]; then
+    SCALE_ARR=3464
+else
+    SCALE_ARR=3742
 fi
 
 echo $SCALE_NPROC $SCALE_ARR
