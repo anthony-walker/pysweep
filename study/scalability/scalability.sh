@@ -6,7 +6,7 @@
 
 #SBATCH -A nrg						# name of my sponsored account, e.g. class or research group
 
-#SBATCH -p dgx2								# name of partition or queue
+#SBATCH -p preempt								# name of partition or queue
 
 #SBATCH --gres=gpu:1
 

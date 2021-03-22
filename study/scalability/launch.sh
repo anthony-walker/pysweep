@@ -3,7 +3,7 @@
 for eqn in heat euler
 do
     export a=1
-    for name in one two three four five six
+    for name in one two three four five
     do
         
             export PYSWEEP_NODES=$a
