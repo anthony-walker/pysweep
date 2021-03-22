@@ -142,3 +142,75 @@
   share: 0.904
   swept: false
   time_per_step: 0.53762273645401
+03/21/2021-03:04:35:
+  array_shape:
+  - 498
+  - 1
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 368.0097289085388
+  share: 0.903954802259887
+  swept: true
+  time_per_step: 0.7404622312043034
+03/21/2021-03:09:53:
+  array_shape:
+  - 501
+  - 1
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 305.2223422527313
+  share: 0.903954802259887
+  swept: false
+  time_per_step: 0.6104446845054626
+03/21/2021-10:21:55:
+  array_shape:
+  - 500
+  - 4
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 11180.734561443329
+  share: 0.903954802259887
+  swept: true
+  time_per_step: 22.406281686259177
+03/21/2021-18:43:27:
+  array_shape:
+  - 501
+  - 4
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 9076.114846229553
+  share: 0.903954802259887
+  swept: false
+  time_per_step: 18.152229692459105
+03/21/2021-18:59:36:
+  array_shape:
+  - 498
+  - 1
+  - 1424
+  - 1424
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 297.8832423686981
+  share: 0.9101123595505618
+  swept: true
+  time_per_step: 0.5993626607016058
+03/21/2021-19:04:30:
+  array_shape:
+  - 501
+  - 1
+  - 1424
+  - 1424
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 281.9367182254791
+  share: 0.9101123595505618
+  swept: false
+  time_per_step: 0.5638734364509582
