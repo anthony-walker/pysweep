@@ -320,7 +320,7 @@ def createSubFigurePlots():
     fcns1 = [Up1,Y1,Comm1,X1]
     for i,fcn in enumerate(fcns1):
         fcn(axes[i],name=name)
-        axes[i].set_title("({})".format(letters[i]))
+        # axes[i].set_title("({})".format(letters[i]))
 
     #Second subplot
     name2 = "SubsPlot2.pdf"
@@ -421,12 +421,12 @@ def numericalImpactImage():
     plt.savefig("NumericalImpact-3.pdf")
 
 if __name__ == "__main__":
-    switchColorScheme()
+    # switchColorScheme()
     # createAll()
     
-    # createSubFigurePlots()
+    createSubFigurePlots()
     # createPresentationGif()
-    numericalImpactImage()
+    # numericalImpactImage()
     
 
     

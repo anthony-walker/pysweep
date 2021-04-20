@@ -92,7 +92,7 @@ def validateClusterEuler():
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
             ax.yaxis.labelpad=-1
-            ax.set_title('N:$t={:0.2e}$ [s]'.format(times[i]*dt))
+            ax.set_title('N:$t={:0.2f}$ [s]'.format(times[i]*dt))
             validate.eulerContourAx(ax,data[times[i],0],1,1)
             ax.grid('on',color="k")
         #Analytical
@@ -101,7 +101,7 @@ def validateClusterEuler():
             ax.set_xlabel("X")
             ax.set_ylabel("Y")
             ax.yaxis.labelpad=-1
-            ax.set_title('A:$t={:0.2e}$ [s]'.format(times[i]*dt))
+            ax.set_title('A:$t={:0.2f}$ [s]'.format(times[i]*dt))
             adata = numpy.zeros((1,4,npx,npx))
             adata[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=(times[i])*dt)
             validate.eulerContourAx(ax,adata[0,0],1,1)
@@ -254,6 +254,7 @@ def getStudyContour(equation):
 
     #Hardware Speedup
     hardwareSpeedUp = oldsweptdata[:,5]/newsweptdata[:,5]
+    hardwareSpeedUpStand = oldstandarddata[:,5]/newstandarddata[:,5]
     print("Hardware Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(hardwareSpeedUp)))
     print("Hardware Speed Up Min {}:{:0.2f}".format(equation,numpy.amin(hardwareSpeedUp)))
     print("Hardware Speed Up Max {}:{:0.2f}\n".format(equation,numpy.amax(hardwareSpeedUp)))
@@ -261,6 +262,7 @@ def getStudyContour(equation):
     # if equation == "heat":
     #     speedLimits = numpy.linspace(1,2,11)
     makeArrayContours(hardwareSpeedUp,oldsweptdata[:,2],oldsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/hardwareSpeedUp{}.pdf".format(equation),switch=True)
+    makeArrayContours(hardwareSpeedUpStand,oldstandarddata[:,2],oldstandarddata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/hardwareStandardSpeedUp{}.pdf".format(equation),switch=True)
     
     # 3D plot
     ThreeDimPlot(oldsweptdata[:,2],100*oldsweptdata[:,3],oldspeedup,speedLimits)
@@ -281,54 +283,50 @@ def ThreeDimPlot(x,y,z,lims):
 def lineregressSlope(d1,d2,name):
     slope, intercept, r_value, p_value, std_err = linregress(d1, d2)
     print(name,slope)
+    return slope
 
 def ScalabilityPlots():
-    
+    plt.close()
     data,standardSizes = getYamlData("./scalability/scalability.yaml","euler")
     dl = len(data)
     eulersweptdata = data[dl//2:]
     eulerstandarddata = data[:dl//2]
-
     data,standardSizes = getYamlData("./scalability/scalability.yaml","heat")
     dl = len(data)
     heatsweptdata = data[dl//2:]
     heatstandarddata = data[:dl//2]
-    fig, axes = plt.subplots(ncols=2,nrows=1)
-    fig.subplots_adjust(wspace=0.55)
     #Euler
-    ax=axes[0]
-    ymax = numpy.ceil(numpy.amax([eulersweptdata,eulerstandarddata])+1000)
-    ymin = numpy.floor(numpy.amin([eulersweptdata,eulerstandarddata]))
-    # ax.set_aspect('equal', adjustable='box')
-    # ax.set_xlim([0,4])
-    # ax.set_ylim([ymin,ymax])
-    ax.set_ylabel("Clock time [s]")
-    ax.set_xlabel("Number of Nodes")
-    ax.set_title("Compressible Euler Equations")
-    # ax.set_title("Weak Scalability")
-    l1 = ax.plot(eulersweptdata[:,1],eulersweptdata[:,4],marker="o",color='#d95f02')
-    l2 = ax.plot(eulerstandarddata[:,1],eulerstandarddata[:,4],marker="o",color="#7570b3")
-    lineregressSlope(eulersweptdata[:,1],eulersweptdata[:,4],"Swept Euler ")
-    lineregressSlope(eulerstandarddata[:,1],eulerstandarddata[:,4],"Standard Euler ")
+    fig, ax = plt.subplots(ncols=1,nrows=1)
+    ax.set_ylabel("Time per Timestep [s]")
+    ax.set_xlabel("Spatial Points")
+    # ax.set_title("Compressible Euler Equations")
+    spacedata = eulersweptdata[:,1]*eulersweptdata[:,1] #2580*numpy.arange(1,5,1)#
+    ax.axis([10**6,10**7, 10, 30])
+    l1 = ax.loglog(spacedata,eulersweptdata[:,5],marker="o",color='#d95f02')
+    l2 = ax.loglog(spacedata,eulerstandarddata[:,5],marker="o",color="#7570b3")
+    lrgsw = lineregressSlope(spacedata,eulersweptdata[:,5],"Swept Euler ")
+    lrgst = lineregressSlope(spacedata,eulerstandarddata[:,5],"Standard Euler ")
+    # ax.annotate('m={:.2f}'.format(lrgsw), xy=(eulersweptdata[-2,1],eulersweptdata[-2,5]), xytext=(eulersweptdata[-2,1]-1000, eulersweptdata[-2,5]+500),arrowprops=dict(facecolor='black', arrowstyle="simple"))
+    # ax.annotate('m={:.2f}'.format(lrgst), xy=(eulerstandarddata[-2,1],eulerstandarddata[-2,4]), xytext=(eulerstandarddata[-2,1]-500, eulerstandarddata[-2,4]+1000),arrowprops=dict(facecolor='black', arrowstyle="simple"))
     leg = ax.legend(["Swept","Standard"])
+    plt.savefig("./plots/weakScalabilityEuler.pdf")
+    plt.close('all')
 
     #Heat
-    ax=axes[1]
-    ymax = numpy.ceil(numpy.amax([heatsweptdata,heatstandarddata]))
-    ymin = numpy.floor(numpy.amin([heatsweptdata,heatstandarddata])) 
-    ax.set_ylabel("Clock time [s]")
-    ax.set_xlabel("Number of Nodes")
-    # ax.set_aspect('equal', adjustable='box')
-    # ax.set_xlim([0,4])
-    # ax.set_ylim([ymin,1000])
-    ax.set_title("Heat Diffusion Equation")
-    # ax.set_title("Weak Scalability")
-    l1 = ax.plot(heatsweptdata[:,1],heatsweptdata[:,4],marker="o",color='#d95f02')
-    l2 = ax.plot(heatstandarddata[:,1],heatstandarddata[:,4],marker="o",color="#7570b3")
-    lineregressSlope(heatsweptdata[:,1],heatsweptdata[:,4],"Swept Heat ")
-    lineregressSlope(heatstandarddata[:,1],heatstandarddata[:,4],"Standard Heat ")
+    fig, ax = plt.subplots(ncols=1,nrows=1)
+    ax.axis([10**6,10**7, 3* 10**-1, 10**0])
+    ax.yaxis.set_label_coords(-0.135,0.5)
+    ax.set_ylabel("Time per Timestep [s]")
+    ax.set_xlabel("Spatial Points")
+    # ax.set_title("Heat Diffusion Equation")
+    l1 = ax.loglog(spacedata,heatsweptdata[:,5],marker="o",color='#d95f02')
+    l2 = ax.loglog(spacedata,heatstandarddata[:,5],marker="o",color="#7570b3")
+    lrgsw = lineregressSlope(spacedata,heatsweptdata[:,5],"Swept Heat ")
+    lrgst = lineregressSlope(spacedata,heatstandarddata[:,5],"Standard Heat ")
+    # ax.annotate('m={:.2f}'.format(lrgsw), xy=(heatsweptdata[-2,1],heatsweptdata[-2,5]), xytext=(heatsweptdata[-2,1]-1000, heatsweptdata[-2,5]),arrowprops=dict(facecolor='black', arrowstyle="simple"))
+    # ax.annotate('m={:.2f}'.format(lrgst), xy=(heatstandarddata[-2,1],heatstandarddata[-2,4]), xytext=(heatstandarddata[-2,1], heatstandarddata[-2,4]-30),arrowprops=dict(facecolor='black', arrowstyle="simple"))
     leg = ax.legend(["Swept","Standard"])
-    plt.savefig("./plots/weakScalability.pdf")
+    plt.savefig("./plots/weakScalabilityHeat.pdf")
     plt.close('all')
     # plt.show()
 
@@ -525,7 +523,7 @@ if __name__ == "__main__":
     calcNumberOfPts()
     
     #Presentation bool
-    pres = True
+    pres = False
     #Switch colors to match presentation
     if pres:
         switchColorScheme()
