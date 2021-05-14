@@ -1,0 +1,34 @@
+#!/bin/tcsh
+    ### myBatchSubmit
+    ### LSF syntax
+    #BSUB -nnodes 32                   #number of nodes
+    #BSUB -W 100                      #walltime in minutes
+    #BSUB -G orsu                     #account
+    #BSUB -e pysweep-log-32.txt              #stderr
+    #BSUB -o pysweep-out-32.txt              #stdout
+    #BSUB -J pysweep-32               #name of job
+    #BSUB -q pbatch                   #queue to use
+
+    ### Shell scripting
+    hostname
+    echo -n 'JobID is '; echo $LSB_JOBID
+    
+    conda activate pysweep-dev
+    
+    ### Launch parallel executable
+    echo 'Launching executable...'
+    echo 'Time at computation start:'
+    date
+    echo ' '
+    jsrun -n32 -r1 -a40 -c40 pysweep -f euler -nx 8000 -nt 2000 -b 16 -s 1 --swept --verbose --ignore --clean
+
+    jsrun -n32 -r1 -a40 -c40 pysweep -f euler -nx 8000 -nt 2000 -b 16 -s 1 --verbose --ignore --clean
+
+    jsrun -n32 -r1 -a40 -c40 pysweep -f heat -nx 8000 -nt 2000 -b 16 -s 1 --swept --verbose --ignore --clean
+
+    jsrun -n32 -r1 -a40 -c40 pysweep -f heat -nx 8000 -nt 2000 -b 16 -s 1 --verbose --ignore --clean
+    echo 'Time at computation finish:'
+    date
+    echo 'Done'
+
+    

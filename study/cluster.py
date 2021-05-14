@@ -2,7 +2,7 @@ import numpy, yaml, itertools, h5py, math
 import pysweep.utils.validate as validate
 import pysweep.tests as tests
 import pysweep
-import matplotlib 
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib import cm
@@ -57,7 +57,7 @@ def calcNumberOfPts():
         cutoffs.append(npts)
     return npts
 
-def validateClusterEuler(): 
+def validateClusterEuler():
     #Plotting
     elev=45
     azim=25
@@ -106,9 +106,9 @@ def validateClusterEuler():
             adata[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=(times[i])*dt)
             validate.eulerContourAx(ax,adata[0,0],1,1)
             ax.grid('on',color="k")
-    plt.savefig("./plots/eulerValidate.pdf")
+    plt.savefig("./plots/eulerValidate.pdf",bbox_inches='tight')
     plt.close('all')
-        
+
 def generateArraySizes():
     """Use this function to generate array sizes based on block sizes."""
     blocksizes = [8, 12, 16, 20, 24, 32] #blocksizes with most options
@@ -135,7 +135,7 @@ def getYamlData(file,equation):
     while i < len(data):
         j = i+1
         while j < len(data):
-            if data[i][:4] == data[j][:4]: 
+            if data[i][:4] == data[j][:4]:
                 data.pop(j)
             j+=1
         i+=1
@@ -144,7 +144,7 @@ def getYamlData(file,equation):
     indexes = numpy.lexsort((data[:,3],data[:,2],data[:,1],data[:,0]))
     sortedData = numpy.zeros(data.shape)
     for i,idx in enumerate(indexes):
-        sortedData[i,:] = data[idx,:] 
+        sortedData[i,:] = data[idx,:]
     return sortedData,standardSizes
 
 def checkForAllPts(sortedData):
@@ -207,7 +207,7 @@ def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,p
         axes[i].set_yticks([0,25,50,75,100])
         axes[i].yaxis.labelpad = 0.5
         axes[i].xaxis.labelpad = 0.5
-    plt.savefig(fname)
+    plt.savefig(fname,bbox_inches='tight')
     plt.close('all')
 
 def getContourYamlData(file,equation):
@@ -223,7 +223,7 @@ def getDataLimits(data,npts=10):
     upperLimit = math.ceil(upperLimit*10)/10
     lowerLimit = math.floor(lowerLimit*10)/10
     return numpy.linspace(lowerLimit,upperLimit,npts)
-    
+
 
 def getStudyContour(equation):
     #Get data
@@ -231,10 +231,6 @@ def getStudyContour(equation):
     olddata,oldstandarddata,oldsweptdata,oldstandardSizes,oldspeedup = getContourYamlData("./oldHardware/log.yaml",equation)
     #Make contour
     #Speedup contours
-    print("New Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(newspeedup)))
-    print("Old Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(oldspeedup)))
-    print("New Speed Up Min,Max {}:{:0.2f},{:0.2f}".format(equation,numpy.amin(newspeedup),numpy.amax(newspeedup)))
-    print("Old Speed Up Min,Max {}:{:0.2f},{:0.2f}".format(equation,numpy.amin(oldspeedup),numpy.amax(oldspeedup)))
     speedLimits = getDataLimits([newspeedup,oldspeedup])
     makeArrayContours(oldspeedup,oldsweptdata[:,2],oldsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+"Old"),switch=True,record=True)
     makeArrayContours(newspeedup,newsweptdata[:,2],newsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/speedUp{}.pdf".format(equation+"New"),switch=True,record=True)
@@ -251,19 +247,36 @@ def getStudyContour(equation):
     makeArrayContours(newsweptdata[:,5],newsweptdata[:,2],newsweptdata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepSwept{}.pdf".format(equation+"New"))
     makeArrayContours(oldstandarddata[:,5],oldstandarddata[:,2],oldstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"Old"))
     makeArrayContours(newstandarddata[:,5],newstandarddata[:,2],newstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"New"))
+    
+    #Speedup based on time per timestep
+    new_tpt_speedup = newstandarddata[:,5]/newsweptdata[:,5]
+    old_tpt_speedup = oldstandarddata[:,5]/oldsweptdata[:,5]
+    tptSpeedLimits = getDataLimits([new_tpt_speedup,old_tpt_speedup])
+    makeArrayContours(new_tpt_speedup,newsweptdata[:,2],newsweptdata[:,3],tptSpeedLimits,cm.inferno,'Speedup',"./plots/SpeedupTPT{}.pdf".format(equation+"New"))
+    makeArrayContours(old_tpt_speedup,oldsweptdata[:,2],oldsweptdata[:,3],tptSpeedLimits,cm.inferno,'Speedup',"./plots/SpeedupTPT{}.pdf".format(equation+"Old"))
+    
+    # makeArrayContours(oldstandarddata[:,5],oldstandarddata[:,2],oldstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"Old"))
+    # makeArrayContours(newstandarddata[:,5],newstandarddata[:,2],newstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"New"))
+    
 
     #Hardware Speedup
     hardwareSpeedUp = oldsweptdata[:,5]/newsweptdata[:,5]
     hardwareSpeedUpStand = oldstandarddata[:,5]/newstandarddata[:,5]
-    print("Hardware Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(hardwareSpeedUp)))
-    print("Hardware Speed Up Min {}:{:0.2f}".format(equation,numpy.amin(hardwareSpeedUp)))
-    print("Hardware Speed Up Max {}:{:0.2f}\n".format(equation,numpy.amax(hardwareSpeedUp)))
+    # print("Hardware Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(hardwareSpeedUp)))
+    # print("Hardware Speed Up Min {}:{:0.2f}".format(equation,numpy.amin(hardwareSpeedUp)))
+    # print("Hardware Speed Up Max {}:{:0.2f}\n".format(equation,numpy.amax(hardwareSpeedUp)))
     speedLimits = getDataLimits([hardwareSpeedUp,])
     # if equation == "heat":
     #     speedLimits = numpy.linspace(1,2,11)
     makeArrayContours(hardwareSpeedUp,oldsweptdata[:,2],oldsweptdata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/hardwareSpeedUp{}.pdf".format(equation),switch=True)
     makeArrayContours(hardwareSpeedUpStand,oldstandarddata[:,2],oldstandarddata[:,3],speedLimits,cm.inferno,'Speedup',"./plots/hardwareStandardSpeedUp{}.pdf".format(equation),switch=True)
+
+    # print("New Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(newspeedup)))
+    # print("Old Speed Up Average {}:{:0.2f}".format(equation,numpy.mean(oldspeedup)))
+    print("New Speed Up Min,Max {}:{:0.2f},{:0.2f}".format(equation,numpy.amin(new_tpt_speedup),numpy.amax(new_tpt_speedup)))
+    print("Old Speed Up Min,Max {}:{:0.2f},{:0.2f}".format(equation,numpy.amin(old_tpt_speedup),numpy.amax(old_tpt_speedup)))
     
+
     # 3D plot
     ThreeDimPlot(oldsweptdata[:,2],100*oldsweptdata[:,3],oldspeedup,speedLimits)
     return oldsweptdata,newsweptdata
@@ -277,7 +290,7 @@ def ThreeDimPlot(x,y,z,lims):
     ax.set_yticks([0,25,50,75,100])
     ax.set_zlim([lims[0],lims[-1]])
     ax.yaxis.labelpad = 0.5
-    ax.xaxis.labelpad = 0.5  
+    ax.xaxis.labelpad = 0.5
     # plt.show()
 
 def lineregressSlope(d1,d2,name):
@@ -295,38 +308,39 @@ def ScalabilityPlots():
     dl = len(data)
     heatsweptdata = data[dl//2:]
     heatstandarddata = data[:dl//2]
+    lsty = "--"
     #Euler
     fig, ax = plt.subplots(ncols=1,nrows=1)
     ax.set_ylabel("Time per Timestep [s]")
     ax.set_xlabel("Spatial Points")
     # ax.set_title("Compressible Euler Equations")
     spacedata = eulersweptdata[:,1]*eulersweptdata[:,1] #2580*numpy.arange(1,5,1)#
-    ax.axis([10**6,10**7, 10, 30])
+    # ax.axis([10**6,10**7, 10, 30])
     l1 = ax.loglog(spacedata,eulersweptdata[:,5],marker="o",color='#d95f02')
-    l2 = ax.loglog(spacedata,eulerstandarddata[:,5],marker="o",color="#7570b3")
+    l2 = ax.loglog(spacedata,eulerstandarddata[:,5],marker="s",color="#7570b3",linestyle=lsty)
     lrgsw = lineregressSlope(spacedata,eulersweptdata[:,5],"Swept Euler ")
     lrgst = lineregressSlope(spacedata,eulerstandarddata[:,5],"Standard Euler ")
     # ax.annotate('m={:.2f}'.format(lrgsw), xy=(eulersweptdata[-2,1],eulersweptdata[-2,5]), xytext=(eulersweptdata[-2,1]-1000, eulersweptdata[-2,5]+500),arrowprops=dict(facecolor='black', arrowstyle="simple"))
     # ax.annotate('m={:.2f}'.format(lrgst), xy=(eulerstandarddata[-2,1],eulerstandarddata[-2,4]), xytext=(eulerstandarddata[-2,1]-500, eulerstandarddata[-2,4]+1000),arrowprops=dict(facecolor='black', arrowstyle="simple"))
     leg = ax.legend(["Swept","Standard"])
-    plt.savefig("./plots/weakScalabilityEuler.pdf")
+    plt.savefig("./plots/weakScalabilityEuler.pdf",bbox_inches='tight')
     plt.close('all')
 
     #Heat
     fig, ax = plt.subplots(ncols=1,nrows=1)
-    ax.axis([10**6,10**7, 3* 10**-1, 10**0])
+    # ax.axis([10**6,10**7, 3* 10**-1, 10**0])
     ax.yaxis.set_label_coords(-0.135,0.5)
     ax.set_ylabel("Time per Timestep [s]")
     ax.set_xlabel("Spatial Points")
     # ax.set_title("Heat Diffusion Equation")
     l1 = ax.loglog(spacedata,heatsweptdata[:,5],marker="o",color='#d95f02')
-    l2 = ax.loglog(spacedata,heatstandarddata[:,5],marker="o",color="#7570b3")
+    l2 = ax.loglog(spacedata,heatstandarddata[:,5],marker="s",color="#7570b3",linestyle=lsty)
     lrgsw = lineregressSlope(spacedata,heatsweptdata[:,5],"Swept Heat ")
     lrgst = lineregressSlope(spacedata,heatstandarddata[:,5],"Standard Heat ")
     # ax.annotate('m={:.2f}'.format(lrgsw), xy=(heatsweptdata[-2,1],heatsweptdata[-2,5]), xytext=(heatsweptdata[-2,1]-1000, heatsweptdata[-2,5]),arrowprops=dict(facecolor='black', arrowstyle="simple"))
     # ax.annotate('m={:.2f}'.format(lrgst), xy=(heatstandarddata[-2,1],heatstandarddata[-2,4]), xytext=(heatstandarddata[-2,1], heatstandarddata[-2,4]-30),arrowprops=dict(facecolor='black', arrowstyle="simple"))
     leg = ax.legend(["Swept","Standard"])
-    plt.savefig("./plots/weakScalabilityHeat.pdf")
+    plt.savefig("./plots/weakScalabilityHeat.pdf",bbox_inches='tight')
     plt.close('all')
     # plt.show()
 
@@ -338,7 +352,7 @@ def modePlots():
     global best, worst
     best = [(i[0],round(j[0]*10,0)/10) for i, j in best]
     worst = [(i[0],round(j[0]*10,0)/10) for i, j in worst]
-    
+
     bBlocks,bShares = zip(*best)
     wBlocks,wShares = zip(*worst)
     bestBlockOccurences = getOccurences(bBlocks,blockSizes) #[:len(bBlocks//2)]
@@ -364,7 +378,7 @@ def modePlots():
     ax2.plot(shares,bestShareOccurences,marker="o",color='#d95f02')
     ax2.plot(shares,worstShareOccurences,marker="o",color="#7570b3")
     leg = ax2.legend(["Best","Worst"])
-    plt.savefig("./plots/caseModes.pdf")
+    plt.savefig("./plots/caseModes.pdf",bbox_inches='tight')
 
 def validateHeat(adata,ndata,times):
     #Plotting
@@ -400,10 +414,10 @@ def validateHeat(adata,ndata,times):
         ax.yaxis.labelpad=-1
         ax.set_title('N:$t={:0.2f}$ [s]'.format(times[i]))
         validate.heatContourAx(ax,adata[i],1,1)
-    plt.savefig("./plots/heatValidate.pdf")
+    plt.savefig("./plots/heatValidate.pdf",bbox_inches='tight')
     plt.close('all')
 
-def PresentationHDE():  
+def PresentationHDE():
     #MPI stuff
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()  #current rank
@@ -436,7 +450,7 @@ def PresentationHDE():
             for i,ts in enumerate([finalsteps//10,finalsteps//2,finalsteps-1]):
                 ndata[i,:,:] = data[ts,0,:,:]
         comm.Barrier()
-    
+
     #Analytical solution
     if rank == 0:
         points = [(int(i),k) for i,k in enumerate(numpy.linspace(0,tf,tsteps))]
@@ -502,7 +516,7 @@ def PresentationEuler():
     gamma=1.4
     d=0.1
     tf,dt = pysweep.equations.euler.getFinalTime(npx1,tsteps,gamma=gamma)
- 
+
     if rank==0:
         validate.switchColorScheme() #Change color scheme
     sizes = [npx1,360,720]
@@ -521,7 +535,7 @@ def PresentationEuler():
 if __name__ == "__main__":
     #Find number of points there should be
     calcNumberOfPts()
-    
+
     #Presentation bool
     pres = False
     #Switch colors to match presentation
@@ -531,16 +545,16 @@ if __name__ == "__main__":
     # Produce contour plots
     sweptEuler = getStudyContour('heat')
     sweptEuler = getStudyContour('euler')
-    
+
     # Scalability
     ScalabilityPlots()
-    
-    # validateClusterEuler()
-    
-    # Produce presentation figures
+
+    # # validateClusterEuler()
+
+    # # Produce presentation figures
     # if pres:
     #     PresentationEuler()
     #     PresentationHDE()
-        # generateOtherEulerGIFs()
-    #mode plots of best and worst cases
+    #     generateOtherEulerGIFs()
+    # # mode plots of best and worst cases
     # modePlots()

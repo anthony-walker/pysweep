@@ -1,0 +1,20 @@
+#!/bin/bash
+conda install --yes -c conda-forge numpy matplotlib yaml mpi4py scipy sympy gputil
+
+#cloning
+git clone https://github.com/h5py/h5py.git
+cd ./h5py
+
+#setting up
+export CC=$(which mpicc)
+export HDF5_MPI="ON"
+export HDF5_DIR=$(dirname $(dirname $(which h5pcc)))
+python setup.py clean
+python setup.py build
+python setup.py install
+
+#removing
+cd ../
+rm -rf ./h5py
+
+python3 -m pip install -e .
