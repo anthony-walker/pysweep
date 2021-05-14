@@ -1,0 +1,4 @@
+#!/bin/bash
+git clone https://github.com/anthony-walker/pysweep-git.git
+cd ./pysweep-git
+./env-setup
