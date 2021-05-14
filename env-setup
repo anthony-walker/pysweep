@@ -10,7 +10,7 @@ export CC=$(which mpicc)
 export HDF5_MPI="ON"
 export HDF5_DIR=$(dirname $(dirname $(which h5pcc)))
 
-pip install mpi4py --mpicc=$CC
+pip install mpi4py
 
 python setup.py clean
 python setup.py build
