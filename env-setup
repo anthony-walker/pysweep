@@ -1,5 +1,5 @@
 #!/bin/bash
-conda install --yes -c conda-forge numpy matplotlib pyyaml scipy sympy gputil
+conda install --yes -c conda-forge mpi4py numpy matplotlib pyyaml scipy sympy gputil
 
 #cloning
 git clone https://github.com/h5py/h5py.git
