@@ -1,17 +1,23 @@
 #!/bin/bash
-conda install --yes -c conda-forge numpy matplotlib pyyaml scipy sympy gputil
+conda install --yes -c conda-forge mpi4py numpy matplotlib pyyaml scipy sympy gputil
 
 #cloning
 git clone https://github.com/h5py/h5py.git
-cd ./h5py
+git clone https://github.com/mpi4py/mpi4py.git
 
-#setting up
 export CC=$(which mpicc)
 export HDF5_MPI="ON"
 export HDF5_DIR=$(dirname $(dirname $(which h5pcc)))
 
-pip install mpi4py
+#install mpi4py
+cd ./mpi4py
+python setup.py build --mpicc=$(dirname $CC)
+python setup.py install
+cd ../
+rm -rf ./mpi4py
 
+#install h5py
+cd ./h5py
 python setup.py clean
 python setup.py build
 python setup.py install
