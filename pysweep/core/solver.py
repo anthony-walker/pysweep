@@ -37,10 +37,10 @@ class Solver(object):
         self.createTimeStepData()
         self.moments.append(time.time())
 
-        #Creating simulatneous input and output file
-        io.verbosePrint(self,'Creating output file...\n')
-        io.createOutputFile(self)
-        self.moments.append(time.time())
+        # #Creating simulatneous input and output file
+        # io.verbosePrint(self,'Creating output file...\n')
+        # io.createOutputFile(self)
+        # self.moments.append(time.time())
         
         # Creating shared array
         io.verbosePrint(self,'Creating shared memory arrays and process functions...\n')
