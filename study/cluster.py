@@ -9,6 +9,8 @@ from matplotlib import cm
 from matplotlib import tri
 from mpl_toolkits import mplot3d
 from matplotlib.colors import Normalize
+import mpi4py
+mpi4py.rc.recv_mprobe = False
 import mpi4py.MPI as MPI
 import os
 from scipy.stats import linregress

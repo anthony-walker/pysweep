@@ -1,6 +1,9 @@
 
 import numpy, h5py, os, sys
+import mpi4py
+mpi4py.rc.recv_mprobe = False
 import mpi4py.MPI as MPI
+
 import pysweep.core.io as io
 try:
     import pycuda.driver as cuda
