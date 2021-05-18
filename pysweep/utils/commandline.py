@@ -65,7 +65,7 @@ def runEuler(args):
         if solver.rank == 0:
             try:
                 # os.system("rm {}".format(filename))
-                os.system("rm {}".format(solver.output))
+                pass #os.system("rm {}".format(solver.output))
             except Exception as e:
                 pass
 
