@@ -1,0 +1,192 @@
+05/03/2021-21:21:06:
+  array_shape:
+  - 498
+  - 1
+  - 2000
+  - 2000
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 106.4237015247345
+  share: 1.0
+  swept: true
+  time_per_step: 0.21413219622682997
+05/03/2021-21:21:08:
+  array_shape:
+  - 498
+  - 1
+  - 1424
+  - 1424
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 106.47289562225342
+  share: 1.0
+  swept: true
+  time_per_step: 0.2142311783143932
+05/03/2021-21:22:13:
+  array_shape:
+  - 501
+  - 1
+  - 2000
+  - 2000
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 63.55119442939758
+  share: 1.0
+  swept: false
+  time_per_step: 0.12710238885879516
+05/03/2021-21:22:16:
+  array_shape:
+  - 501
+  - 1
+  - 1424
+  - 1424
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 64.62413597106934
+  share: 1.0
+  swept: false
+  time_per_step: 0.12924827194213867
+05/03/2021-21:24:26:
+  array_shape:
+  - 498
+  - 1
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 122.51238536834717
+  share: 1.0
+  swept: true
+  time_per_step: 0.24650379349768042
+05/03/2021-21:26:14:
+  array_shape:
+  - 501
+  - 1
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 103.65755701065063
+  share: 1.0
+  swept: false
+  time_per_step: 0.20731511402130126
+05/03/2021-21:28:00:
+  array_shape:
+  - 498
+  - 1
+  - 2448
+  - 2448
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 99.20195150375366
+  share: 1.0
+  swept: true
+  time_per_step: 0.19960151207998725
+05/03/2021-21:29:14:
+  array_shape:
+  - 501
+  - 1
+  - 2448
+  - 2448
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+  runtime: 69.78567719459534
+  share: 1.0
+  swept: false
+  time_per_step: 0.13957135438919066
+05/03/2021-21:39:29:
+  array_shape:
+  - 500
+  - 4
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 1025.3835508823395
+  share: 1.0
+  swept: true
+  time_per_step: 2.05487685547563
+05/03/2021-21:44:50:
+  array_shape:
+  - 500
+  - 4
+  - 2448
+  - 2448
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 925.1711220741272
+  share: 1.0
+  swept: true
+  time_per_step: 1.8540503448379302
+05/03/2021-21:49:13:
+  array_shape:
+  - 501
+  - 4
+  - 2832
+  - 2832
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 577.2254340648651
+  share: 1.0
+  swept: false
+  time_per_step: 1.1544508681297303
+05/03/2021-21:53:15:
+  array_shape:
+  - 501
+  - 4
+  - 2448
+  - 2448
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 499.5572519302368
+  share: 1.0
+  swept: false
+  time_per_step: 0.9991145038604736
+05/03/2021-22:03:47:
+  array_shape:
+  - 499
+  - 4
+  - 2000
+  - 2000
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 863.8364078998566
+  share: 1.0
+  swept: true
+  time_per_step: 1.7346112608430855
+05/03/2021-22:05:37:
+  array_shape:
+  - 500
+  - 4
+  - 1424
+  - 1424
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 732.1774785518646
+  share: 1.0
+  swept: true
+  time_per_step: 1.4672895361760814
+05/03/2021-22:10:52:
+  array_shape:
+  - 500
+  - 4
+  - 2000
+  - 2000
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 419.3391237258911
+  share: 1.0
+  swept: false
+  time_per_step: 0.8403589653825473
+05/03/2021-22:11:59:
+  array_shape:
+  - 501
+  - 4
+  - 1424
+  - 1424
+  blocksize: 16
+  cpu: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/euler.py
+  runtime: 377.96594190597534
+  share: 1.0
+  swept: false
+  time_per_step: 0.7559318838119506

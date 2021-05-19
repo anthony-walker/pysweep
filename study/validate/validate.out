@@ -1,0 +1,18 @@
+164398
+
+Pysweep simulation properties:
+	simulation type: swept
+	number of processes: 32
+	gpu source: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.cu
+	cpu source: /nfs/hpc/share/walkanth/pysweep-git/pysweep/equations/heat.py
+	output file: heatOutput.hdf5
+	verbose: False
+	Array shape: (1, 1120, 1120)
+	dtype: float64
+	share: 0.9
+	blocksize: 32
+	stencil size: 3
+	intermediate time steps: 1
+	time data (t0,tf,dt): (0,0.00019965483671828145,7.986193468731258e-08)
+	globals: [0,0.00019965483671828145,7.986193468731258e-08,0.0008936550491510277,0.0008936550491510277,1,True]
+
