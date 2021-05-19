@@ -32,8 +32,8 @@ def cleanupProcesses(solver,start,stop):
         solver.cuda_context.pop()
     solver.comm.Barrier()
     clocktime = stop-start
-    solver.clocktime[0] = clocktime
-    solver.hdf5.close()
+    # solver.clocktime[0] = clocktime
+    # solver.hdf5.close()
     #Removing input file.
     if solver.clusterMasterBool:
         io.updateLogFile(solver,clocktime)

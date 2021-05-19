@@ -23,7 +23,7 @@ azim2=45
 #Angle
 gelev=40
 gazim=35
-
+sloc = "lower left"
 anch_box = (-15,-5,5)
 alps = [0,0.1,1]
 lnc = 1
@@ -41,8 +41,8 @@ zlim = 15
 ylims = [slb-bsh,npy+bsh]
 xlims = [slb-bsh,sub+bsh]
 zlims = [0,zlim]
-mscal = 20
-lwidth = 1.5
+mscal = 7
+lwidth = 0.5
 asty = "->"
 node_alpha = 0.2
 upsets = block.createUpPyramidSets((bsx,bsx,1),ops)
@@ -97,8 +97,8 @@ def create_arrow_axes(ax):
     b = Arrow3D([xlims[0], xlims[0]], [ylims[0], ylims[1]+3],[zlims[0], zlims[0]], mutation_scale=mscal, lw=lwidth, arrowstyle=asty, color=aclr)
     c = Arrow3D([xlims[0], xlims[1]+5], [ylims[0], ylims[0]],[zlims[0], zlims[0]], mutation_scale=mscal, lw=lwidth, arrowstyle=asty, color=aclr)
 
-    ax.text(xlims[1],ylims[0]-3,0,'X')
-    ax.text(xlims[0]-4,ylims[1],0,'Y')
+    ax.text(xlims[1],ylims[0]-3.2,2.5,'X')
+    ax.text(xlims[0]-4,ylims[1],1.75,'Y')
     ax.text(xlims[0]-3,ylims[0]+2,zlims[1],'t')
     ax.add_artist(a)
     ax.add_artist(b)
@@ -134,7 +134,7 @@ def plot_uppyramid(ax,start=0,edges=True,alp=1,L=USL+1):
             for j in range(ndy): #ndy
                 make_block(ax,(k*ops+i*bsx,k*ops+j*bsx,k+start),bsx-2*ops*k,bsx-2*ops*k,1,sc=color,edges=edges,alp=alp)
             color = 'dodgerblue' if color == 'orange' else 'orange'
-             
+
 
 def plot_ybridges(ax,start=0,edges=True,alp=1,L=YSL+1):
     # Create Y-Bridges
@@ -202,7 +202,21 @@ def plot_dwp(ax,start=0,edges=True,alp=1,L=USL+1):
                     make_block(ax,(bsh-k*ops+i*bsx,bsh-k*ops+j*bsx,nz+start),2*ops*k,2*ops*k,1,sc=color,alp=alp,edges=edges)
             color = 'dodgerblue' if color == 'orange' else 'orange'
 
-def staxf(ax,elev=40,azim=35):
+def getLegendLines():
+    fl1 = mpl.lines.Line2D([0],[0], linestyle="none", c='dodgerblue', marker = 'o',markersize=ms)
+    fl2 = mpl.lines.Line2D([0],[0], linestyle="none", c='orange', marker = 'o',markersize=ms)
+    fl3 = mpl.lines.Line2D([0],[0], linestyle="none", c='red', marker = 'o',markersize=ms,alpha=node_alpha)
+    fl4 = mpl.lines.Line2D([0],[0], linestyle="none", c='green', marker = 'o',markersize=ms,alpha=node_alpha)
+    return [fl1,fl2,fl3,fl4]
+
+def addLegend(ax,frame=None):
+    f = lambda tup: mplot3d.proj3d.proj_transform(tup[0],tup[1],tup[2], ax.get_proj())[:2]
+    legLines = getLegendLines()
+    frame = frame if frame is not None else ax
+    leg1 = frame.legend(legLines,[' GPU   ',' CPU    ','node 1','node 2'],markerscale=scale,ncol=lnc,loc=sloc, bbox_to_anchor=f(anch_box), #-40,0,-5
+          bbox_transform=ax.transData)
+
+def staxf(ax,elev=40,azim=35,addLeg=True):
     ax.set_zlim3d((zlims[0],zlims[1]+5))
     ax.set_ylim3d(ylims)
     ax.set_xlim3d(xlims)
@@ -214,51 +228,46 @@ def staxf(ax,elev=40,azim=35):
     ax.zaxis._axinfo['juggled'] = (2,2,2)
     make_node_surfaces(ax,['red','green'],(npx+bsx)/ndy)
     create_arrow_axes(ax)
-    f = lambda tup: mplot3d.proj3d.proj_transform(tup[0],tup[1],tup[2], ax.get_proj())[:2]
-    fl1 = mpl.lines.Line2D([0],[0], linestyle="none", c='dodgerblue', marker = 'o',markersize=ms)
-    fl2 = mpl.lines.Line2D([0],[0], linestyle="none", c='orange', marker = 'o',markersize=ms)
-    fl3 = mpl.lines.Line2D([0],[0], linestyle="none", c='red', marker = 'o',markersize=ms,alpha=node_alpha)
-    fl4 = mpl.lines.Line2D([0],[0], linestyle="none", c='green', marker = 'o',markersize=ms,alpha=node_alpha)
-    leg1 = ax.legend([fl1,fl2,fl3,fl4],[' GPU   ',' CPU    ','node 1','node 2'],markerscale=scale,ncol=lnc,loc="lower left", bbox_to_anchor=f(anch_box), #-40,0,-5
-          bbox_transform=ax.transData)
+    if addLeg:
+        addLegend(ax)
     return ax
 
-def Up1(ax,name='UpPyramid1.pdf'):
-    ax = staxf(ax,elev=gelev,azim=gazim)
+def Up1(ax,name='UpPyramid1.pdf',addLeg=True):
+    ax = staxf(ax,elev=gelev,azim=gazim,addLeg=addLeg)
     plot_uppyramid(ax,0)
     plt.savefig(name,bbox_inches='tight')
     return ax
-    
-def Y1(ax,name='YBridge1.pdf'):
-    ax = staxf(ax)
+
+def Y1(ax,name='YBridge1.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_uppyramid(ax,edges=False,alp=palp)
     plot_ybridges(ax)
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def Comm1(ax,name='Comm1.pdf'):
-    ax = staxf(ax)
+def Comm1(ax,name='Comm1.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm1(ax)
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def X1(ax,name='XBridge1.pdf'):
-    ax = staxf(ax)
+def X1(ax,name='XBridge1.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax)
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def Oct1(ax,name='Octahedron1.pdf'):
-    ax = staxf(ax)
+def Oct1(ax,name='Octahedron1.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax,edges=False,alp=palp)
     plot_octahedrons(ax)
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def Y2(ax,name='YBridge2.pdf'):
-    ax = staxf(ax)
+def Y2(ax,name='YBridge2.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm1(ax,edges=False,alp=palp)
     plot_xbridges(ax,edges=False,alp=palp)
     plot_octahedrons(ax,edges=False,alp=palp)
@@ -266,21 +275,21 @@ def Y2(ax,name='YBridge2.pdf'):
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def Comm2(ax,name='Comm2.pdf'):
-    ax = staxf(ax)
+def Comm2(ax,name='Comm2.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm2(ax)
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def X2(ax,name='XBridge2.pdf'):
-    ax = staxf(ax)
+def X2(ax,name='XBridge2.pdf',addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm2(ax,edges=False,alp=palp)
     plot_xbridges(ax,start=len(upsets))
     plt.savefig(name,bbox_inches='tight')
     return ax
 
-def DWP1(ax,name="DownPyramid1.pdf"):
-    ax = staxf(ax)
+def DWP1(ax,name="DownPyramid1.pdf",addLeg=True):
+    ax = staxf(ax,addLeg=addLeg)
     plot_comm2(ax,edges=False,alp=palp)
     plot_xbridges(ax,start=len(upsets),edges=False,alp=palp)
     plot_dwp(ax)
@@ -319,22 +328,26 @@ def createSubFigurePlots():
     name = "SubsPlot1.pdf"
     fcns1 = [Up1,Y1,Comm1,X1]
     for i,fcn in enumerate(fcns1):
-        fcn(axes[i],name=name)
-        axes[i].set_title("({})".format(letters[i]))
-
+        fcn(axes[i],name=name,addLeg=False)
+        # axes[i].set_title("({})".format(letters[i]))
+    global sloc, lnc, scale
+    lls = getLegendLines()
+    fig.legend(lls,[' GPU   ',' CPU    ','node 1','node 2'],ncol=4,loc='upper center')
+    plt.savefig(name,bbox_inches='tight')
     #Second subplot
     name2 = "SubsPlot2.pdf"
     fcns2 = [Oct1,X2,Y2,DWP1]
     for i,fcn in enumerate(fcns2):
         axes[i].clear()
-        fcn(axes[i],name=name2)    
+        fcn(axes[i],name=name2,addLeg=False)
+    plt.savefig(name,bbox_inches='tight')
 
 def createPresentationGif():
-    
+
     frames = 9*USL+2
     anim = animation.FuncAnimation(gfig,plotStep,frames)
     anim.save("SweptProcess.gif",writer="imagemagick",fps=3)
-    
+
 def plotStep(i):
     global gax
     gax.clear()
@@ -421,12 +434,11 @@ def numericalImpactImage():
     plt.savefig("NumericalImpact-3.pdf")
 
 if __name__ == "__main__":
-    switchColorScheme()
+    # switchColorScheme()
     # createAll()
-    
-    # createSubFigurePlots()
-    # createPresentationGif()
-    numericalImpactImage()
-    
 
-    
+    createSubFigurePlots()
+    # createPresentationGif()
+    # numericalImpactImage()
+
+

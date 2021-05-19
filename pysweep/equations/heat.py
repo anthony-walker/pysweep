@@ -1,5 +1,7 @@
 import numpy, h5py, os, sys
 import itertools
+import mpi4py
+mpi4py.rc.recv_mprobe = False
 import mpi4py.MPI as MPI
 try:
     import pycuda.driver as cuda

@@ -1,0 +1,8 @@
+spack:
+  specs: []
+  view: true
+  packages:
+    all:
+      compiler: [mpicc, gcc, clang, intel, pgi, xl, nag, fj]
+      providers:
+        mpi: [mpich, openmpi]

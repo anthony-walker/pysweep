@@ -86,7 +86,7 @@ def createOutputFile(solver):
     solver.clocktime = solver.hdf5.create_dataset("clocktime",(1,),data=0.0)
     solver.data = solver.hdf5.create_dataset("data",solver.arrayShape,dtype=solver.dtype)
     if solver.clusterMasterBool:
-        solver.data[0,:,:,:] = solver.initialConditions[:,:,:]
+        pass # solver.data[0,:,:,:] = solver.initialConditions[:,:,:]
     solver.comm.Barrier()
 
 def verbosePrint(solver,outString):
@@ -136,7 +136,7 @@ def sweptWrite(cwt,solver):
         # data after writing."""
     iv,ix,iy = solver.globalBlock #Unpack global tuple
     for i in range((solver.globalTimeStep+solver.subtraction)%solver.intermediate+solver.intermediate,solver.maxPyramidSize+solver.intermediate,solver.intermediate):
-        solver.data[cwt,iv,ix,iy] = solver.sharedArray[i,:,:,:]
+        # solver.data[cwt,iv,ix,iy] = solver.sharedArray[i,:,:,:]
         cwt+=1
     nte = solver.sharedShape[0]-solver.maxPyramidSize
     solver.sharedArray[:nte,:,:,:] = solver.sharedArray[solver.maxPyramidSize:,:,:,:]
@@ -190,7 +190,7 @@ def standardWrite(cwt,solver):
     if (solver.globalTimeStep)%solver.intermediate==0 and solver.nodeMasterBool:
         #Unpacking globalBlock
         iv,ix,iy = solver.globalBlock #Unpack global tuple
-        solver.data[cwt,iv,ix,iy] = solver.sharedArray[solver.intermediate-1,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
+        # solver.data[cwt,iv,ix,iy] = solver.sharedArray[solver.intermediate-1,:,solver.operating:-solver.operating,solver.operating:-solver.operating]
         cwt+=1
     solver.nodeComm.Barrier()
     #Update CPU shared data

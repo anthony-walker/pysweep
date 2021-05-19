@@ -1,6 +1,8 @@
 import pysweep,numpy,sys,h5py
 import pysweep.tests as tests
 import pysweep.utils.validate as validate
+import mpi4py
+mpi4py.rc.recv_mprobe = False
 import mpi4py.MPI as MPI
 
 #Matplotlib imports
