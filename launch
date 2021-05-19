@@ -1,0 +1,6 @@
+#!/bin/bash
+cd ./study/sierra/test
+echo "Changing to working directory: $(pwd)"
+export BATCH_TEST_PYSWEEP=pysweep-batch-test
+echo "Launching test: $BATCH_TEST_PYSWEEP"
+bsub<$BATCH_TEST_PYSWEEP

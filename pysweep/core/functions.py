@@ -91,7 +91,7 @@ def firstForward(solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:
         buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
-        buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
+        buffer = solver.clusterComm.Sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
         solver.clusterComm.Barrier() #Barrier to make sure all buffers are copied before writing
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
@@ -103,7 +103,7 @@ def sendForward(cwt,solver):
     if solver.nodeMasterBool:
         cwt = io.sweptWrite(cwt,solver)
         buff = numpy.copy(solver.sharedArray[:,:,-solver.splitx:,:])
-        buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
+        buffer = solver.clusterComm.Sendrecv(sendobj=buff,dest=solver.neighbors[1],source=solver.neighbors[0])
         solver.clusterComm.Barrier() #Barrier to make sure all buffers are copied before writing
         solver.sharedArray[:,:,solver.splitx:,:] = solver.sharedArray[:,:,:-solver.splitx,:] #Shift solver.sharedArray data forward by solver.splitx
         solver.sharedArray[:,:,:solver.splitx,:] = buffer[:,:,:,:]
@@ -114,7 +114,7 @@ def sendBackward(cwt,solver):
     """Use this function to communicate data between nodes"""
     if solver.nodeMasterBool:
         buff = numpy.copy(solver.sharedArray[:,:,:solver.splitx,:])
-        buffer = solver.clusterComm.sendrecv(sendobj=buff,dest=solver.neighbors[0],source=solver.neighbors[1])
+        buffer = solver.clusterComm.Sendrecv(sendobj=buff,dest=solver.neighbors[0],source=solver.neighbors[1])
         solver.clusterComm.Barrier() #Barrier to make sure all buffers are copied before writing
         solver.sharedArray[:,:,:-solver.splitx,:] = solver.sharedArray[:,:,solver.splitx:,:] #Shift solver.sharedArray backward data by solver.splitx
         solver.sharedArray[:,:,-solver.splitx:,:] = buffer[:,:,:,:]
@@ -153,8 +153,8 @@ def sendEdges(solver):
         solver.sharedArray[:,:,ops:-ops,-ops:] = solver.sharedArray[:,:,ops:-ops,ops:2*ops]
         bufffor = numpy.copy(solver.sharedArray[:,:,-2*ops:-ops,:])
         buffback = numpy.copy(solver.sharedArray[:,:,ops:2*ops,:])
-        bufferf = solver.clusterComm.sendrecv(sendobj=bufffor,dest=solver.neighbors[1],source=solver.neighbors[0])
-        bufferb = solver.clusterComm.sendrecv(sendobj=buffback,dest=solver.neighbors[0],source=solver.neighbors[1])
+        bufferf = solver.clusterComm.Sendrecv(sendobj=bufffor,dest=solver.neighbors[1],source=solver.neighbors[0])
+        bufferb = solver.clusterComm.Sendrecv(sendobj=buffback,dest=solver.neighbors[0],source=solver.neighbors[1])
         solver.clusterComm.Barrier()
         solver.sharedArray[:,:,:ops,:] = bufferf[:,:,:,:]
         solver.sharedArray[:,:,-ops:,:] = bufferb[:,:,:,:]

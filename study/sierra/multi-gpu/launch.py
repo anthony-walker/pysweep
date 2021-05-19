@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import math
+import math, os
 batch = """#!/bin/tcsh
     ### myBatchSubmit
     ### LSF syntax
