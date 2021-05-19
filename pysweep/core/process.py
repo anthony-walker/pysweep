@@ -44,8 +44,9 @@ def getGPUInfo(solver):
     ranksPerNode = os.getenv('RANKS_PER_NODE') #make an environment variable available
     ranksPerNode = solver.nodeComm.Get_size() if ranksPerNode is None else int(ranksPerNode) #number of ranks for each node
     if solver.share>0:  
-        gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
-        numberOfGPUs = len(gpuRank)
+        #gpuRank = GPUtil.getAvailable(order = 'load',maxLoad=1,maxMemory=1,excludeID=solver.exid,limit=ranksPerNode) #getting devices by load
+        gpuRank = [i for i in range(numberOfGPUs)]
+        numberOfGPUs = os.getenv('GPUS_PER_NODE')
     else:
         gpuRank = []
         numberOfGPUs = 0

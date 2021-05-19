@@ -15,14 +15,18 @@ batch = """#!/bin/tcsh
     hostname
     echo -n 'JobID is '; echo $LSB_JOBID
     
+    #Set env
     conda activate pysweep-dev
     
+    #Set num gpus
+    export GPUS_PER_NODE=1
+
     ### Launch parallel executable
     echo 'Launching executable...'
     echo 'Time at computation start:'
     date
     echo ' '
-    jsrun -n{:d} -r1 -a40 -c40 -g1pysweep -f euler -nx {:d} -nt 2000 -b 16 -s 1 --swept --verbose --ignore --clean
+    jsrun -n{:d} -r1 -a40 -c40 -g1 pysweep -f euler -nx {:d} -nt 2000 -b 16 -s 1 --swept --verbose --ignore --clean
 
     jsrun -n{:d} -r1 -a40 -c40 -g1 pysweep -f euler -nx {:d} -nt 2000 -b 16 -s 1 --verbose --ignore --clean
 

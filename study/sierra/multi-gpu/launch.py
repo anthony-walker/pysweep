@@ -15,8 +15,12 @@ batch = """#!/bin/tcsh
     hostname
     echo -n 'JobID is '; echo $LSB_JOBID
     
+    #Set env
     conda activate pysweep-dev
     
+    #Set num gpus
+    export GPUS_PER_NODE=4
+
     ### Launch parallel executable
     echo 'Launching executable...'
     echo 'Time at computation start:'
