@@ -25,7 +25,13 @@
 # run my jobs
 
 #run me with sbatch --nodes=N scalability.sh
-SCALE_NPROC=$(($PYSWEEP_NODES*16))
+SHARE=0.9
+if [ $SHARE -eq 1 ]; then 
+    SCALE_NPROC=$PYSWEEP_NODES
+else
+    SCALE_NPROC=$(($PYSWEEP_NODES*16))
+fi
+
 if [ $PYSWEEP_NODES -eq 1 ]; then 
     SCALE_ARR=1424
 elif [ $PYSWEEP_NODES -eq 2 ]; then
@@ -41,9 +47,7 @@ elif [ $PYSWEEP_NODES -eq 6 ]; then
 else
     SCALE_ARR=3742
 fi
-
-echo $SLURM_JOB_ID $PYSWEEP_NODES $SCALE_NPROC $SCALE_ARR $PYSWEEP_EQN
-SHARE=0.9
+echo "$SLURM_JOB_ID : Executing $PYSWEEP_EQN scalability on $PYSWEEP_NODES test with share $SHARE, array size $SCALE_ARR and $SCALE_NPROC processes"
 mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 5000 -b 16 -s $SHARE --swept --verbose --ignore --clean
 
 mpiexec -n $SCALE_NPROC --hostfile ./hosts/$PYSWEEP_FILE  pysweep -f $PYSWEEP_EQN -nx $SCALE_ARR -nt 5000 -b 16 -s $SHARE --verbose --ignore --clean
