@@ -1,3 +1,4 @@
+#!python
 import numpy, yaml, itertools, h5py, math
 import pysweep.utils.validate as validate
 import pysweep.tests as tests
@@ -96,7 +97,7 @@ def validateClusterEuler():
             ax.yaxis.labelpad=-1
             ax.set_title('N:$t={:0.2f}$ [s]'.format(times[i]*dt))
             validate.eulerContourAx(ax,data[times[i],0],1,1)
-            ax.grid('on',color="k")
+            # ax.grid('on',color="k")
         #Analytical
         npx = numpy.shape(data)[2]
         for i,ax in enumerate(axes[:3]):
@@ -107,7 +108,7 @@ def validateClusterEuler():
             adata = numpy.zeros((1,4,npx,npx))
             adata[0,:,:,:] = pysweep.equations.euler.getAnalyticalArray(npx,npx,t=(times[i])*dt)
             validate.eulerContourAx(ax,adata[0,0],1,1)
-            ax.grid('on',color="k")
+            # ax.grid('on',color="k")
     plt.savefig("./plots/eulerValidate.pdf",bbox_inches='tight')
     plt.close('all')
 
@@ -194,6 +195,8 @@ def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,p
         axes[i].tricontour(rBlocks[lb:ub],rShares[lb:ub]*100,data[lb:ub],
                  colors=('k',),linestyles=('-',),linewidths=(0.25,),vmin=cbounds[0],vmax=cbounds[-1])
         axes[i].tricontourf(rBlocks[lb:ub],rShares[lb:ub]*100,data[lb:ub],cmap=cmap,vmin=cbounds[0],vmax=cbounds[-1])
+        axes[i].plot([8,32],[100,0],color='k',linestyle='--',linewidth=0.5)
+        axes[i].plot([8,32],[0,100],color='k',linestyle='--',linewidth=0.5)
         #Marking best and worst
         axes[i].plot(rBlocks[lb:ub][xb],rShares[lb:ub][xb]*100,linestyle=None,marker='o',markerfacecolor=mbc[0],markeredgecolor=mbc[1],markersize=6)
         axes[i].plot(rBlocks[lb:ub][xw],rShares[lb:ub][xw]*100,linestyle=None,marker='o',markerfacecolor=mbc[1],markeredgecolor=mbc[0],markersize=6)
@@ -204,11 +207,12 @@ def makeArrayContours(data,rBlocks,rShares,cbounds,cmap,cbt,fname,switch=False,p
         axes[i].set_title('Array Size: ${}$'.format(standardSizes[i+1]))
         axes[i].set_ylabel('Share [%]')
         axes[i].set_xlabel('Block Size')
-        axes[i].grid(color='k', linewidth=1)
+        axes[i].grid(color='k', linewidth=0.5,linestyle='--')
         axes[i].set_xticks([8,16,24,32])
         axes[i].set_yticks([0,25,50,75,100])
         axes[i].yaxis.labelpad = 0.5
         axes[i].xaxis.labelpad = 0.5
+    
     plt.savefig(fname,bbox_inches='tight')
     plt.close('all')
 
@@ -226,6 +230,37 @@ def getDataLimits(data,npts=10):
     lowerLimit = math.floor(lowerLimit*10)/10
     return numpy.linspace(lowerLimit,upperLimit,npts)
 
+def tptAnalysis(testdata):
+    s = len(standardSizes)
+    data = numpy.zeros((s*len(blockSizes),))
+    ct = 0
+    for i in range(len(testdata[:,1])):
+        if (testdata[i,3]==1):
+            data[ct] = testdata[i,5]
+            ct += 1
+            # input()
+    
+    maxvals = []
+    for k,i in enumerate(range(0,len(data),s)):
+        cdata = data[i:i+s]
+        avg = numpy.mean(cdata)
+        cmax = numpy.amax(cdata)
+        maxvals.append(cmax)
+        print("{:0.0f}: max: {:0.3f}, avg: {:0.3f}".format(standardSizes[k],cmax,avg))
+    return maxvals
+
+def makeMaxFigs(swept,stand,eqn,appd):
+    swept = tptAnalysis(swept)
+    stand = tptAnalysis(stand)
+    fig, ax = plt.subplots(ncols=1,nrows=1)
+    ax.set_ylabel("Time per Timestep [s]")
+    ax.set_xlabel("Spatial Points")
+    # ax.axis([10**6,10**7, 10, 30])
+    l1 = ax.plot(standardSizes[1:],swept,marker="o",color='#d95f02')
+    l2 = ax.plot(standardSizes[1:],stand,marker="s",color="#7570b3",linestyle="--")
+    leg = ax.legend(["Swept","Standard"])
+    plt.savefig("./plots/max{:s}{:s}.pdf".format(appd,eqn),bbox_inches='tight')
+    plt.close('all')
 
 def getStudyContour(equation):
     #Get data
@@ -245,6 +280,8 @@ def getStudyContour(equation):
 
     #Time per timestep contours
     timePerStepLimits = getDataLimits([oldsweptdata[:,5],newsweptdata[:,5],oldstandarddata[:,5],newstandarddata[:,5]])
+
+    
     makeArrayContours(oldsweptdata[:,5],oldsweptdata[:,2],oldsweptdata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepSwept{}.pdf".format(equation+"Old"))
     makeArrayContours(newsweptdata[:,5],newsweptdata[:,2],newsweptdata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepSwept{}.pdf".format(equation+"New"))
     makeArrayContours(oldstandarddata[:,5],oldstandarddata[:,2],oldstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"Old"))
@@ -254,9 +291,12 @@ def getStudyContour(equation):
     new_tpt_speedup = newstandarddata[:,5]/newsweptdata[:,5]
     old_tpt_speedup = oldstandarddata[:,5]/oldsweptdata[:,5]
     tptSpeedLimits = getDataLimits([new_tpt_speedup,old_tpt_speedup])
-    makeArrayContours(new_tpt_speedup,newsweptdata[:,2],newsweptdata[:,3],tptSpeedLimits,cm.inferno,'Speedup',"./plots/SpeedupTPT{}.pdf".format(equation+"New"))
-    makeArrayContours(old_tpt_speedup,oldsweptdata[:,2],oldsweptdata[:,3],tptSpeedLimits,cm.inferno,'Speedup',"./plots/SpeedupTPT{}.pdf".format(equation+"Old"))
-    
+    makeArrayContours(new_tpt_speedup,newsweptdata[:,2],newsweptdata[:,3],tptSpeedLimits,cm.inferno,'Speedup',"./plots/SpeedupTPT{}.pdf".format(equation+"New"),switch=True,record=True)
+    makeArrayContours(old_tpt_speedup,oldsweptdata[:,2],oldsweptdata[:,3],tptSpeedLimits,cm.inferno,'Speedup',"./plots/SpeedupTPT{}.pdf".format(equation+"Old"),switch=True,record=True)
+
+    makeMaxFigs(oldsweptdata,oldstandarddata,equation,'Old')
+    makeMaxFigs(newsweptdata,newstandarddata,equation,'New')
+
     # makeArrayContours(oldstandarddata[:,5],oldstandarddata[:,2],oldstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"Old"))
     # makeArrayContours(newstandarddata[:,5],newstandarddata[:,2],newstandarddata[:,3],timePerStepLimits,cm.inferno_r,'Time/Step [s]',"./plots/timePerStepStandard{}.pdf".format(equation+"New"))
     
@@ -534,22 +574,50 @@ def PresentationEuler():
     if rank == 0:
         os.system("eulerConditions.hdf5 testingVortex.hdf5")
 
+def quickBandwidthCheck():
+    testsize = 32
+    findsize = True
+    while (findsize):
+        for i in blockSizes:
+            if (not testsize%i==0):
+                findsize=True
+                testsize+=32
+                break
+            else:
+                findsize=False
+    ops=2
+    K = []
+    sums = []
+    for i in blockSizes:
+        csum = i/2
+        k = int(i/(2*2)-1)
+        for j in range(1,k,1):
+            csum+=(i-2*j*ops)/2
+        csum *= testsize/i
+        K.append(k)
+        sums.append(csum) 
+    nsteps = numpy.product(K)
+    for i,k in enumerate(K):    
+        sums[i]*=nsteps/k
+        print("A block size of {:0.0f} with send {:0.0f} points in one step.".format(blockSizes[i],sums[i]))
+    print(nsteps,testsize)
 if __name__ == "__main__":
-    #Find number of points there should be
-    calcNumberOfPts()
+    quickBandwidthCheck()
+    # #Find number of points there should be
+    # calcNumberOfPts()
 
-    #Presentation bool
-    pres = False
-    #Switch colors to match presentation
-    if pres:
-        switchColorScheme()
+    # #Presentation bool
+    # pres = False
+    # #Switch colors to match presentation
+    # if pres:
+    #     switchColorScheme()
 
-    # Produce contour plots
-    sweptEuler = getStudyContour('heat')
-    sweptEuler = getStudyContour('euler')
+    # # Produce contour plots
+    # sweptEuler = getStudyContour('heat')
+    # sweptEuler = getStudyContour('euler')
 
-    # Scalability
-    ScalabilityPlots()
+    # # Scalability
+    # ScalabilityPlots()
 
     # # validateClusterEuler()
 
