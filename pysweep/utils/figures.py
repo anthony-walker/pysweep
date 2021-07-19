@@ -319,27 +319,17 @@ def createAll():
     DWP1(ax)
     ax.clear()
 
-
-def createSubFigurePlots():
+def createSubFigurePlots(name, fcns):
     fig = plt.figure()
     axes = [fig.add_subplot(2,2,i,projection='3d',elev=gelev,azim=gazim) for i in range(1,5,1)]
     letters = ["a","b","c","d"]
     #First subplot
-    name = "SubsPlot1.pdf"
-    fcns1 = [Up1,Y1,Comm1,X1]
-    for i,fcn in enumerate(fcns1):
+    for i,fcn in enumerate(fcns):
         fcn(axes[i],name=name,addLeg=False)
         # axes[i].set_title("({})".format(letters[i]))
     global sloc, lnc, scale
     lls = getLegendLines()
     fig.legend(lls,[' GPU   ',' CPU    ','node 1','node 2'],ncol=4,loc='upper center')
-    plt.savefig(name,bbox_inches='tight')
-    #Second subplot
-    name2 = "SubsPlot2.pdf"
-    fcns2 = [Oct1,X2,Y2,DWP1]
-    for i,fcn in enumerate(fcns2):
-        axes[i].clear()
-        fcn(axes[i],name=name2,addLeg=False)
     plt.savefig(name,bbox_inches='tight')
 
 def createPresentationGif():
@@ -433,11 +423,18 @@ def numericalImpactImage():
     ax.view_init(90, 90)
     plt.savefig("NumericalImpact-3.pdf")
 
+def createAllSubs():
+    name1 = "SubsPlot1.pdf"
+    fcns1 = [Up1,Y1,Comm1,X1]
+    createSubFigurePlots(name1,fcns1)
+    name2 = "SubsPlot2.pdf"
+    fcns2 = [Oct1,X2,Y2,DWP1]
+    createSubFigurePlots(name2,fcns2)
+
 if __name__ == "__main__":
     # switchColorScheme()
     # createAll()
-
-    createSubFigurePlots()
+    createAllSubs()
     # createPresentationGif()
     # numericalImpactImage()
 
